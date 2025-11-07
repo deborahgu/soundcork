@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    base_url: str = ''
     device_id: str = ''
     device_serial_number: str = ''
     product_serial_number: str = ''
