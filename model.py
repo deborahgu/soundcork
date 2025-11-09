@@ -59,3 +59,55 @@ class Service:
     streamTypes: List
     id: Id
     authenticationModel: dict
+
+
+class Stream:
+    def __init__(self, _links, bufferingTimeout, connectingTimeout, hasPlaylist, isRealtime, streamUrl):
+        super()
+        self._links = _links
+        self.bufferingTimeout = bufferingTimeout
+        self.connectingTimeout = connectingTimeout
+        self.hasPlaylist = hasPlaylist
+        self.isRealtime = isRealtime
+        self.streamUrl = streamUrl
+
+    _links: dict
+    bufferingTimeout: int
+    connectingTimeout: int
+    hasPlaylist: bool
+    isRealtime: bool
+    streamUrl: str
+
+
+class Audio(BaseModel):
+    def __init__(self, hasPlaylist, isRealtime, maxTimeout, streamUrl, streams):
+        super()
+        self.hasPlaylist = hasPlaylist
+        self.isRealtime = isRealtime
+        self.maxTimeout = maxTimeout
+        self.streamUrl = streamUrl
+        self.streams = streams
+
+    hasPlaylist: bool
+    isRealtime: bool
+    maxTimeout: int
+    streamUrl: str
+    streams: List
+
+
+class BmxPlaybackResponse(BaseModel):
+    def __init__(self, _links, audio, imageUrl, isFavorite, name, streamType):
+        super()
+        self._links = _links
+        self.audio = audio
+        self.imageUrl = imageUrl
+        self.isFavorite = isFavorite
+        self.name = name
+        self.streamType = streamType
+
+    _links: dict
+    audio: Audio
+    imageUrl: str
+    isFavorite: bool
+    name: str
+    streamType: str

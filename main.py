@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI
 
 from config import Settings
-from model import BmxResponse, Service, Asset, Id, IconSet
+from model import BmxResponse, Service, Asset, Id, IconSet, BmxPlaybackResponse, Audio, Stream
 
 description = """
 This emulates the SoundTouch servers so you don't need connectivity
@@ -111,3 +111,18 @@ def bmx_services(settings: Annotated[Settings, Depends(get_settings)]) -> BmxRes
     response.bmx_services = [tunein]
 
     return response
+
+@app.get("/bmx/{service}/v1/playback/station/{station}", tags=["bmx"])
+def bmx_services(settings: Annotated[Settings, Depends(get_settings)], service: str, station: str) -> BmxPlaybackResponse:
+    if (service == 'tunein'):
+        stream = Stream({ 'bmx_reporting': { "href": '/v1/report?stream_id=e92888046&guide_id=s24062&listen_id=1761921446&stream_type=liveRadio'}},
+                        20, 10, True, True, 'https://nebcoradio.com:8443/WXRV')
+        audio = Audio(True, True, 60, 'https://nebcoradio.com:8443/WXRV', [])
+
+        resp = BmxPlaybackResponse({'bmx_favorite': {'href': '/v1/favorite/s24062'},'bmx_nowplaying': {
+            'href': '/v1/now-playing/station/s24062','useInternalClient': 'ALWAYS'},'bmx_reporting': {
+            'href': '/v1/report?stream_id=e92888046&guide_id=s24062&listen_id=1761921446&stream_type=liveRadio'}},
+            audio, 'http://cdn-profiles.tunein.com/s24062/images/logog.png?t=636602555323000000', False,
+            'WXRV/92.5 the River', 'liveRadio')
+        return resp
+
