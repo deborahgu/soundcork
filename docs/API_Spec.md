@@ -23,7 +23,9 @@ these headers,  so they are not documented here.
 
 The BMX endpoints appear to be for streaming radio stations.
 
-In various places in these docs, instead of writing "`[placeholder for real station]`" or the like, I am using the specific placeholder of the radio station `WKRP in Cincinnati`. This will vary by station.
+In various places in these docs, instead of writing "`[placeholder for real
+station]`" or the like, I am using the specific placeholder of the radio station
+`WKRP in Cincinnati`. This will vary by station.
 
 #### GET /bmx/registry/v1/services
 
