@@ -39,8 +39,8 @@ not enough information there to know what the actual requirements are or the
 problem statement is, just ask.
 
 You do not need to ask for permission to work on any of these issues.
-Just fix the issue yourself, [try to add a unit test](#running-tests) and
-[open a pull request](#submitting-changes).
+Just fix the issue yourself, try to add a unit test and
+open a pull request.
 
 ### Submitting changes
 
