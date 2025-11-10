@@ -4,7 +4,16 @@ from typing import Annotated
 from fastapi import Depends, FastAPI
 
 from config import Settings
-from model import BmxResponse, Service, Asset, Id, IconSet
+from model import (
+    BmxResponse,
+    Service,
+    Asset,
+    Id,
+    IconSet,
+    BmxPlaybackResponse,
+    Audio,
+    Stream,
+)
 
 description = """
 This emulates the SoundTouch servers so you don't need connectivity
@@ -73,19 +82,10 @@ def power_on(settings: Annotated[Settings, Depends(get_settings)]):
 
 @app.get("/bmx/registry/v1/services", tags=["bmx"])
 def bmx_services(settings: Annotated[Settings, Depends(get_settings)]) -> BmxResponse:
-    response = BmxResponse() # type: ignore
-    response._links = {"bmx_services_availability": {"href": "../servicesAvailability"}}
     # not sure what this number means; could be a timestamp or something similar?
-    response.askAgainAfter = 1277728
     # this probably should be read from a config file or from some other kind of storage
-    tunein = Service()
-    tunein._links = {
-        "bmx_navigate": {"href": "/v1/navigate"},
-        "bmx_token": {"href": "/v1/token"},
-        "self": {"href": "/"},
-    }
-    tunein.askAdapter = False
-    tunein.assets = Asset(
+
+    assets = Asset(
         color="#000000",
         description="With TuneIn on SoundTouch, listen to more than 100,000 stations and the hottest podcasts, "
         "plus live games, concerts and shows from around the world. However, you cannot access your "
@@ -101,13 +101,61 @@ def bmx_services(settings: Annotated[Settings, Depends(get_settings)]) -> BmxRes
         name="TuneIn",
         shortDescription="",
     )
-    tunein.baseUrl = settings.base_url + "/bmx/tunein"
-    tunein.streamTypes = ["liveRadio", "onDemand"]
-    tunein.id = Id(name="TUNEIN", value=25)
-    tunein.authenticationModel = {
-        "anonymousAccount": {"autoCreate": True, "enabled": True}
-    }
-
-    response.bmx_services = [tunein]
+    tunein = Service(links = {
+        "bmx_navigate": {"href": "/v1/navigate"},
+        "bmx_token": {"href": "/v1/token"},
+        "self": {"href": "/"},
+        }, askAdapter = False, baseUrl = settings.base_url + "/bmx/tunein", streamTypes = ["liveRadio", "onDemand"],
+        id = Id(name="TUNEIN", value=25),
+        authenticationModel = {
+            "anonymousAccount": {"autoCreate": True, "enabled": True}
+        }, assets = assets)
+    links = {"bmx_services_availability": {"href": "../servicesAvailability"}}
+    response = BmxResponse(links = links, askAgainAfter = 1277728, bmx_services = [tunein])
 
     return response
+
+
+@app.get("/bmx/{service}/v1/playback/station/{station}", tags=["bmx"])
+def bmx_services(
+    settings: Annotated[Settings, Depends(get_settings)], service: str, station: str
+) -> BmxPlaybackResponse:
+    if service == "tunein":
+        stream = Stream(
+            links={
+                "bmx_reporting": {
+                    "href": "/v1/report?stream_id=e92888046&guide_id=s24062&listen_id=1761921446&stream_type=liveRadio"
+                }
+            },
+            bufferingTimeout=20,
+            connectingTimeout=10,
+            hasPlaylist=True,
+            isRealtime=True,
+            streamUrl="https://nebcoradio.com:8443/WXRV",
+        )
+        audio = Audio(
+            hasPlaylist=True,
+            isRealtime=True,
+            maxTimeout=60,
+            streamUrl="https://nebcoradio.com:8443/WXRV",
+            streams=[stream],
+        )
+
+        resp = BmxPlaybackResponse(
+            links={
+                "bmx_favorite": {"href": "/v1/favorite/s24062"},
+                "bmx_nowplaying": {
+                    "href": "/v1/now-playing/station/s24062",
+                    "useInternalClient": "ALWAYS",
+                },
+                "bmx_reporting": {
+                    "href": "/v1/report?stream_id=e92888046&guide_id=s24062&listen_id=1761921446&stream_type=liveRadio"
+                },
+            },
+            audio=audio,
+            imageUrl="http://cdn-profiles.tunein.com/s24062/images/logog.png?t=636602555323000000",
+            isFavorite=False,
+            name="WXRV/92.5 the River",
+            streamType="liveRadio",
+        )
+        return resp
