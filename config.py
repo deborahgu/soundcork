@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     network_connection_type: str = ""
     product_code: str = ""
     type: str = ""
+    data_dir: str
     model_config = SettingsConfigDict(
         # `.env.private` takes priority over `.env.shared`
         env_file=(".env.shared", ".env.private")

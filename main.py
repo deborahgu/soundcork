@@ -1,3 +1,4 @@
+import xml.etree.ElementTree as ET
 from functools import lru_cache
 from http import HTTPStatus
 from typing import Annotated
@@ -5,7 +6,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Response
 
 from config import Settings
-from marge import source_providers
+from marge import presets_xml, source_providers
 from model import (
     Asset,
     Audio,
@@ -100,6 +101,17 @@ def streaming_sourceproviders(settings: Annotated[Settings, Depends(get_settings
     return response
 
 
+@app.get("/marge/streaming/account/{account}/device/{device}/presets", tags=["marge"])
+def account_presets(
+    settings: Annotated[Settings, Depends(get_settings)], account: str, device: str
+):
+    xml = presets_xml(settings, account, device)
+    return_xml = ET.tostring(xml, "UTF-8", xml_declaration=True)
+    response = Response(content=return_xml, media_type="application/xml")
+    response.headers["content-type"] = "application/vnd.bose.streaming-v1.2+xml"
+    return response
+
+
 @app.get("/bmx/registry/v1/services", tags=["bmx"])
 def bmx_services(settings: Annotated[Settings, Depends(get_settings)]) -> BmxResponse:
     # not sure what this number means; could be a timestamp or something similar?
@@ -141,7 +153,7 @@ def bmx_services(settings: Annotated[Settings, Depends(get_settings)]) -> BmxRes
 
 
 @app.get("/bmx/{service}/v1/playback/station/{station}", tags=["bmx"])
-def bmx_services(
+def bmx_playback(
     settings: Annotated[Settings, Depends(get_settings)], service: str, station: str
 ) -> BmxPlaybackResponse:
     if service == "tunein":

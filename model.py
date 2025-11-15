@@ -73,3 +73,22 @@ class SourceProvider(BaseModel):
     created_on: str
     name: str
     updated_on: str
+
+
+class Preset(BaseModel):
+    id: str
+    name: str
+    source: str
+    type: str
+    location: str
+    source_account: str
+    is_presetable: str
+    container_art: str
+
+
+class ConfiguredSource(BaseModel):
+    display_name: str
+    secret: str
+    secret_type: str
+    source_key_type: str
+    source_key_account: str
