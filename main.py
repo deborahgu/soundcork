@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Response
 
+from bmx import tunein_playback
 from config import Settings
 from marge import presets_xml, source_providers
 from model import (
@@ -154,46 +155,7 @@ def bmx_services(settings: Annotated[Settings, Depends(get_settings)]) -> BmxRes
     return response
 
 
-@app.get("/bmx/{service}/v1/playback/station/{station}", tags=["bmx"])
-def bmx_playback(
-    settings: Annotated[Settings, Depends(get_settings)], service: str, station: str
-) -> BmxPlaybackResponse:
+@app.get("/bmx/{service}/v1/playback/station/{station_id}", tags=["bmx"])
+def bmx_playback(service: str, station_id: str) -> BmxPlaybackResponse:
     if service == "tunein":
-        stream = Stream(
-            links={
-                "bmx_reporting": {
-                    "href": "/v1/report?stream_id=e92888046&guide_id=s24062&listen_id=1761921446&stream_type=liveRadio"
-                }
-            },
-            bufferingTimeout=20,
-            connectingTimeout=10,
-            hasPlaylist=True,
-            isRealtime=True,
-            streamUrl="https://nebcoradio.com:8443/WXRV",
-        )
-        audio = Audio(
-            hasPlaylist=True,
-            isRealtime=True,
-            maxTimeout=60,
-            streamUrl="https://nebcoradio.com:8443/WXRV",
-            streams=[stream],
-        )
-
-        resp = BmxPlaybackResponse(
-            links={
-                "bmx_favorite": {"href": "/v1/favorite/s24062"},
-                "bmx_nowplaying": {
-                    "href": "/v1/now-playing/station/s24062",
-                    "useInternalClient": "ALWAYS",
-                },
-                "bmx_reporting": {
-                    "href": "/v1/report?stream_id=e92888046&guide_id=s24062&listen_id=1761921446&stream_type=liveRadio"
-                },
-            },
-            audio=audio,
-            imageUrl="http://cdn-profiles.tunein.com/s24062/images/logog.png?t=636602555323000000",
-            isFavorite=False,
-            name="WXRV/92.5 the River",
-            streamType="liveRadio",
-        )
-        return resp
+        return tunein_playback(station_id)
