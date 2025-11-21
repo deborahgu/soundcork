@@ -20,7 +20,69 @@ these headers,  so they are not documented here.
 
 The Marge endpoints seem to be for account/device information.
 
+On bose, these go to `https://streaming.bose.com/`
+
+#### GET /marge
+
+Callers:
+
+- Called at power on, and returns a 404
+
+
+#### POST /marge/streaming/account/{account_id}/device/{device_id}/recent
+
+Callers:
+
+- Called at switching to a station
+
+Payload:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<recent>
+  <!-- see definition of source for defintion of these fields -->
+  <lastplayedat>2025-11-14T02:04:54+00:00</lastplayedat>
+  <sourceid>{source_id}</sourceid>
+  <name>{station name}</name>
+  <location>{location}</location>
+  <contentItemType>{as appropriate}</contentItemType>
+</recent>
+```
+
+Response:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<recent id="2239532516">
+  <contentItemType>stationurl</contentItemType>
+  <createdOn>2018-10-19T18:45:44.000+00:00</createdOn>
+  <lastplayedat>2025-11-14T02:04:54.000+00:00</lastplayedat>
+  <!-- see definition of source for defintion of these fields -->
+  <location>{location}</location>
+  <name>{station name}</name>
+  <source id="{source_id}" type="Audio">
+    <createdOn>2017-07-19T14:48:47.000+00:00</createdOn>
+    <credential type="token">{credential}</credential>
+    <name></name>
+    <sourceproviderid>{source_provider_id}</sourceproviderid>
+    <sourcename></sourcename>
+    <sourceSettings/>
+    <updatedOn>2017-07-19T14:48:47.000+00:00</updatedOn>
+    <username></username>
+  </source>
+  <sourceid>{source_id}</sourceid>
+  <updatedOn>2025-11-14T02:04:57.695+00:00</updatedOn>
+</recent>
+```
+
+
 #### GET /marge/streaming/sourceproviders
+
+Callers:
+
+- Called at power on
+
+Comments:
 
 Returns the configured source providers (TUNEIN, PANDORA, etc)
 
@@ -38,6 +100,12 @@ Response:
 ```
 
 #### POST /marge/streaming/support/power_on
+
+Callers:
+
+- Called at power on
+
+Comments:
 
 This sends a payload with a lot basic device info, but it returns a 404.
 Maybe it once worked, but it does seem fine with a 404.
@@ -76,7 +144,15 @@ The info it sends:
 
 #### GET /marge/streaming/account/{account_id}/full
 
-returns:
+Callers:
+
+- Called at power on
+
+Comments:
+
+- most of these are nested responses you can get from other calls, so should be easier than it looks to build this (and if we keep this spec doc, should be easy to clean up).
+
+Returns:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -230,17 +306,76 @@ returns:
 ```
 
 
+#### GET /marge/streaming/account/{account_id}/provider_settings
+
+Callers:
+
+- Called at power on
+
+Comments:
+
+- most of these are nested responses you can get from other calls, so should be easier than it looks to build this (and if we keep this spec doc, should be easy to clean up).
+
+Returns:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<providerSettings>
+  <providerSetting>
+    <boseId>{account_id}</boseId>
+    <keyName>ELIGIBLE_FOR_TRIAL</keyName>
+    <value>true</value>
+    <providerId>14</providerId>
+  </providerSetting>
+</providerSettings>
+```
+
+#### GET /marge/streaming/software/update/account/{account_id}
+
+Callers:
+
+- Called at power on
+
+Comments:
+
+On first post-power on call, returns nothing. Later in same sequence, goes again and has a response.
+
+Response:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<software_update>
+  <softwareUpdateLocation></softwareUpdateLocation>
+</software_update>
+```
+
 ### Bmx
 
-The BMX endpoints appear to be for streaming radio stations.
+The BMX endpoints appear to be for streaming radio stations, possibly only for TuneIn.
+
+On bose, these go to `https://content.api.bose.io/bmx/`
 
 In various places in these docs, instead of writing "`[placeholder for real
 station]`" or the like, I am using the specific placeholder of the radio station
 `WKRP in Cincinnati`. This will vary by station.
 
+#### GET /bmx
+
+Possibly this is a fake call, need to verify.
+
+Callers:
+
+- Called at power on, and returns 
+```json
+{"fault":{"faultstring":"Unable to identify proxy for host: content and url: \/bmx\/","detail":{"errorcode":"messaging.adaptors.http.flow.ApplicationNotFound"}}}
+```
+
 #### GET /bmx/registry/v1/services
 
-Response:
+
+Callers:
+
+- Called at power on
 
 Comments:
 -  We don't yet know what `askAgainAfter` indicates, or if it matters.  It possible that it's  milliseconds (the numbers do work out to be about 20 minutes in milliseconds, plus or minus a certain amount of randomized jitter)
@@ -302,6 +437,10 @@ Comments:
 ```
 #### GET /bmx/{name of service}/v1/playback/station/{station ID}
 
+Callers:
+
+- Called at switching to a station
+
 Response:
 
 ```json
@@ -351,6 +490,12 @@ These might be specific to TuneIn, or they might be valid for any service, not s
 
 ##### POST /bmx/tunein/v1/token
 
+Callers:
+
+- Called at switching to a station
+
+Comments:
+
 Request payload:
 
 ```json
@@ -368,6 +513,15 @@ Response:
 ```
 
 #####  POST /bmx/tunein/v1/report
+
+Comment:
+
+We think this might be analytics and we can ignore it.
+
+Querystring:
+
+`/bmx/tunein/v1/report?stream_id={id}&guide_id={id}&listen_id={id}&stream_type={type}`
+
 Payload:
 
 Sample payload included here. Not sure yet what all of these are used for.
@@ -379,6 +533,15 @@ Sample payload included here. Not sure yet what all of these are used for.
   "reason": "USER_SELECT_PLAYABLE",
   "timeIntoTrack": 0,
   "playbackDelay": 6664
+}
+```
+
+other possibilities:
+
+```json
+{
+  "eventType":"STOP",
+  "reason":"USER_STOP"
 }
 ```
 
@@ -394,6 +557,12 @@ Response:
   },
   "nextReportIn": 1800
 }
+```
+
+other possibilities:
+
+```json
+{}
 ```
 
 ##### GET /bmx/tunein/v1/playback/station/{station ID}
@@ -442,4 +611,25 @@ Response:
 }
 ```
 
+## Callers
 
+### power on
+
+1. /bmx/
+1. /marge/streaming/support/power_on
+1. /marge
+1. /bmx/registry/v1/services
+1. /marge/streaming/sourceproviders
+1. /marge/streaming/account/3380435/full
+1. /marge/streaming/software/update/account/3380435
+1. /marge/streaming/account/3380435/provider_settings
+1. /marge/streaming/software/update/account/3380435
+
+### switch to a station
+
+1. /bmx/tunein/v1/report
+1. /bmx/tunein/v1/playback/station/s30913
+1. /bmx/tunein/v1/token
+1. /bmx/tunein/v1/playback/station/s30913
+1. /marge/streaming/account/3380435/device/B0D5CC0391DB/recent
+1. /bmx/tunein/v1/report
