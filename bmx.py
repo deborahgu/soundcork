@@ -1,9 +1,10 @@
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
 from model import Audio, BmxPlaybackResponse, Stream
 
-TODO: move into constants file eventually.
+# TODO: move into constants file eventually.
 TUNEIN_DESCRIBE = "https://opml.radiotime.com/describe.ashx?id=%s"
 TUNEIN_STREAM = "http://opml.radiotime.com/Tune.ashx?id=%s"
 
@@ -38,15 +39,15 @@ def tunein_playback(station_id: str) -> BmxPlaybackResponse:
     # so we might need to give them actual values
     stream_id = "e3342"
     listen_id = str(3432432423)
-    bmx_reporting = (
-        "/v1/report?stream_id="
-        + stream_id
-        + "&guide_id="
-        + station_id
-        + "&listen_id="
-        + listen_id
-        + "&stream_type=liveRadio"
+    bmx_reporting_qs = urllib.parse.urlencode(
+        {
+            "stream_id": stream_id,
+            "guide_id": station_id,
+            "listen_id": listen_id,
+            "stream_type": "liveRadio",
+        }
     )
+    bmx_reporting = "/v1/report?" + bmx_reporting_qs
 
     stream_url_list = stream_url_resp.splitlines()
     stream_list = [
