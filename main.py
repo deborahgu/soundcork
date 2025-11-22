@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, Response
 
 from bmx import tunein_playback
 from config import Settings
-from marge import presets_xml, source_providers
+from marge import presets_xml, recents_xml, source_providers
 from model import (
     Asset,
     Audio,
@@ -108,6 +108,18 @@ def account_presets(
     settings: Annotated[Settings, Depends(get_settings)], account: str, device: str
 ):
     xml = presets_xml(settings, account, device)
+    return_xml = ET.tostring(xml, "UTF-8", xml_declaration=True)
+    response = Response(content=return_xml, media_type="application/xml")
+    # TODO: move content type to constants
+    response.headers["content-type"] = "application/vnd.bose.streaming-v1.2+xml"
+    return response
+
+
+@app.get("/marge/streaming/account/{account}/device/{device}/recents", tags=["marge"])
+def account_recents(
+    settings: Annotated[Settings, Depends(get_settings)], account: str, device: str
+):
+    xml = recents_xml(settings, account, device)
     return_xml = ET.tostring(xml, "UTF-8", xml_declaration=True)
     response = Response(content=return_xml, media_type="application/xml")
     # TODO: move content type to constants

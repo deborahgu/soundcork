@@ -1,8 +1,9 @@
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from os import path
 
 from config import Settings
-from model import ConfiguredSource, Preset, SourceProvider
+from model import ConfiguredSource, Preset, Recent, SourceProvider
 
 # We'll move these into a constants file eventually.
 PROVIDERS = [
@@ -180,3 +181,67 @@ def source_xml(
     ET.SubElement(source, "username").text = preset.name
 
     return source
+
+
+def recents(settings: Settings, account: str, device: str) -> list[Recent]:
+    stored_tree = ET.parse(
+        path.join(account_device_dir(settings, account, device), "Recents.xml")
+    )
+    root = stored_tree.getroot()
+
+    recents = []
+
+    for recent in root.findall("recent"):
+        id = recent.attrib.get("id", "")
+        device_id = recent.attrib.get("deviceID", "")
+        utc_time = recent.attrib.get("utcTime", "")
+        content_item = recent.find("contentItem")
+        name = content_item.find("itemName").text or "test"
+        source = content_item.get("source", "")
+        type = content_item.attrib.get("type", "")
+        location = content_item.attrib["location"]
+        source_account = content_item.attrib["sourceAccount"]
+        is_presetable = content_item.attrib["isPresetable"]
+
+        recents.append(
+            Recent(
+                name=name,
+                utc_time=utc_time,
+                id=id,
+                device_id=device_id,
+                source=source,
+                type=type,
+                location=location,
+                source_account=source_account,
+                is_presetable=is_presetable,
+            )
+        )
+
+    return recents
+
+
+def recents_xml(settings: Settings, account: str, device: str) -> ET.Element:
+    conf_sources_list = configured_sources(settings, account, device)
+
+    recents_list = recents(settings, account, device)
+
+    # We hardcode a date here because we'll never use it, so there's no need for a real date object.
+    datestr = "2012-09-19T12:43:00.000+00:00"
+
+    recents_element = ET.Element("recents")
+    for recent in recents_list:
+        lastplayed = datetime.fromtimestamp(
+            int(recent.utc_time), timezone.utc
+        ).isoformat()
+
+        recent_element = ET.SubElement(recents_element, "recent")
+        recent_element.attrib["id"] = recent.id
+        ET.SubElement(recent_element, "contentItemType").text = recent.type
+        ET.SubElement(recent_element, "createdOn").text = datestr
+        ET.SubElement(recent_element, "lastplayedat").text = lastplayed
+        ET.SubElement(recent_element, "location").text = recent.location
+        ET.SubElement(recent_element, "name").text = recent.name
+        recent_element.append(source_xml(conf_sources_list, recent, datestr))
+        ET.SubElement(recent_element, "updatedOn").text = datestr
+
+    return recents_element

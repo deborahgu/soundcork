@@ -92,3 +92,17 @@ class ConfiguredSource(BaseModel):
     secret_type: str
     source_key_type: str
     source_key_account: str
+
+
+# TODO: Recent and Preset are almost the same; could
+# make a shared parent class
+class Recent(BaseModel):
+    device_id: str
+    utc_time: str
+    id: str
+    name: str
+    source: str
+    type: str
+    location: str
+    source_account: str
+    is_presetable: str
