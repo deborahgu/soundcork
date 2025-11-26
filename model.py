@@ -75,34 +75,40 @@ class SourceProvider(BaseModel):
     updated_on: str
 
 
-class Preset(BaseModel):
+class ContentItem(BaseModel):
     id: str
     name: str
     source: str
     type: str
     location: str
     source_account: str
-    is_presetable: str
+
+
+class Preset(ContentItem):
     container_art: str
+
+
+# TODO: Recent and Preset are almost the same; could
+# make a shared parent class
+class Recent(ContentItem):
+    device_id: str
+    utc_time: str
+    is_presetable: str
 
 
 class ConfiguredSource(BaseModel):
     display_name: str
+    id: str
     secret: str
     secret_type: str
     source_key_type: str
     source_key_account: str
 
 
-# TODO: Recent and Preset are almost the same; could
-# make a shared parent class
-class Recent(BaseModel):
-    device_id: str
-    utc_time: str
-    id: str
+class DeviceInfo(BaseModel):
+    product_code: str
+    device_serial_number: str
+    product_serial_number: str
+    firmware_version: str
+    ip_address: str
     name: str
-    source: str
-    type: str
-    location: str
-    source_account: str
-    is_presetable: str
