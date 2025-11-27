@@ -68,7 +68,7 @@ def tunein_playback(station_id: str) -> BmxPlaybackResponse:
         isRealtime=True,
         maxTimeout=60,
         streamUrl=stream_url_list[0],
-        streams=[stream_list],
+        streams=stream_list,
     )
     resp = BmxPlaybackResponse(
         links={
@@ -77,7 +77,7 @@ def tunein_playback(station_id: str) -> BmxPlaybackResponse:
                 "href": "/v1/now-playing/station/" + station_id,
                 "useInternalClient": "ALWAYS",
             },
-            "bmx_reporting": bmx_reporting,
+            "bmx_reporting": {"href": bmx_reporting},
         },
         audio=audio,
         imageUrl=logo,

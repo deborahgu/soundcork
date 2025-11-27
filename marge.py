@@ -180,22 +180,7 @@ def content_item_source_xml(
         if i.source_key_type == content_item.source
         and i.source_key_account == content_item.source_account
     )
-
-    source = ET.Element("source")
-    source.attrib["id"] = matching_src.id
-    source.attrib["type"] = "Audio"
-    ET.SubElement(source, "createdOn").text = datestr
-    credential = ET.SubElement(source, "credential")
-    credential.text = matching_src.secret
-    credential.attrib["type"] = "token"
-    ET.SubElement(source, "name").text = content_item.name
-    ET.SubElement(source, "sourceproviderid").text = idx
-    ET.SubElement(source, "sourcename").text = matching_src.display_name
-    ET.SubElement(source, "sourcesettings")
-    ET.SubElement(source, "updatedOn").text = datestr
-    ET.SubElement(source, "username").text = content_item.name
-
-    return source
+    return confifgured_source_xml(matching_src, datestr)
 
 
 def all_sources_xml(
@@ -206,23 +191,29 @@ def all_sources_xml(
     sources_elem = ET.Element("sources")
 
     for conf_source in configured_sources:
-        source = ET.SubElement(sources_elem, "source")
-        source.attrib["id"] = conf_source.id
-        source.attrib["type"] = "Audio"
-        ET.SubElement(source, "createdOn").text = datestr
-        credential = ET.SubElement(source, "credential")
-        credential.text = conf_source.secret
-        credential.attrib["type"] = "token"
-        ET.SubElement(source, "name").text = conf_source.display_name
-        ET.SubElement(source, "sourceproviderid").text = str(
-            PROVIDERS.index(conf_source.source_key_type) + 1
-        )
-        ET.SubElement(source, "sourcename").text = conf_source.display_name
-        ET.SubElement(source, "sourcesettings")
-        ET.SubElement(source, "updatedOn").text = datestr
-        ET.SubElement(source, "username").text = conf_source.display_name
+        sources_elem.append(confifgured_source_xml(conf_source, datestr))
 
     return sources_elem
+
+
+def confifgured_source_xml(conf_source: ConfiguredSource, datestr: str) -> ET.Element:
+    source = ET.Element("source")
+    source.attrib["id"] = conf_source.id
+    source.attrib["type"] = "Audio"
+    ET.SubElement(source, "createdOn").text = datestr
+    credential = ET.SubElement(source, "credential")
+    credential.text = conf_source.secret
+    credential.attrib["type"] = "token"
+    ET.SubElement(source, "name").text = conf_source.source_key_account
+    ET.SubElement(source, "sourceproviderid").text = str(
+        PROVIDERS.index(conf_source.source_key_type) + 1
+    )
+    ET.SubElement(source, "sourcename").text = conf_source.display_name
+    ET.SubElement(source, "sourcesettings")
+    ET.SubElement(source, "updatedOn").text = datestr
+    ET.SubElement(source, "username").text = conf_source.source_key_account
+
+    return source
 
 
 def recents(settings: Settings, account: str, device: str) -> list[Recent]:
@@ -395,7 +386,7 @@ def software_update_xml() -> ET.Element:
     return su
 
 
-def etag_configured_sources(settings: Settings) -> int:
+def etag_configured_sources(settings: Settings, account, device) -> int:
     return path.getmtime(
         path.join(account_device_dir(settings, account, device), "Sources.xml")
     )

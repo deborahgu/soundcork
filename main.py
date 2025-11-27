@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+from datetime import datetime
 from functools import lru_cache
 from http import HTTPStatus
 from typing import Annotated
@@ -9,6 +10,7 @@ from bmx import tunein_playback
 from config import Settings
 from marge import (
     account_full_xml,
+    etag_configured_sources,
     presets_xml,
     provider_settings_xml,
     recents_xml,
@@ -61,6 +63,9 @@ app = FastAPI(
 @lru_cache
 def get_settings():
     return Settings()
+
+
+startup_timestamp = int(datetime.now().timestamp())
 
 
 @app.get("/")
@@ -193,11 +198,15 @@ def bmx_playback(service: str, station_id: str) -> BmxPlaybackResponse:
         return tunein_playback(station_id)
 
 
-def bose_xml_response(xml: ET.Element, etag: int = 10000) -> Response:
+def bose_xml_response(xml: ET.Element, etag: int = 0) -> Response:
     # ET.tostring won't allow you to set standalone="yes"
     return_xml = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>{ET.tostring(xml, encoding="unicode")}'
     response = Response(content=return_xml, media_type="application/xml")
     # TODO: move content type to constants
     response.headers["content-type"] = "application/vnd.bose.streaming-v1.2+xml"
+
+    if etag == 0:
+        etag = startup_timestamp
+
     response.headers["etag"] = str(etag)
     return response
