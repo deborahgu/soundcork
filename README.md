@@ -38,7 +38,7 @@ This has been written and tested with Python 3.12. Eventually it will be bundled
 
 1. You can use `venv`, `virtualenvwrapper`, or any other tool that lets you
 manage virtual environments. These docs assume `venv`.
-	- Unix, Windows, and MaxOS [installation and use guide for venv](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/).
+	- Unix, Windows, and MacOS [installation and use guide for venv](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/).
 	- Your operating system might have some prerequisites here. On ubuntu, you may need:
 		```sh
 		sudo apt-install python3-pip python3.12-venv
