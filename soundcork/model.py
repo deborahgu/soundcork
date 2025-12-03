@@ -32,7 +32,7 @@ class Id(BaseModel):
 
 
 class Service(BaseModel):
-    links: dict = Field(..., serialization_alias="_links")
+    links: Optional[dict] = Field(..., serialization_alias="_links")
     askAdapter: bool
     assets: Asset
     baseUrl: str
@@ -43,9 +43,9 @@ class Service(BaseModel):
 
 
 class Stream(BaseModel):
-    links: dict = Field(..., serialization_alias="_links")
-    bufferingTimeout: int
-    connectingTimeout: int
+    links: Optional[dict] = Field(default=None, serialization_alias="_links")
+    bufferingTimeout: Optional[int] = None
+    connectingTimeout: Optional[int] = None
     hasPlaylist: bool
     isRealtime: bool
     streamUrl: str
@@ -54,16 +54,16 @@ class Stream(BaseModel):
 class Audio(BaseModel):
     hasPlaylist: bool
     isRealtime: bool
-    maxTimeout: int
+    maxTimeout: Optional[int] = None
     streamUrl: str
     streams: List
 
 
 class BmxPlaybackResponse(BaseModel):
-    links: dict = Field(..., serialization_alias="_links")
+    links: Optional[dict] = Field(default=None, serialization_alias="_links")
     audio: Audio
     imageUrl: str
-    isFavorite: bool
+    isFavorite: Optional[bool] = None
     name: str
     streamType: str
 

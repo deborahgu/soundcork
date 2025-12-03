@@ -4,9 +4,9 @@ from functools import lru_cache
 from http import HTTPStatus
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, Request, Response
 
-from soundcork.bmx import tunein_playback
+from soundcork.bmx import play_custom_stream, tunein_playback
 from soundcork.config import Settings
 from soundcork.marge import (
     account_full_xml,
@@ -188,6 +188,12 @@ def bmx_services(settings: Annotated[Settings, Depends(get_settings)]) -> BmxRes
 def bmx_playback(service: str, station_id: str) -> BmxPlaybackResponse:
     if service == "tunein":
         return tunein_playback(station_id)
+
+
+@app.get("/core02/svc-bmx-adapter-orion/prod/orion/station", tags=["bmx"])
+def custom_stream_playback(request: Request) -> BmxPlaybackResponse:
+    data = request.query_params.get("data", "")
+    return play_custom_stream(data)
 
 
 def bose_xml_response(xml: ET.Element, etag: int = 0, method: str = "") -> Response:

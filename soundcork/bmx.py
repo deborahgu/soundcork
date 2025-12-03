@@ -1,3 +1,5 @@
+import base64
+import json
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -83,6 +85,34 @@ def tunein_playback(station_id: str) -> BmxPlaybackResponse:
         imageUrl=logo,
         isFavorite=False,
         name=name,
+        streamType="liveRadio",
+    )
+    return resp
+
+
+def play_custom_stream(data: str) -> BmxPlaybackResponse:
+    # data comes in as base64-encoded json with fields
+    # streamUrl, imageUrl, and name
+    json_str = base64.b64decode(data)
+    json_obj = json.loads(json_str)
+    stream_list = [
+        Stream(
+            hasPlaylist=True,
+            isRealtime=True,
+            streamUrl=json_obj["streamUrl"],
+        )
+    ]
+
+    audio = Audio(
+        hasPlaylist=True,
+        isRealtime=True,
+        streamUrl=json_obj["streamUrl"],
+        streams=stream_list,
+    )
+    resp = BmxPlaybackResponse(
+        audio=audio,
+        imageUrl=json_obj["imageUrl"],
+        name=json_obj["name"],
         streamType="liveRadio",
     )
     return resp
