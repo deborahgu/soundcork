@@ -175,6 +175,12 @@ def content_item_source_xml(
     content_item: ContentItem,
     datestr: str,
 ) -> ET.Element:
+    if content_item.source_id:
+        matching_src = next(
+            i for i in configured_sources if i.id == content_item.source_id
+        )
+        return confifgured_source_xml(matching_src, datestr)
+
     idx = str(PROVIDERS.index(content_item.source) + 1)
 
     matching_src = next(
@@ -228,16 +234,21 @@ def recents(settings: Settings, account: str, device: str) -> list[Recent]:
     recents = []
 
     for recent in root.findall("recent"):
-        id = recent.attrib.get("id", "")
+        id = recent.attrib.get("id", "1")
         device_id = recent.attrib.get("deviceID", "")
         utc_time = recent.attrib.get("utcTime", "")
         content_item = recent.find("contentItem")
         name = content_item.find("itemName").text or "test"
-        source = content_item.get("source", "")
+        source = content_item.attrib.get("source", "")
         type = content_item.attrib.get("type", "")
         location = content_item.attrib["location"]
         source_account = content_item.attrib["sourceAccount"]
         is_presetable = content_item.attrib["isPresetable"]
+        container_art_elem = content_item.find("containerArt")
+        if container_art_elem is not None:
+            container_art = container_art_elem.text
+        else:
+            container_art = None
 
         recents.append(
             Recent(
@@ -250,6 +261,7 @@ def recents(settings: Settings, account: str, device: str) -> list[Recent]:
                 location=location,
                 source_account=source_account,
                 is_presetable=is_presetable,
+                container_art=container_art,
             )
         )
 
@@ -283,6 +295,121 @@ def recents_xml(settings: Settings, account: str, device: str) -> ET.Element:
         ET.SubElement(recent_element, "updatedOn").text = datestr
 
     return recents_element
+
+
+def recent_add(
+    settings: Settings, account: str, device: str, source_xml: str
+) -> ET.Element:
+    conf_sources_list = configured_sources(settings, account, device)
+    recents_list = recents(settings, account, device)
+
+    new_recent_elem = ET.fromstring(source_xml)
+
+    # load the recent to add
+    id = new_recent_elem.attrib.get("id", "")
+    device_id = device
+    last_played_at = new_recent_elem.find("lastplayedat").text
+    utc_time = int(datetime.fromisoformat(last_played_at).timestamp())
+    name = new_recent_elem.find("name").text
+    source_id = new_recent_elem.find("sourceid").text
+    type = new_recent_elem.find("contentItemType").text
+    location = new_recent_elem.find("location").text
+    is_presetable = "true"
+
+    matching_src = next((src for src in conf_sources_list if src.id == source_id), None)
+    source = matching_src.source_key_type
+    source_account = matching_src.source_key_account
+
+    # We hardcode a date here because we'll never use it, so there's no need for a real date object.
+    datestr = "2012-09-19T12:43:00.000+00:00"
+    created_on = datestr
+
+    # see if this item is already in the recents list
+    matching_recent = next(
+        (
+            i
+            for i in recents_list
+            if i.source == source
+            and i.location == location
+            and i.source_account == source_account
+        ),
+        None,
+    )
+    recent_obj = None
+    if matching_recent:
+        # just update the time and move it to the front of the list
+        matching_recent.utc_time = str(utc_time)
+        recent_obj = matching_recent
+    else:
+        # need a new id
+        next_id = max(int(recent.id) for recent in recents_list) + 1
+        recent_obj = Recent(
+            name=name,
+            utc_time=str(utc_time),
+            id=str(next_id),
+            source_id=source_id,
+            source=source,
+            device_id=device_id,
+            type=type,
+            location=location,
+            source_account=source_account,
+            is_presetable=is_presetable,
+        )
+        created_on = datetime.fromtimestamp(
+            datetime.now().timestamp(), timezone.utc
+        ).isoformat()
+
+        recents_list.insert(0, recent_obj)
+        # probably shouldn't just let this grow unbounded
+        if len(recents_list) > 10:
+            recents_list.pop()
+
+    recents_save(settings, account, device, recents_list)
+
+    lastplayed = datetime.fromtimestamp(
+        int(recent_obj.utc_time), timezone.utc
+    ).isoformat()
+
+    # return newly created or updated element in return-value xml format
+    # TODO reuse code from recents_xml()
+    recent_element = ET.Element("recent")
+    recent_element.attrib["id"] = recent_obj.id
+    ET.SubElement(recent_element, "contentItemType").text = recent_obj.type
+    ET.SubElement(recent_element, "createdOn").text = created_on
+    ET.SubElement(recent_element, "lastplayedat").text = lastplayed
+    ET.SubElement(recent_element, "location").text = recent_obj.location
+    ET.SubElement(recent_element, "name").text = recent_obj.name
+    recent_element.append(
+        content_item_source_xml(conf_sources_list, recent_obj, datestr)
+    )
+    ET.SubElement(recent_element, "updatedOn").text = created_on
+
+    return recent_element
+
+
+def recents_save(
+    settings: Settings, account: str, device: str, recents_list: list[Recent]
+) -> ET.Element:
+    save_file = path.join(account_device_dir(settings, account, device), "Recents2.xml")
+    recents_elem = ET.Element("recents")
+    for recent in recents_list:
+        recent_elem = ET.SubElement(recents_elem, "recent")
+        recent_elem.attrib["deviceID"] = recent.device_id
+        recent_elem.attrib["utcTime"] = recent.utc_time
+        recent_elem.attrib["id"] = recent.id
+        content_item_elem = ET.SubElement(recent_elem, "contentItem")
+        content_item_elem.attrib["source"] = recent.source
+        content_item_elem.attrib["type"] = recent.type
+        content_item_elem.attrib["location"] = recent.location
+        content_item_elem.attrib["sourceAccount"] = recent.source_account
+        content_item_elem.attrib["isPresetable"] = recent.is_presetable
+        ET.SubElement(content_item_elem, "itemName").text = recent.name
+        ET.SubElement(content_item_elem, "containerArt").text = recent.container_art
+
+    recents_tree = ET.ElementTree(recents_elem)
+    ET.indent(recents_tree, space="    ", level=0)
+    recents_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
+    return recents_elem
 
 
 def provider_settings_xml(settings: Settings, account: str) -> ET.Element:

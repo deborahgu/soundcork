@@ -16,6 +16,7 @@ from soundcork.marge import (
     etag_configured_sources,
     presets_xml,
     provider_settings_xml,
+    recent_add,
     recents_xml,
     software_update_xml,
     source_providers,
@@ -165,6 +166,18 @@ def software_update(settings: Annotated[Settings, Depends(get_settings)], accoun
 def account_full(settings: Annotated[Settings, Depends(get_settings)], account: str):
     xml = account_full_xml(settings, account, datastore)
     return bose_xml_response(xml, startup_timestamp, "getFullAccount")
+
+
+@app.post("/marge/streaming/account/{account}/device/{device}/recent", tags=["marge"])
+async def post_account_recent(
+    settings: Annotated[Settings, Depends(get_settings)],
+    account: str,
+    device: str,
+    request: Request,
+):
+    xml = await request.body()
+    xml_resp = recent_add(settings, account, device, xml)
+    return bose_xml_response(xml_resp, startup_timestamp)
 
 
 @app.get("/bmx/registry/v1/services", tags=["bmx"])

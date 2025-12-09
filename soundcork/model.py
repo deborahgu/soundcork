@@ -78,22 +78,22 @@ class SourceProvider(BaseModel):
 class ContentItem(BaseModel):
     id: str
     name: str
-    source: str
+    source: Optional[str] = None
     type: str
     location: str
-    source_account: str
+    source_account: Optional[str] = None
+    source_id: Optional[str] = None
 
 
 class Preset(ContentItem):
     container_art: str
 
 
-# TODO: Recent and Preset are almost the same; could
-# make a shared parent class
 class Recent(ContentItem):
     device_id: str
     utc_time: str
     is_presetable: str
+    container_art: Optional[str] = None
 
 
 class ConfiguredSource(BaseModel):
