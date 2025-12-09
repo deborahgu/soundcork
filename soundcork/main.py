@@ -1,4 +1,6 @@
+import logging
 import xml.etree.ElementTree as ET
+from contextlib import asynccontextmanager
 from datetime import datetime
 from functools import lru_cache
 from http import HTTPStatus
@@ -8,6 +10,7 @@ from fastapi import Depends, FastAPI, Response
 
 from soundcork.bmx import tunein_playback
 from soundcork.config import Settings
+from soundcork.datastore import DataStore
 from soundcork.marge import (
     account_full_xml,
     etag_configured_sources,
@@ -27,6 +30,23 @@ from soundcork.model import (
     Service,
     Stream,
 )
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting up soundcork")
+    datastore = DataStore()
+    datastore.discover_devices()
+    logger.info("done starting up server")
+    yield
+    logger.debug("closing server")
+
 
 description = """
 This emulates the SoundTouch servers so you don't need connectivity
@@ -49,6 +69,7 @@ app = FastAPI(
     summary="Emulates SoundTouch servers.",
     version="0.0.1",
     openapi_tags=tags_metadata,
+    lifespan=lifespan,
 )
 
 
