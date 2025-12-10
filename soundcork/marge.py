@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from os import path, walk
 from typing import Any
 
+from fastapi import HTTPException
+
 from soundcork.config import Settings
 from soundcork.model import (
     ConfiguredSource,
@@ -176,10 +178,13 @@ def content_item_source_xml(
     datestr: str,
 ) -> ET.Element:
     if content_item.source_id:
-        matching_src = next(
-            i for i in configured_sources if i.id == content_item.source_id
-        )
-        return confifgured_source_xml(matching_src, datestr)
+        try:
+            matching_src = next(
+                i for i in configured_sources if i.id == content_item.source_id
+            )
+        except StopIteration:
+            raise HTTPException(status_code=400, detail="Invalid source")
+        return configured_source_xml(matching_src, datestr)
 
     idx = str(PROVIDERS.index(content_item.source) + 1)
 
@@ -189,7 +194,7 @@ def content_item_source_xml(
         if i.source_key_type == content_item.source
         and i.source_key_account == content_item.source_account
     )
-    return confifgured_source_xml(matching_src, datestr)
+    return configured_source_xml(matching_src, datestr)
 
 
 def all_sources_xml(
@@ -200,12 +205,12 @@ def all_sources_xml(
     sources_elem = ET.Element("sources")
 
     for conf_source in configured_sources:
-        sources_elem.append(confifgured_source_xml(conf_source, datestr))
+        sources_elem.append(configured_source_xml(conf_source, datestr))
 
     return sources_elem
 
 
-def confifgured_source_xml(conf_source: ConfiguredSource, datestr: str) -> ET.Element:
+def configured_source_xml(conf_source: ConfiguredSource, datestr: str) -> ET.Element:
     source = ET.Element("source")
     source.attrib["id"] = conf_source.id
     source.attrib["type"] = "Audio"
@@ -297,7 +302,7 @@ def recents_xml(settings: Settings, account: str, device: str) -> ET.Element:
     return recents_element
 
 
-def recent_add(
+def add_recent(
     settings: Settings, account: str, device: str, source_xml: str
 ) -> ET.Element:
     conf_sources_list = configured_sources(settings, account, device)
@@ -306,7 +311,6 @@ def recent_add(
     new_recent_elem = ET.fromstring(source_xml)
 
     # load the recent to add
-    id = new_recent_elem.attrib.get("id", "")
     device_id = device
     last_played_at = new_recent_elem.find("lastplayedat").text
     utc_time = int(datetime.fromisoformat(last_played_at).timestamp())
@@ -316,7 +320,10 @@ def recent_add(
     location = new_recent_elem.find("location").text
     is_presetable = "true"
 
-    matching_src = next((src for src in conf_sources_list if src.id == source_id), None)
+    try:
+        matching_src = next(src for src in conf_sources_list if src.id == source_id)
+    except StopIteration:
+        raise HTTPException(status_code=400, detail="Invalid account")
     source = matching_src.source_key_type
     source_account = matching_src.source_key_account
 
@@ -342,6 +349,8 @@ def recent_add(
         recent_obj = matching_recent
     else:
         # need a new id
+        # TODO handle race conditions -- right now two recent requests
+        # would probably have the second clobber the first
         next_id = max(int(recent.id) for recent in recents_list) + 1
         recent_obj = Recent(
             name=name,
@@ -361,8 +370,7 @@ def recent_add(
 
         recents_list.insert(0, recent_obj)
         # probably shouldn't just let this grow unbounded
-        if len(recents_list) > 10:
-            recents_list.pop()
+        recents_list = recents_list[:10]
 
     recents_save(settings, account, device, recents_list)
 
@@ -390,7 +398,7 @@ def recent_add(
 def recents_save(
     settings: Settings, account: str, device: str, recents_list: list[Recent]
 ) -> ET.Element:
-    save_file = path.join(account_device_dir(settings, account, device), "Recents2.xml")
+    save_file = path.join(account_device_dir(settings, account, device), "Recents.xml")
     recents_elem = ET.Element("recents")
     for recent in recents_list:
         recent_elem = ET.SubElement(recents_elem, "recent")

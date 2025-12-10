@@ -6,17 +6,17 @@ from functools import lru_cache
 from http import HTTPStatus
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 
 from soundcork.bmx import play_custom_stream, tunein_playback
 from soundcork.config import Settings
 from soundcork.datastore import DataStore
 from soundcork.marge import (
     account_full_xml,
+    add_recent,
     etag_configured_sources,
     presets_xml,
     provider_settings_xml,
-    recent_add,
     recents_xml,
     software_update_xml,
     source_providers,
@@ -144,6 +144,8 @@ def account_presets(
 def account_recents(
     settings: Annotated[Settings, Depends(get_settings)], account: str, device: str
 ):
+    validate_params(account, device)
+
     xml = recents_xml(settings, account, device)
     return bose_xml_response(xml)
 
@@ -175,8 +177,9 @@ async def post_account_recent(
     device: str,
     request: Request,
 ):
+    validate_params(account)
     xml = await request.body()
-    xml_resp = recent_add(settings, account, device, xml)
+    xml_resp = add_recent(settings, account, device, xml)
     return bose_xml_response(xml_resp, startup_timestamp)
 
 
@@ -245,3 +248,14 @@ def bose_xml_response(xml: ET.Element, etag: int = 0, method: str = "") -> Respo
     response.headers["etag"] = str(etag)
     response.headers["method_name"] = method
     return response
+
+
+def validate_params(account=12345, device="ABCD3"):
+    try:
+        int(account)
+    except ValueError:
+        raise HTTPException(status_code=500, detail="invalid account")
+    try:
+        int(device, 16)
+    except ValueError:
+        raise HTTPException(status_code=500, detail="invalid device id")
