@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -7,6 +9,7 @@ from http import HTTPStatus
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 
 from soundcork.bmx import play_custom_stream, tunein_playback
 from soundcork.config import Settings
@@ -183,44 +186,18 @@ async def post_account_recent(
     return bose_xml_response(xml_resp, startup_timestamp)
 
 
-@app.get("/bmx/registry/v1/services", tags=["bmx"])
+@app.get("/bmx/registry/v1/services", response_model_exclude_none=True, tags=["bmx"])
 def bmx_services(settings: Annotated[Settings, Depends(get_settings)]) -> BmxResponse:
-    # not sure what this number means; could be a timestamp or something similar?
-    # this probably should be read from a config file or from some other kind of storage
 
-    assets = Asset(
-        color="#000000",
-        description="With TuneIn on SoundTouch, listen to more than 100,000 stations and the hottest podcasts, "
-        "plus live games, concerts and shows from around the world. However, you cannot access your "
-        "Favorites and Premium content on your existing TuneIn account at this time.",
-        # todo: cache/copy these icons
-        icons=IconSet(
-            defaultAlbumArt="https://media.bose.io/bmx-icons/tunein/default-album-art.png",
-            largeSvg="https://media.bose.io/bmx-icons/tunein/smallSvg.svg",
-            monochromePng="https://media.bose.io/bmx-icons/tunein/monochromePng.png",
-            monochromeSvg="https://media.bose.io/bmx-icons/tunein/monochromeSvg.svg",
-            smallSvg="https://media.bose.io/bmx-icons/tunein/smallSvg.svg",
-        ),
-        name="TuneIn",
-        shortDescription="",
-    )
-    tunein = Service(
-        links={
-            "bmx_navigate": {"href": "/v1/navigate"},
-            "bmx_token": {"href": "/v1/token"},
-            "self": {"href": "/"},
-        },
-        askAdapter=False,
-        baseUrl=settings.base_url + "/bmx/tunein",
-        streamTypes=["liveRadio", "onDemand"],
-        id=Id(name="TUNEIN", value=25),
-        authenticationModel={"anonymousAccount": {"autoCreate": True, "enabled": True}},
-        assets=assets,
-    )
-    links = {"bmx_services_availability": {"href": "../servicesAvailability"}}
-    response = BmxResponse(links=links, askAgainAfter=1277728, bmx_services=[tunein])
-
-    return response
+    with open("bmx_services.json", "r") as file:
+        bmx_response_json = file.read()
+        bmx_response_json = bmx_response_json.replace(
+            "{MEDIA_SERVER}", f"{settings.base_url}/media"
+        ).replace("{BMX_SERVER}", settings.base_url)
+        # TODO:  we're sending askAgainAfter hardcoded, but that value actually
+        # varies.
+        bmx_response = BmxResponse.model_validate_json(bmx_response_json)
+        return bmx_response
 
 
 @app.get("/bmx/{service}/v1/playback/station/{station_id}", tags=["bmx"])
@@ -233,6 +210,18 @@ def bmx_playback(service: str, station_id: str) -> BmxPlaybackResponse:
 def custom_stream_playback(request: Request) -> BmxPlaybackResponse:
     data = request.query_params.get("data", "")
     return play_custom_stream(data)
+
+
+@app.get("/media/{filename}", tags="bmx")
+def bmx_media_file(filename: str) -> FileResponse:
+    sanitized_filename = "".join(
+        x for x in filename if x.isalnum() or x == "." or x == "-" or x == "_"
+    )
+    file_path = os.path.join("media", sanitized_filename)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+
+    raise HTTPException(status_code=404, detail="not found")
 
 
 def bose_xml_response(xml: ET.Element, etag: int = 0, method: str = "") -> Response:

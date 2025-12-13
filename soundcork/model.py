@@ -4,14 +4,20 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
-class BmxResponse(BaseModel):
-    links: dict = Field(..., serialization_alias="_links")
-    askAgainAfter: int
-    bmx_services: List
+class Link(BaseModel):
+    href: str
+
+
+class Links(BaseModel):
+    bmx_logout: Optional[Link] = None
+    bmx_navigate: Optional[Link] = None
+    bmx_services_availability: Optional[Link] = None
+    bmx_token: Optional[Link] = None
+    self: Optional[Link] = None
 
 
 class IconSet(BaseModel):
-    defaultAlbumArt: str
+    defaultAlbumArt: Optional[str] = None
     largeSvg: str
     monochromePng: str
     monochromeSvg: str
@@ -23,7 +29,7 @@ class Asset(BaseModel):
     description: str
     icons: IconSet
     name: str
-    shortDescription: str
+    shortDescription: Optional[str] = None
 
 
 class Id(BaseModel):
@@ -32,18 +38,30 @@ class Id(BaseModel):
 
 
 class Service(BaseModel):
-    links: Optional[dict] = Field(..., serialization_alias="_links")
+    links: Optional[Links] = Field(
+        default=None, alias="_links", serialization_alias="_links"
+    )
     askAdapter: bool
     assets: Asset
     baseUrl: str
     signupUrl: Optional[str] = None
-    streamTypes: List
-    id: Id
+    streamTypes: list[str]
     authenticationModel: dict
+    id: Id
+
+
+class BmxResponse(BaseModel):
+    links: Optional[Links] = Field(
+        default=None, alias="_links", serialization_alias="_links"
+    )
+    askAgainAfter: int
+    bmx_services: list[Service]
 
 
 class Stream(BaseModel):
-    links: Optional[dict] = Field(default=None, serialization_alias="_links")
+    links: Optional[Links] = Field(
+        default=None, alias="_links", serialization_alias="_links"
+    )
     bufferingTimeout: Optional[int] = None
     connectingTimeout: Optional[int] = None
     hasPlaylist: bool
@@ -60,7 +78,9 @@ class Audio(BaseModel):
 
 
 class BmxPlaybackResponse(BaseModel):
-    links: Optional[dict] = Field(default=None, serialization_alias="_links")
+    links: Optional[Links] = Field(
+        default=None, alias="_links", serialization_alias="_links"
+    )
     audio: Audio
     imageUrl: str
     isFavorite: Optional[bool] = None
