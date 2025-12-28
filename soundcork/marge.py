@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from os import path, walk
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException
 
@@ -14,6 +14,9 @@ from soundcork.model import (
     Recent,
     SourceProvider,
 )
+
+if TYPE_CHECKING:
+    from soundcork.datastore import DataStore
 
 # pyright: reportOptionalMemberAccess=false
 
@@ -506,7 +509,9 @@ def provider_settings_xml(settings: Settings, account: str) -> ET.Element:
     return provider_settings
 
 
-def account_full_xml(settings: Settings, account: str, datastore: Any) -> ET.Element:
+def account_full_xml(
+    settings: Settings, account: str, datastore: "DataStore"
+) -> ET.Element:
     datestr = "2012-09-19T12:43:00.000+00:00"
 
     account_dir = path.join(settings.data_dir, account)
