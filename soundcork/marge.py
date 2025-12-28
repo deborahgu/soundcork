@@ -65,48 +65,12 @@ PROVIDERS = [
 ]
 
 
-def account_device_dir(account: str, device: str) -> str:
-    return path.join(settings.data_dir, account, device)
-
-
 def source_providers() -> list[SourceProvider]:
     datestr = "2012-09-19T12:43:00.000+00:00"
     return [
         SourceProvider(id=i[0], created_on=datestr, name=i[1], updated_on=datestr)
         for i in enumerate(PROVIDERS, start=1)
     ]
-
-
-# This will probably be refactored into a datastore class for reading and writing the datastore,
-# but it's too early to do that refactor for now during POC.
-def configured_sources(account: str, device: str) -> list[ConfiguredSource]:
-    sources_tree = ET.parse(
-        path.join(account_device_dir(account, device), "Sources.xml")
-    )
-    root = sources_tree.getroot()
-    sources_list = []
-    for source_elem in root.findall("source"):
-        display_name = source_elem.attrib.get("displayName", "")
-        # the id had to be hand-added to the xml; once we get it working we'll
-        # see if we can use an artificially-generated value
-        id = source_elem.attrib.get("id", "")
-        secret = source_elem.attrib.get("secret", "")
-        secret_type = source_elem.attrib.get("secretType", "")
-        source_key_elem = source_elem.find("sourceKey")
-        source_key_account = source_key_elem.attrib.get("account", "")
-        source_key_type = source_key_elem.attrib.get("type", "")
-        sources_list.append(
-            ConfiguredSource(
-                display_name=display_name,
-                id=id,
-                secret=secret,
-                secret_type=secret_type,
-                source_key_type=source_key_type,
-                source_key_account=source_key_account,
-            )
-        )
-
-    return sources_list
 
 
 def preset_xml(
@@ -125,7 +89,7 @@ def preset_xml(
 
 
 def presets_xml(datastore: "DataStore", account: str, device: str) -> ET.Element:
-    conf_sources_list = configured_sources(account, device)
+    conf_sources_list = datastore.get_configured_sources(account, device)
 
     presets_list = datastore.get_presets(account, device)
 
@@ -147,7 +111,7 @@ def update_preset(
     preset_number: int,
     source_xml: bytes,
 ) -> ET.Element:
-    conf_sources_list = configured_sources(account, device)
+    conf_sources_list = datastore.get_configured_sources(account, device)
     presets_list = datastore.get_presets(account, device)
 
     new_preset_elem = ET.fromstring(source_xml)
@@ -253,7 +217,7 @@ def configured_source_xml(conf_source: ConfiguredSource, datestr: str) -> ET.Ele
 
 
 def recents_xml(datastore: "DataStore", account: str, device: str) -> ET.Element:
-    conf_sources_list = configured_sources(account, device)
+    conf_sources_list = datastore.get_configured_sources(account, device)
 
     recents_list = datastore.get_recents(account, device)
 
@@ -284,7 +248,7 @@ def recents_xml(datastore: "DataStore", account: str, device: str) -> ET.Element
 def add_recent(
     datastore: "DataStore", account: str, device: str, source_xml: bytes
 ) -> ET.Element:
-    conf_sources_list = configured_sources(account, device)
+    conf_sources_list = datastore.get_configured_sources(account, device)
     recents_list = datastore.get_recents(account, device)
 
     new_recent_elem = ET.fromstring(source_xml)
@@ -438,7 +402,9 @@ def account_full_xml(account: str, datastore: "DataStore") -> ET.Element:
     ET.SubElement(account_elem, "preferrendLanguage").text = "en"
     account_elem.append(provider_settings_xml(account))
     account_elem.append(
-        all_sources_xml(configured_sources(account, last_device_id), datestr)
+        all_sources_xml(
+            datastore.get_configured_sources(account, last_device_id), datestr
+        )
     )
 
     return account_elem
@@ -452,5 +418,6 @@ def software_update_xml() -> ET.Element:
     return su
 
 
-def etag_configured_sources(account, device) -> float:
-    return path.getmtime(path.join(account_device_dir(account, device), "Sources.xml"))
+# TODO figure out etags
+# def etag_configured_sources(account, device) -> float:
+#    return path.getmtime(path.join(account_device_dir(account, device), "Sources.xml"))
