@@ -109,49 +109,6 @@ def configured_sources(account: str, device: str) -> list[ConfiguredSource]:
     return sources_list
 
 
-def presets(account: str, device: str) -> list[Preset]:
-    storedTree = ET.parse(path.join(account_device_dir(account, device), "Presets.xml"))
-    root = storedTree.getroot()
-
-    presets = []
-
-    for preset in root.findall("preset"):
-        id = preset.attrib["id"]
-        created_on = preset.attrib.get("createdOn", "")
-        updated_on = preset.attrib.get("updatedOn", "")
-        content_item = preset.find("ContentItem")
-        name = content_item.find("itemName").text
-        source = content_item.attrib["source"]
-        type = content_item.attrib.get("type", "")
-        location = content_item.attrib.get("location", "")
-        source_account = content_item.attrib.get("sourceAccount", "")
-        is_presetable = content_item.attrib.get("isPresetable", "")
-        container_art_elem = content_item.find("containerArt")
-        # have to 'is not None' because bool(Element) returns false
-        # if the element has no children
-        if container_art_elem is not None and container_art_elem.text:
-            container_art = container_art_elem.text
-        else:
-            container_art = ""
-
-        presets.append(
-            Preset(
-                name=name,
-                created_on=created_on,
-                updated_on=updated_on,
-                id=id,
-                source=source,
-                type=type,
-                location=location,
-                source_account=source_account,
-                is_presetable=is_presetable,
-                container_art=container_art,
-            )
-        )
-
-    return presets
-
-
 def preset_xml(
     preset: Preset, conf_sources_list: list[ConfiguredSource], datestr: str
 ) -> ET.Element:
@@ -167,10 +124,10 @@ def preset_xml(
     return preset_element
 
 
-def presets_xml(account: str, device: str) -> ET.Element:
+def presets_xml(datastore: "DataStore", account: str, device: str) -> ET.Element:
     conf_sources_list = configured_sources(account, device)
 
-    presets_list = presets(account, device)
+    presets_list = datastore.get_presets(account, device)
 
     # We hardcode a date here because we'll never use it, so there's no need for a real date object.
     datestr = "2012-09-19T12:43:00.000+00:00"
@@ -184,14 +141,14 @@ def presets_xml(account: str, device: str) -> ET.Element:
 
 
 def update_preset(
-    datastore: Any,
+    datastore: "DataStore",
     account: str,
     device: str,
     preset_number: int,
     source_xml: bytes,
 ) -> ET.Element:
     conf_sources_list = configured_sources(account, device)
-    presets_list = presets(account, device)
+    presets_list = datastore.get_presets(account, device)
 
     new_preset_elem = ET.fromstring(source_xml)
 
@@ -535,7 +492,7 @@ def account_full_xml(account: str, datastore: "DataStore") -> ET.Element:
         )
         ET.SubElement(device_elem, "ipaddress").text = device_info.ip_address
         ET.SubElement(device_elem, "name").text = device_info.name
-        device_elem.append(presets_xml(account, device_id))
+        device_elem.append(presets_xml(datastore, account, device_id))
         device_elem.append(recents_xml(account, device_id))
         ET.SubElement(device_elem, "serialnumber").text = (
             device_info.device_serial_number

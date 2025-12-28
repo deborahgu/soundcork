@@ -110,3 +110,47 @@ class DataStore:
         ET.indent(presets_tree, space="    ", level=0)
         presets_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
         return presets_elem
+
+    def get_presets(self, account: str, device: str) -> list[Preset]:
+        storedTree = ET.parse(
+            path.join(account_device_dir(account, device), "Presets.xml")
+        )
+        root = storedTree.getroot()
+
+        presets = []
+
+        for preset in root.findall("preset"):
+            id = preset.attrib["id"]
+            created_on = preset.attrib.get("createdOn", "")
+            updated_on = preset.attrib.get("updatedOn", "")
+            content_item = preset.find("ContentItem")
+            name = content_item.find("itemName").text
+            source = content_item.attrib["source"]
+            type = content_item.attrib.get("type", "")
+            location = content_item.attrib.get("location", "")
+            source_account = content_item.attrib.get("sourceAccount", "")
+            is_presetable = content_item.attrib.get("isPresetable", "")
+            container_art_elem = content_item.find("containerArt")
+            # have to 'is not None' because bool(Element) returns false
+            # if the element has no children
+            if container_art_elem is not None and container_art_elem.text:
+                container_art = container_art_elem.text
+            else:
+                container_art = ""
+
+            presets.append(
+                Preset(
+                    name=name,
+                    created_on=created_on,
+                    updated_on=updated_on,
+                    id=id,
+                    source=source,
+                    type=type,
+                    location=location,
+                    source_account=source_account,
+                    is_presetable=is_presetable,
+                    container_art=container_art,
+                )
+            )
+
+        return presets

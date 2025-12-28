@@ -126,7 +126,7 @@ def streamingsourceproviders():
 
 @app.get("/marge/streaming/account/{account}/device/{device}/presets", tags=["marge"])
 def account_presets(account: str, device: str):
-    xml = presets_xml(account, device)
+    xml = presets_xml(datastore, account, device)
     return bose_xml_response(xml)
 
 
