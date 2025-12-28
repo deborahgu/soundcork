@@ -5,8 +5,7 @@ from os import path, walk
 import upnpclient
 
 from soundcork.config import Settings
-from soundcork.marge import account_device_dir
-from soundcork.model import DeviceInfo, Preset, Recent
+from soundcork.model import ConfiguredSource, DeviceInfo, Preset, Recent
 
 # pyright: reportOptionalMemberAccess=false
 
@@ -33,6 +32,9 @@ class DataStore:
         self.bose_devices: list[upnpclient.upnp.Device]
         logger.info("Initiating Datastore")
 
+    def account_device_dir(self, account: str, device: str) -> str:
+        return path.join(settings.data_dir, account, device)
+
     def discover_devices(self) -> None:
         """Discovered upnp devices on the network
 
@@ -53,7 +55,7 @@ class DataStore:
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Get the device info"""
         stored_tree = ET.parse(
-            path.join(account_device_dir(account, device), "PowerOn.xml")
+            path.join(self.account_device_dir(account, device), "PowerOn.xml")
         )
         root = stored_tree.getroot()
         device_elem = root.find("device")
@@ -71,7 +73,7 @@ class DataStore:
         )
         system_stored_tree = ET.parse(
             path.join(
-                account_device_dir(account, device),
+                self.account_device_dir(account, device),
                 "SystemConfigurationDB.xml",
             )
         )
@@ -88,7 +90,7 @@ class DataStore:
         )
 
     def save_presets(self, account: str, device: str, presets_list: list[Preset]):
-        save_file = path.join(account_device_dir(account, device), "Presets.xml")
+        save_file = path.join(self.account_device_dir(account, device), "Presets.xml")
         presets_elem = ET.Element("presets")
         for preset in presets_list:
             preset_elem = ET.SubElement(presets_elem, "preset")
@@ -113,7 +115,7 @@ class DataStore:
 
     def get_presets(self, account: str, device: str) -> list[Preset]:
         storedTree = ET.parse(
-            path.join(account_device_dir(account, device), "Presets.xml")
+            path.join(self.account_device_dir(account, device), "Presets.xml")
         )
         root = storedTree.getroot()
 
@@ -157,7 +159,7 @@ class DataStore:
 
     def get_recents(self, account: str, device: str) -> list[Recent]:
         stored_tree = ET.parse(
-            path.join(account_device_dir(account, device), "Recents.xml")
+            path.join(self.account_device_dir(account, device), "Recents.xml")
         )
         root = stored_tree.getroot()
 
@@ -200,7 +202,7 @@ class DataStore:
     def save_recents(
         self, account: str, device: str, recents_list: list[Recent]
     ) -> ET.Element:
-        save_file = path.join(account_device_dir(account, device), "Recents.xml")
+        save_file = path.join(self.account_device_dir(account, device), "Recents.xml")
         recents_elem = ET.Element("recents")
         for recent in recents_list:
             recent_elem = ET.SubElement(recents_elem, "recent")
@@ -222,3 +224,34 @@ class DataStore:
         ET.indent(recents_tree, space="    ", level=0)
         recents_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
         return recents_elem
+
+    def get_configured_sources(
+        self, account: str, device: str
+    ) -> list[ConfiguredSource]:
+        sources_tree = ET.parse(
+            path.join(self.account_device_dir(account, device), "Sources.xml")
+        )
+        root = sources_tree.getroot()
+        sources_list = []
+        for source_elem in root.findall("source"):
+            display_name = source_elem.attrib.get("displayName", "")
+            # the id had to be hand-added to the xml; once we get it working we'll
+            # see if we can use an artificially-generated value
+            id = source_elem.attrib.get("id", "")
+            secret = source_elem.attrib.get("secret", "")
+            secret_type = source_elem.attrib.get("secretType", "")
+            source_key_elem = source_elem.find("sourceKey")
+            source_key_account = source_key_elem.attrib.get("account", "")
+            source_key_type = source_key_elem.attrib.get("type", "")
+            sources_list.append(
+                ConfiguredSource(
+                    display_name=display_name,
+                    id=id,
+                    secret=secret,
+                    secret_type=secret_type,
+                    source_key_type=source_key_type,
+                    source_key_account=source_key_account,
+                )
+            )
+
+        return sources_list
