@@ -1,15 +1,15 @@
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from os import path, walk
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
 
 from soundcork.config import Settings
+from soundcork.constants import PROVIDERS
 from soundcork.model import (
     ConfiguredSource,
     ContentItem,
-    DeviceInfo,
     Preset,
     Recent,
     SourceProvider,
@@ -21,48 +21,6 @@ if TYPE_CHECKING:
 # pyright: reportOptionalMemberAccess=false
 
 settings = Settings()
-
-# We'll move these into a constants file eventually.
-PROVIDERS = [
-    "PANDORA",
-    "INTERNET_RADIO",
-    "OFF",
-    "LOCAL",
-    "AIRPLAY",
-    "CURRATED_RADIO",
-    "STORED_MUSIC",
-    "SLAVE_SOURCE",
-    "AUX",
-    "RECOMMENDED_INTERNET_RADIO",
-    "LOCAL_INTERNET_RADIO",
-    "GLOBAL_INTERNET_RADIO",
-    "HELLO",
-    "DEEZER",
-    "SPOTIFY",
-    "IHEART",
-    "SIRIUSXM",
-    "GOOGLE_PLAY_MUSIC",
-    "QQMUSIC",
-    "AMAZON",
-    "LOCAL_MUSIC",
-    "WBMX",
-    "SOUNDCLOUD",
-    "TIDAL",
-    "TUNEIN",
-    "QPLAY",
-    "JUKE",
-    "BBC",
-    "DARFM",
-    "7DIGITAL",
-    "SAAVN",
-    "RDIO",
-    "PHONE_MUSIC",
-    "ALEXA",
-    "RADIOPLAYER",
-    "RADIO.COM",
-    "RADIO_COM",
-    "SIRIUSXM_EVEREST",
-]
 
 
 def source_providers() -> list[SourceProvider]:

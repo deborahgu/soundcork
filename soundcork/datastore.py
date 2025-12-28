@@ -126,6 +126,7 @@ class DataStore:
             created_on = preset.attrib.get("createdOn", "")
             updated_on = preset.attrib.get("updatedOn", "")
             content_item = preset.find("ContentItem")
+            # If name is not present, the .text will correctly raise an error here
             name = content_item.find("itemName").text
             source = content_item.attrib["source"]
             type = content_item.attrib.get("type", "")
@@ -142,7 +143,7 @@ class DataStore:
 
             presets.append(
                 Preset(
-                    name=name,
+                    name=name,  # type: ignore
                     created_on=created_on,
                     updated_on=updated_on,
                     id=id,
@@ -216,7 +217,7 @@ class DataStore:
             content_item_elem.attrib["location"] = recent.location
             if recent.source_account:
                 content_item_elem.attrib["sourceAccount"] = recent.source_account
-            content_item_elem.attrib["isPresetable"] = recent.is_presetable
+            content_item_elem.attrib["isPresetable"] = recent.is_presetable or "true"
             ET.SubElement(content_item_elem, "itemName").text = recent.name
             ET.SubElement(content_item_elem, "containerArt").text = recent.container_art
 
