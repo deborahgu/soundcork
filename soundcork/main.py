@@ -1,14 +1,11 @@
-import json
 import logging
 import os
 import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from datetime import datetime
-from functools import lru_cache
 from http import HTTPStatus
-from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
 from soundcork.bmx import play_custom_stream, tunein_playback
@@ -17,7 +14,6 @@ from soundcork.datastore import DataStore
 from soundcork.marge import (
     account_full_xml,
     add_recent,
-    etag_configured_sources,
     presets_xml,
     provider_settings_xml,
     recents_xml,
@@ -25,16 +21,7 @@ from soundcork.marge import (
     source_providers,
     update_preset,
 )
-from soundcork.model import (
-    Asset,
-    Audio,
-    BmxPlaybackResponse,
-    BmxResponse,
-    IconSet,
-    Id,
-    Service,
-    Stream,
-)
+from soundcork.model import BmxPlaybackResponse, BmxResponse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 datastore = DataStore()
+settings = Settings()
 
 
 @asynccontextmanager
@@ -80,9 +68,9 @@ app = FastAPI(
 )
 
 
-@lru_cache
-def get_settings():
-    return Settings()
+# @lru_cache
+# def get_settings():
+#     return Settings()
 
 
 startup_timestamp = int(datetime.now().timestamp() * 1000)
@@ -98,7 +86,7 @@ def read_root():
     tags=["marge"],
     status_code=HTTPStatus.OK,
 )
-def power_on(settings: Annotated[Settings, Depends(get_settings)]):
+def power_on():
     # see https://github.com/fastapi/fastapi/discussions/8091 for the TODO here
     # I wonder if the endpoint will work if I return HTTPStatus.IM_A_TEAPOT
     # instead? I'd like to try it.
@@ -107,7 +95,7 @@ def power_on(settings: Annotated[Settings, Depends(get_settings)]):
 
 
 @app.get("/marge/streaming/sourceproviders", tags=["marge"])
-def streamingsourceproviders(settings: Annotated[Settings, Depends(get_settings)]):
+def streamingsourceproviders():
     return_xml = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sourceProviders>'
     )
@@ -137,10 +125,8 @@ def streamingsourceproviders(settings: Annotated[Settings, Depends(get_settings)
 
 
 @app.get("/marge/streaming/account/{account}/device/{device}/presets", tags=["marge"])
-def account_presets(
-    settings: Annotated[Settings, Depends(get_settings)], account: str, device: str
-):
-    xml = presets_xml(settings, account, device)
+def account_presets(account: str, device: str):
+    xml = presets_xml(account, device)
     return bose_xml_response(xml)
 
 
@@ -149,7 +135,6 @@ def account_presets(
     tags=["marge"],
 )
 async def put_account_preset(
-    settings: Annotated[Settings, Depends(get_settings)],
     account: str,
     device: str,
     preset_number: int,
@@ -157,55 +142,50 @@ async def put_account_preset(
 ):
     validate_params(account, device)
     xml = await request.body()
-    xml_resp = update_preset(settings, datastore, account, device, preset_number, xml)
+    xml_resp = update_preset(datastore, account, device, preset_number, xml)
     return bose_xml_response(xml_resp, startup_timestamp)
 
 
 @app.get("/marge/streaming/account/{account}/device/{device}/recents", tags=["marge"])
-def account_recents(
-    settings: Annotated[Settings, Depends(get_settings)], account: str, device: str
-):
+def account_recents(account: str, device: str):
     validate_params(account, device)
 
-    xml = recents_xml(settings, account, device)
+    xml = recents_xml(account, device)
     return bose_xml_response(xml)
 
 
 @app.get("/marge/streaming/account/{account}/provider_settings", tags=["marge"])
-def account_provider_settings(
-    settings: Annotated[Settings, Depends(get_settings)], account: str
-):
-    xml = provider_settings_xml(settings, account)
+def account_provider_settings(account: str):
+    xml = provider_settings_xml(account)
     return bose_xml_response(xml, startup_timestamp, "getProviderSettings")
 
 
 @app.get("/marge/streaming/software/update/account/{account}", tags=["marge"])
-def software_update(settings: Annotated[Settings, Depends(get_settings)], account: str):
+def software_update(account: str):
     xml = software_update_xml()
     return bose_xml_response(xml)
 
 
 @app.get("/marge/streaming/account/{account}/full", tags=["marge"])
-def account_full(settings: Annotated[Settings, Depends(get_settings)], account: str):
-    xml = account_full_xml(settings, account, datastore)
+def account_full(account: str):
+    xml = account_full_xml(account, datastore)
     return bose_xml_response(xml, startup_timestamp, "getFullAccount")
 
 
 @app.post("/marge/streaming/account/{account}/device/{device}/recent", tags=["marge"])
 async def post_account_recent(
-    settings: Annotated[Settings, Depends(get_settings)],
     account: str,
     device: str,
     request: Request,
 ):
     validate_params(account)
     xml = await request.body()
-    xml_resp = add_recent(settings, account, device, xml)
+    xml_resp = add_recent(account, device, xml)
     return bose_xml_response(xml_resp, startup_timestamp)
 
 
 @app.get("/bmx/registry/v1/services", response_model_exclude_none=True, tags=["bmx"])
-def bmx_services(settings: Annotated[Settings, Depends(get_settings)]) -> BmxResponse:
+def bmx_services() -> BmxResponse:
 
     with open("bmx_services.json", "r") as file:
         bmx_response_json = file.read()

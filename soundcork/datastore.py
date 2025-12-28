@@ -16,6 +16,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+settings = Settings()
+
 
 class DataStore:
     """The Soundcork datastore.
@@ -48,12 +50,10 @@ class DataStore:
             f'Discovered Bose devices:\n- {"\n- ".join([b.friendly_name for b in self.bose_devices])}'
         )
 
-    def get_device_info(
-        self, settings: Settings, account: str, device: str
-    ) -> DeviceInfo:
+    def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Get the device info"""
         stored_tree = ET.parse(
-            path.join(account_device_dir(settings, account, device), "PowerOn.xml")
+            path.join(account_device_dir(account, device), "PowerOn.xml")
         )
         root = stored_tree.getroot()
         device_elem = root.find("device")
@@ -71,7 +71,7 @@ class DataStore:
         )
         system_stored_tree = ET.parse(
             path.join(
-                account_device_dir(settings, account, device),
+                account_device_dir(account, device),
                 "SystemConfigurationDB.xml",
             )
         )
@@ -87,12 +87,8 @@ class DataStore:
             name=str(name),
         )
 
-    def save_presets(
-        self, settings: Settings, account: str, device: str, presets_list: list[Preset]
-    ):
-        save_file = path.join(
-            account_device_dir(settings, account, device), "Presets.xml"
-        )
+    def save_presets(self, account: str, device: str, presets_list: list[Preset]):
+        save_file = path.join(account_device_dir(account, device), "Presets.xml")
         presets_elem = ET.Element("presets")
         for preset in presets_list:
             preset_elem = ET.SubElement(presets_elem, "preset")

@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 
 # pyright: reportOptionalMemberAccess=false
 
+settings = Settings()
+
 # We'll move these into a constants file eventually.
 PROVIDERS = [
     "PANDORA",
@@ -63,7 +65,7 @@ PROVIDERS = [
 ]
 
 
-def account_device_dir(settings: Settings, account: str, device: str) -> str:
+def account_device_dir(account: str, device: str) -> str:
     return path.join(settings.data_dir, account, device)
 
 
@@ -77,11 +79,9 @@ def source_providers() -> list[SourceProvider]:
 
 # This will probably be refactored into a datastore class for reading and writing the datastore,
 # but it's too early to do that refactor for now during POC.
-def configured_sources(
-    settings: Settings, account: str, device: str
-) -> list[ConfiguredSource]:
+def configured_sources(account: str, device: str) -> list[ConfiguredSource]:
     sources_tree = ET.parse(
-        path.join(account_device_dir(settings, account, device), "Sources.xml")
+        path.join(account_device_dir(account, device), "Sources.xml")
     )
     root = sources_tree.getroot()
     sources_list = []
@@ -109,10 +109,8 @@ def configured_sources(
     return sources_list
 
 
-def presets(settings: Settings, account: str, device: str) -> list[Preset]:
-    storedTree = ET.parse(
-        path.join(account_device_dir(settings, account, device), "Presets.xml")
-    )
+def presets(account: str, device: str) -> list[Preset]:
+    storedTree = ET.parse(path.join(account_device_dir(account, device), "Presets.xml"))
     root = storedTree.getroot()
 
     presets = []
@@ -169,10 +167,10 @@ def preset_xml(
     return preset_element
 
 
-def presets_xml(settings: Settings, account: str, device: str) -> ET.Element:
-    conf_sources_list = configured_sources(settings, account, device)
+def presets_xml(account: str, device: str) -> ET.Element:
+    conf_sources_list = configured_sources(account, device)
 
-    presets_list = presets(settings, account, device)
+    presets_list = presets(account, device)
 
     # We hardcode a date here because we'll never use it, so there's no need for a real date object.
     datestr = "2012-09-19T12:43:00.000+00:00"
@@ -186,15 +184,14 @@ def presets_xml(settings: Settings, account: str, device: str) -> ET.Element:
 
 
 def update_preset(
-    settings: Settings,
     datastore: Any,
     account: str,
     device: str,
     preset_number: int,
     source_xml: bytes,
 ) -> ET.Element:
-    conf_sources_list = configured_sources(settings, account, device)
-    presets_list = presets(settings, account, device)
+    conf_sources_list = configured_sources(account, device)
+    presets_list = presets(account, device)
 
     new_preset_elem = ET.fromstring(source_xml)
 
@@ -232,7 +229,7 @@ def update_preset(
 
     presets_list[preset_number - 1] = preset_obj
 
-    datastore.save_presets(settings, account, device, presets_list)
+    datastore.save_presets(account, device, presets_list)
     datestr = "2012-09-19T12:43:00.000+00:00"
 
     preset_element = preset_xml(preset_obj, conf_sources_list, datestr)
@@ -298,9 +295,9 @@ def configured_source_xml(conf_source: ConfiguredSource, datestr: str) -> ET.Ele
     return source
 
 
-def recents(settings: Settings, account: str, device: str) -> list[Recent]:
+def recents(account: str, device: str) -> list[Recent]:
     stored_tree = ET.parse(
-        path.join(account_device_dir(settings, account, device), "Recents.xml")
+        path.join(account_device_dir(account, device), "Recents.xml")
     )
     root = stored_tree.getroot()
 
@@ -341,10 +338,10 @@ def recents(settings: Settings, account: str, device: str) -> list[Recent]:
     return recents
 
 
-def recents_xml(settings: Settings, account: str, device: str) -> ET.Element:
-    conf_sources_list = configured_sources(settings, account, device)
+def recents_xml(account: str, device: str) -> ET.Element:
+    conf_sources_list = configured_sources(account, device)
 
-    recents_list = recents(settings, account, device)
+    recents_list = recents(account, device)
 
     # We hardcode a date here because we'll never use it, so there's no need for a real date object.
     datestr = "2012-09-19T12:43:00.000+00:00"
@@ -370,11 +367,9 @@ def recents_xml(settings: Settings, account: str, device: str) -> ET.Element:
     return recents_element
 
 
-def add_recent(
-    settings: Settings, account: str, device: str, source_xml: bytes
-) -> ET.Element:
-    conf_sources_list = configured_sources(settings, account, device)
-    recents_list = recents(settings, account, device)
+def add_recent(account: str, device: str, source_xml: bytes) -> ET.Element:
+    conf_sources_list = configured_sources(account, device)
+    recents_list = recents(account, device)
 
     new_recent_elem = ET.fromstring(source_xml)
 
@@ -447,7 +442,7 @@ def add_recent(
         # probably shouldn't just let this grow unbounded
         recents_list = recents_list[:10]
 
-    recents_save(settings, account, device, recents_list)
+    recents_save(account, device, recents_list)
 
     lastplayed = datetime.fromtimestamp(
         int(recent_obj.utc_time), timezone.utc
@@ -470,10 +465,8 @@ def add_recent(
     return recent_element
 
 
-def recents_save(
-    settings: Settings, account: str, device: str, recents_list: list[Recent]
-) -> ET.Element:
-    save_file = path.join(account_device_dir(settings, account, device), "Recents.xml")
+def recents_save(account: str, device: str, recents_list: list[Recent]) -> ET.Element:
+    save_file = path.join(account_device_dir(account, device), "Recents.xml")
     recents_elem = ET.Element("recents")
     for recent in recents_list:
         recent_elem = ET.SubElement(recents_elem, "recent")
@@ -497,7 +490,7 @@ def recents_save(
     return recents_elem
 
 
-def provider_settings_xml(settings: Settings, account: str) -> ET.Element:
+def provider_settings_xml(account: str) -> ET.Element:
     # this seems to report information like if you're eligible for a free
     # trial
     provider_settings = ET.Element("providerSettings")
@@ -509,9 +502,7 @@ def provider_settings_xml(settings: Settings, account: str) -> ET.Element:
     return provider_settings
 
 
-def account_full_xml(
-    settings: Settings, account: str, datastore: "DataStore"
-) -> ET.Element:
+def account_full_xml(account: str, datastore: "DataStore") -> ET.Element:
     datestr = "2012-09-19T12:43:00.000+00:00"
 
     account_dir = path.join(settings.data_dir, account)
@@ -523,7 +514,7 @@ def account_full_xml(
     last_device_id = ""
     for device_id in next(walk(account_dir))[1]:
         last_device_id = device_id
-        device_info = datastore.get_device_info(settings, account, device_id)
+        device_info = datastore.get_device_info(account, device_id)
 
         device_elem = ET.SubElement(devices_elem, "device")
         device_elem.attrib["deviceid"] = device_id
@@ -544,8 +535,8 @@ def account_full_xml(
         )
         ET.SubElement(device_elem, "ipaddress").text = device_info.ip_address
         ET.SubElement(device_elem, "name").text = device_info.name
-        device_elem.append(presets_xml(settings, account, device_id))
-        device_elem.append(recents_xml(settings, account, device_id))
+        device_elem.append(presets_xml(account, device_id))
+        device_elem.append(recents_xml(account, device_id))
         ET.SubElement(device_elem, "serialnumber").text = (
             device_info.device_serial_number
         )
@@ -554,9 +545,9 @@ def account_full_xml(
     ET.SubElement(account_elem, "mode").text = "global"
 
     ET.SubElement(account_elem, "preferrendLanguage").text = "en"
-    account_elem.append(provider_settings_xml(settings, account))
+    account_elem.append(provider_settings_xml(account))
     account_elem.append(
-        all_sources_xml(configured_sources(settings, account, last_device_id), datestr)
+        all_sources_xml(configured_sources(account, last_device_id), datestr)
     )
 
     return account_elem
@@ -570,7 +561,5 @@ def software_update_xml() -> ET.Element:
     return su
 
 
-def etag_configured_sources(settings: Settings, account, device) -> float:
-    return path.getmtime(
-        path.join(account_device_dir(settings, account, device), "Sources.xml")
-    )
+def etag_configured_sources(account, device) -> float:
+    return path.getmtime(path.join(account_device_dir(account, device), "Sources.xml"))
