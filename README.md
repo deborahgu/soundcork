@@ -76,7 +76,7 @@ or OS.)
 	```
 1. Install the pre-requisites
 	```bash
-	pip install requirements.txt
+	pip install -r requirements.txt
 	```
 
 When you're done with the virtual environment, you can type `deactivate` to leave that shell.
