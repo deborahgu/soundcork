@@ -1,4 +1,4 @@
-FROM alpine
+FROM alpine3:22
 
 ENV TARGET=run
 
