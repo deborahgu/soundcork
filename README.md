@@ -42,15 +42,14 @@ This is a full-fledged version of the run command:
 sudo docker run \
   -dt \
   --rm \
-  -p 8080:8080/tcp \
+  -p 8000:8000/tcp \
   --env TARGET=dev \
-  --env BASEURL=https://soundcork.example.com \
-  --env PORT=8080 \
-  --env DATADIR=/path/to/soundcork/db \
+  --volume ~/private_env:/soundcork/soundcork/.env.private \
   --volume volumename:/path/to/soundcork/db \
   localhost/soundcork:latest
 ```
-For the pre-determined values of the env variables see [`Dockerfile`](Dockerfile).
+In order to protect your privacy within the image, `.env.private` is mounted as a (mandatory) volume. `base_url` and `data_dir` should match the exposed port as well as the volume for the database.
+The environment variable TARGET is pre-populated with `run`, i.e. prod environment.
 
 ### Bare metal
 #### Installing
