@@ -318,7 +318,7 @@ def provider_settings_xml(account: str) -> ET.Element:
 def account_full_xml(account: str, datastore: "DataStore") -> ET.Element:
     datestr = "2012-09-19T12:43:00.000+00:00"
 
-    account_dir = path.join(settings.data_dir, account)
+    account_dir = datastore.account_devices_dir(account)
 
     account_elem = ET.Element("account")
     account_elem.attrib["id"] = account
@@ -334,7 +334,7 @@ def account_full_xml(account: str, datastore: "DataStore") -> ET.Element:
         attached_product_elem = ET.SubElement(device_elem, "attachedProduct")
         attached_product_elem.attrib["product_code"] = device_info.product_code
         # some devices seem to have components but i don't know they're important
-        ET.SubElement(device_elem, "components")
+        ET.SubElement(attached_product_elem, "components")
         ET.SubElement(attached_product_elem, "productlabel").text = (
             device_info.product_code
         )

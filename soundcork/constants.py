@@ -39,3 +39,17 @@ PROVIDERS = [
     "RADIO_COM",
     "SIRIUSXM_EVEREST",
 ]
+
+# where we store associated devices.
+DEVICES_DIR = "devices"
+
+# retrieved per-device via {deviceip}:8090/info
+DEVICE_INFO_FILE = "DeviceInfo.xml"
+# retrieved per account via {deviceip}:8090/presets
+PRESETS_FILE = "Presets.xml"
+# retrieved per account via {deviceip}:8090/recents
+RECENTS_FILE = "Recents.xml"
+# retrieved per account via file retrieval from /mnt/nv/BoseApp-Persistence/1/Sources.xml
+# a limited version is available via {deviceip}:8090/sources but this doesn't include
+# necessary secrets
+SOURCES_FILE = "Sources.xml"

@@ -5,6 +5,13 @@ from os import path, walk
 import upnpclient
 
 from soundcork.config import Settings
+from soundcork.constants import (
+    DEVICE_INFO_FILE,
+    DEVICES_DIR,
+    PRESETS_FILE,
+    RECENTS_FILE,
+    SOURCES_FILE,
+)
 from soundcork.model import ConfiguredSource, DeviceInfo, Preset, Recent
 
 # pyright: reportOptionalMemberAccess=false
@@ -32,8 +39,14 @@ class DataStore:
         self.bose_devices: list[upnpclient.upnp.Device]
         logger.info("Initiating Datastore")
 
+    def account_dir(self, account: str) -> str:
+        return path.join(settings.data_dir, account)
+
+    def account_devices_dir(self, account: str) -> str:
+        return path.join(settings.data_dir, account, DEVICES_DIR)
+
     def account_device_dir(self, account: str, device: str) -> str:
-        return path.join(settings.data_dir, account, device)
+        return path.join(self.account_devices_dir(account), device)
 
     def discover_devices(self) -> None:
         """Discovered upnp devices on the network
@@ -54,34 +67,31 @@ class DataStore:
 
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Get the device info"""
+
         stored_tree = ET.parse(
-            path.join(self.account_device_dir(account, device), "PowerOn.xml")
+            path.join(self.account_device_dir(account, device), DEVICE_INFO_FILE)
         )
-        root = stored_tree.getroot()
-        device_elem = root.find("device")
-        device_id = device_elem.attrib.get("id", "")
-        device_serial_number = device_elem.find("serialnumber").text
-        firmware_version = device_elem.find("firmware-version").text
-        product_elem = device_elem.find("product")
-        product_code = product_elem.attrib.get("product_code", "")
-        product_serial_number = product_elem.find("serialnumber").text
-        ip_address = (
-            root.find("diagnostic-data")
-            .find("device-landscape")
-            .find("ip-address")
-            .text
-        )
-        system_stored_tree = ET.parse(
-            path.join(
-                self.account_device_dir(account, device),
-                "SystemConfigurationDB.xml",
-            )
-        )
-        name = system_stored_tree.find("DeviceName").text
+        info_elem = stored_tree.getroot()
+        # info_elem = root.find("info")
+        device_id = info_elem.attrib.get("deviceID", "")
+        name = info_elem.find("name").text
+        type = info_elem.find("type").text
+        module_type = info_elem.find("moduleType").text
+        components = info_elem.find("components").findall("component")
+        for component in components:
+            component_category = component.find("componentCategory").text
+            if component_category == "SCM":
+                firmware_version = component.find("softwareVersion").text
+                device_serial_number = component.find("serialNumber").text
+            elif component_category == "PackagedProduct":
+                product_serial_number = component.find("serialNumber").text
+        for network_info in info_elem.findall("networkInfo"):
+            if network_info.attrib.get("type", "") == "SCM":
+                ip_address = network_info.find("ipAddress").text
 
         return DeviceInfo(
             device_id=device_id,
-            product_code=product_code,
+            product_code=f"{type} {module_type}",
             device_serial_number=str(device_serial_number),
             product_serial_number=str(product_serial_number),
             firmware_version=str(firmware_version),
@@ -90,7 +100,7 @@ class DataStore:
         )
 
     def save_presets(self, account: str, device: str, presets_list: list[Preset]):
-        save_file = path.join(self.account_device_dir(account, device), "Presets.xml")
+        save_file = path.join(self.account_dir(account), PRESETS_FILE)
         presets_elem = ET.Element("presets")
         for preset in presets_list:
             preset_elem = ET.SubElement(presets_elem, "preset")
@@ -114,9 +124,7 @@ class DataStore:
         return presets_elem
 
     def get_presets(self, account: str, device: str) -> list[Preset]:
-        storedTree = ET.parse(
-            path.join(self.account_device_dir(account, device), "Presets.xml")
-        )
+        storedTree = ET.parse(path.join(self.account_dir(account), PRESETS_FILE))
         root = storedTree.getroot()
 
         presets = []
@@ -159,9 +167,7 @@ class DataStore:
         return presets
 
     def get_recents(self, account: str, device: str) -> list[Recent]:
-        stored_tree = ET.parse(
-            path.join(self.account_device_dir(account, device), "Recents.xml")
-        )
+        stored_tree = ET.parse(path.join(self.account_dir(account), RECENTS_FILE))
         root = stored_tree.getroot()
 
         recents = []
@@ -203,7 +209,7 @@ class DataStore:
     def save_recents(
         self, account: str, device: str, recents_list: list[Recent]
     ) -> ET.Element:
-        save_file = path.join(self.account_device_dir(account, device), "Recents.xml")
+        save_file = path.join(self.account_dir(account), RECENTS_FILE)
         recents_elem = ET.Element("recents")
         for recent in recents_list:
             recent_elem = ET.SubElement(recents_elem, "recent")
@@ -229,9 +235,7 @@ class DataStore:
     def get_configured_sources(
         self, account: str, device: str
     ) -> list[ConfiguredSource]:
-        sources_tree = ET.parse(
-            path.join(self.account_device_dir(account, device), "Sources.xml")
-        )
+        sources_tree = ET.parse(path.join(self.account_dir(account), SOURCES_FILE))
         root = sources_tree.getroot()
         sources_list = []
         for source_elem in root.findall("source"):
