@@ -81,7 +81,12 @@ def update_preset(
     # we could use username to match source maybe?
     # username = new_preset_elem.find("username").text
     location = new_preset_elem.find("location").text.strip()
-    content_item_type = new_preset_elem.find("contentItemType").text.strip()
+    content_item_type = new_preset_elem.find("contentItemType").text
+    if content_item_type == None:
+        content_item_type = ""
+    else:
+        content_item_type = content_item_type.strip()
+
     container_art = new_preset_elem.find("containerArt").text.strip()
 
     try:
@@ -224,9 +229,14 @@ def add_recent(
     # they should produce an exception
     name = new_recent_elem.find("name").text
     source_id = new_recent_elem.find("sourceid").text
-    type = new_recent_elem.find("contentItemType").text
     location = new_recent_elem.find("location").text
     is_presetable = "true"
+
+    type = new_recent_elem.find("contentItemType").text
+    if type == None:
+        type = ""
+    else:
+        type = type.strip()
 
     try:
         matching_src = next(src for src in conf_sources_list if src.id == source_id)
