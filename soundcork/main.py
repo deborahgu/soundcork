@@ -120,14 +120,17 @@ def streamingsourceproviders():
     response = Response(content=return_xml, media_type="application/xml")
     # TODO: move content type to constants
     response.headers["content-type"] = "application/vnd.bose.streaming-v1.2+xml"
-    response.headers["etag"] = str(startup_timestamp)
+    # sourceproviders seems to return now as its etag
+    etag = int(datetime.now().timestamp() * 1000)
+    response.headers["etag"] = str(etag)
     return response
 
 
 @app.get("/marge/streaming/account/{account}/device/{device}/presets", tags=["marge"])
 def account_presets(account: str, device: str):
     xml = presets_xml(datastore, account, device)
-    return bose_xml_response(xml)
+    etag = datastore.etag_for_presets(account)
+    return bose_xml_response(xml, etag)
 
 
 @app.put(
@@ -143,7 +146,8 @@ async def put_account_preset(
     validate_params(account, device)
     xml = await request.body()
     xml_resp = update_preset(datastore, account, device, preset_number, xml)
-    return bose_xml_response(xml_resp, startup_timestamp)
+    etag = datastore.etag_for_presets(account)
+    return bose_xml_response(xml_resp, etag)
 
 
 @app.get("/marge/streaming/account/{account}/device/{device}/recents", tags=["marge"])
@@ -151,7 +155,8 @@ def account_recents(account: str, device: str):
     validate_params(account, device)
 
     xml = recents_xml(datastore, account, device)
-    return bose_xml_response(xml)
+    etag = datastore.etag_for_recents(account)
+    return bose_xml_response(xml, etag)
 
 
 @app.get("/marge/streaming/account/{account}/provider_settings", tags=["marge"])
@@ -169,7 +174,8 @@ def software_update(account: str):
 @app.get("/marge/streaming/account/{account}/full", tags=["marge"])
 def account_full(account: str):
     xml = account_full_xml(account, datastore)
-    return bose_xml_response(xml, startup_timestamp, "getFullAccount")
+    etag = datastore.etag_for_account(account)
+    return bose_xml_response(xml, etag, "getFullAccount")
 
 
 @app.post("/marge/streaming/account/{account}/device/{device}/recent", tags=["marge"])
@@ -181,7 +187,8 @@ async def post_account_recent(
     validate_params(account)
     xml = await request.body()
     xml_resp = add_recent(datastore, account, device, xml)
-    return bose_xml_response(xml_resp, startup_timestamp)
+    etag = datastore.etag_for_recents(account)
+    return bose_xml_response(xml_resp, etag)
 
 
 @app.get("/bmx/registry/v1/services", response_model_exclude_none=True, tags=["bmx"])

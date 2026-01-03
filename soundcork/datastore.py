@@ -260,3 +260,22 @@ class DataStore:
             )
 
         return sources_list
+
+    def etag_for_presets(self, account: str) -> int:
+        presets_file = path.join(self.account_dir(account), PRESETS_FILE)
+        return int(path.getmtime(presets_file) * 1000)
+
+    def etag_for_sources(self, account: str) -> int:
+        presets_file = path.join(self.account_dir(account), SOURCES_FILE)
+        return int(path.getmtime(presets_file) * 1000)
+
+    def etag_for_recents(self, account: str) -> int:
+        recents_file = path.join(self.account_dir(account), RECENTS_FILE)
+        return int(path.getmtime(recents_file) * 1000)
+
+    def etag_for_account(self, account: str) -> int:
+        return max(
+            self.etag_for_presets(account),
+            self.etag_for_sources(account),
+            self.etag_for_recents(account),
+        )
