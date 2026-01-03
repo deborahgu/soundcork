@@ -120,30 +120,44 @@ Once you're logged into the shell on the SoundTouch speaker, there are two thing
 
 #### Configuring the soundcork server from the Bose speaker
 
-The first two things that we'll need to do is to get the speaker's device ID and account ID. The device ID should show up as the HWaddr
+*NOTE in the future we plan to have a web UI that will automatically transfer over these values, but for now the only way to do it is by hand.* 
 
-	spotty login: root
-	Last login: Fri Nov 28 22:43:49 EST 2025 on pts/0
-	eth0      Link encap:Ethernet  HWaddr A0:B1:C2:D3:E4:F5  
-	
-The device ID is the HWaddr without the separating colons, so in this case A0B1C2D3E4F5.
+The general layout of the soundcork db (using /home/soundcork/db as the db location) is
 
-The account ID can be found in the file ```/mnt/nv/BoseApp-Persistence/1/SystemConfigurationDB.xml```:
+	/home/soundcork/db/{account}/Presets.xml
+	/home/soundcork/db/{account}/Recents.xml
+	/home/soundcork/db/{account}/Sources.xml
+	/home/soundcork/db/{account}/devices/{deviceid}/DeviceInfo.xml
+		
+The first two things that we'll need to do is to get the speaker's device ID and account ID. Both of these are available via the webserver running on port 8090 of the SoundTouch device:
 
-	grep AccountUUID /mnt/nv/BoseApp-Persistence/1/SystemConfigurationDB.xml
+	http://192.168.1.158:8090/info
 
-	<AccountUUID>1234567</AccountUUID>
+This should return something like
+
+	<info deviceID="A0B1C2D3E4F5">
+	<name>Your SoundTouch Name</name>
+	<type>SoundTouch 20</type>
+	<margeAccountUUID>1234567</margeAccountUUID>
 	
 So now your have your account number of ```1234567``` and device ID of ```A0B1C2D3E4F5```. Now, back on your soundcork system, create directories for the account and device in your ```data_dir```:
 
-	mkdir -p /home/soundcork/db/1234567/A0B1C2D3E4F5
+	mkdir -p /home/soundcork/db/1234567/devices/A0B1C2D3E4F5
 
-Finally, back on the SoundTouch speaker login,  bring over the current configuration of the speaker to the soundcork data directory:
+`Presets.xml`, `Recents.xml`, and `DeviceInfo.xml` can all be gotten via the web UI at http://{SoundTouchIp}:8080/presets, http://{SoundTouchIp}:8080/recents, and http://{SoundTouchIp}:8080/info, respectively. Fetch those URLs and save the returned XML as the apprpriate files. (If you have multiple SoundTouch devices, create a directory and `DeviceInfo.xml` file for each one. If you have multiple accounts that you keep separate, repeat this procedure for each account.)
+
+For Sources, there is some information that is stored on the devices themselves that isn't exposed via the web UI, so you have to go onto the device itself to get that file. `telnet` or `ssh` into the device and then transfer the `Sources.xml` file over to your soundcork db:
 
 	cd /mnt/nv/BoseApp-Persistence/1/
-	scp * username@soundcork.local.example.com:/home/soundcork/db/1234567/A0B1C2D3E4F5
+	scp Sources.xml username@soundcork.local.example.com:/home/soundcork/db/1234567
 	
 (If you're not running an ssh server on your machine you can also copy over the files to your USB stick and transfer them that way; the stick is mounted at ```/media/sda1```.)
+
+*Note on `Sources.xml`*: The marge server has `id`s associated with the configured sources but these values don't seem to be stored anywhere on the devices. These values should all be unique but I believe that they are arbitrary--that is, it's necessary for soundcork to have `id`s for each source, but not that the `id`s match the original marge `id`s. soundcork will assign `id`s to sources if they are not present, but it might be better at this time to go ahead and assign `id`s in the `Sources.xml` file. To do so, just add an `id` field to each `source` element like so:
+
+	<source displayName="AUX IN" id="123456" secret="">
+
+
 
 #### Configuring the Bose speaker to use the soundcork server
 

@@ -238,11 +238,17 @@ class DataStore:
         sources_tree = ET.parse(path.join(self.account_dir(account), SOURCES_FILE))
         root = sources_tree.getroot()
         sources_list = []
+        # TODO we should put ids in the Sources.xml file but if we don't then
+        # this workaround is better than nothing
+        last_id = 100001
         for source_elem in root.findall("source"):
             display_name = source_elem.attrib.get("displayName", "")
             # the id had to be hand-added to the xml; once we get it working we'll
             # see if we can use an artificially-generated value
             id = source_elem.attrib.get("id", "")
+            if id == "":
+                id = str(last_id)
+                last_id += 1
             secret = source_elem.attrib.get("secret", "")
             secret_type = source_elem.attrib.get("secretType", "")
             source_key_elem = source_elem.find("sourceKey")

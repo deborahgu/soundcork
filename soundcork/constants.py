@@ -51,5 +51,8 @@ PRESETS_FILE = "Presets.xml"
 RECENTS_FILE = "Recents.xml"
 # retrieved per account via file retrieval from /mnt/nv/BoseApp-Persistence/1/Sources.xml
 # a limited version is available via {deviceip}:8090/sources but this doesn't include
-# necessary secrets
+# necessary secrets.
+#
+# also each source should have an id but they don't seem to; should probably add these
+# values on initial copy of the Sources.xml file from the device.
 SOURCES_FILE = "Sources.xml"
