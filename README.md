@@ -43,8 +43,6 @@ Then you can run a container from the image:
 sudo docker run \
   -dt \
   --rm \
-  --replace \
-  --name soundcork \
   -p 8000:8000/tcp \
   --env TARGET=dev \                                                 # optional, will be prod if omitted
   --volume ~/private_env:/soundcork/soundcork/.env.private \         # optional, should be the custom env file, will be the same like .env.shared if not provided
