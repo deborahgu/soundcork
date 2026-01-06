@@ -10,7 +10,7 @@ This project is pre-alpha. We welcome contributions! See [CONTRIBUTING.md](CONTR
 
 This is an attempt to reverse-engineer those servers so that users can continue to use the full set of SoundTouch functionality after Bose shuts the official servers down.
 
-### Context
+## Context
 
 [As described here](https://flarn2006.blogspot.com/2014/09/hacking-bose-soundtouch-and-its-linux.html), it is possible to access the underlying server by creating a USB stick with an empty file called ```remote_services``` and then booting the SoundTouch with the USB stick plugged in to the USB port in the back. From there we can then telnet (or ssh, but the ssh server running is fairly old) over and log in as root (no password).
 
@@ -31,7 +31,29 @@ Assumingly all four servers listed there will be shut down. From testing, the `m
 
 ## Running, testing, and installing soundcork
 
-### Installing
+### In a container
+A container image can be built from the provided `Dockerfile`.
+```
+sudo docker build -f Dockerfile -t localhost/soundcork:latest .
+```
+If you want to provide a custom env file (for content see [below](#configuring-the-soundcork-server)), create one before starting the container.
+
+Then you can run a container from the image:
+```
+podman run \
+  -dt \
+  --rm \
+  --replace \
+  --name soundcork \
+  -p 8000:8000/tcp \
+  --env TARGET=dev \                                                 # optional, will be prod if omitted
+  --volume ~/private_env:/soundcork/soundcork/.env.private \         # optional, should be the custom env file, will be the same like .env.shared if not provided
+  --volume volumename:/path/to/soundcork/db \                        # optional, but necessary if you want to persist the server data
+  localhost/soundcork:latest
+```
+
+### Bare metal
+#### Installing
 
 This has been written and tested with Python 3.12. Eventually it will be bundled as an installable app but for now you'll want a virtual environment.
 
@@ -54,12 +76,12 @@ or OS.)
 	```
 1. Install the pre-requisites
 	```bash
-	pip install requirements.txt
+	pip install -r requirements.txt
 	```
 
 When you're done with the virtual environment, you can type `deactivate` to leave that shell.
 
-### Running
+#### Running
 
 - To run in test
 	```sh
@@ -89,7 +111,7 @@ When you're done with the virtual environment, you can type `deactivate` to leav
 
 You can verify the server by checking the `/docs` endpoint at your URL.
 
-### Setting your SoundTouch device to use the soundcork server
+#### Configuring the soundcork server
 
 For purposes of this example, let's say that you've set up a soundcork server on your local server available via hostname ```soundcork.local.example.com``` and running on port 8000.  Let's also say that you want a data dir at ```/home/soundcork/db```.
 
@@ -108,6 +130,8 @@ and then start the server
 
 	fastapi run main.py
 
+
+### Configuration of the speakers to use soundcork
 Once a soundcork server is running, the next step is to configure your SoundTouch device to run using soundcork instead of the Bose servers.  The first step is to get access to the Bose system. As mentioned in the Context section above, the way to do that is to get a USB drive, create a file called ```remote_services```, plug it into the USB port of the SoundTouch speaker and then reboot the speaker (unplugging and plugging back in being the most direct way).  
 
 Once the speaker has rebooted, you can connect to it via telnet. So if your SoundTouch device is on 192.168.1.158, you can do
@@ -118,7 +142,7 @@ You'll get a login screen.  Log in as user ```root```; there is no password.
 
 Once you're logged into the shell on the SoundTouch speaker, there are two things that need to be done. First, the speaker has a lot of information about its current configuration; this information will need to be sent to the soundcork server so that we can send it back to the speaker.  Second, the speaker will need to be configured to point to the soundcork server itself.
 
-#### Configuring the soundcork server from the Bose speaker
+#### Configuring the soundcork server
 
 *NOTE in the future we plan to have a web UI that will automatically transfer over these values, but for now the only way to do it is by hand.* 
 
@@ -159,7 +183,7 @@ For Sources, there is some information that is stored on the devices themselves 
 
 
 
-#### Configuring the Bose speaker to use the soundcork server
+#### Configuring the Bose speaker
 
 Now that the soundcork server has all of the information that it needs, we're ready to tell the speaker to use the soundcork server instead of the Bose servers.  For this, we go to 
 
@@ -184,7 +208,7 @@ The original values are
   	<isZeroconfEnabled>true</isZeroconfEnabled>
   	<saveMargeCustomerReport>false</saveMargeCustomerReport>
   	<bmxRegistryUrl>https://content.api.bose.io/bmx/registry/v1/services</bmxRegistryUrl>
-	</SoundTouchSdkPrivateCfg>>
+	</SoundTouchSdkPrivateCfg>
 	
 set these all to point to the soundcork server
 
@@ -197,7 +221,7 @@ set these all to point to the soundcork server
   	<isZeroconfEnabled>true</isZeroconfEnabled>
   	<saveMargeCustomerReport>false</saveMargeCustomerReport>
   	<bmxRegistryUrl>http://soundcork.local.example.com:8000/bmx/registry/v1/services</bmxRegistryUrl>
-	</SoundTouchSdkPrivateCfg>>
+	</SoundTouchSdkPrivateCfg>
 
 And finally, the moment of truth: reboot the speaker.  You can do it the way we did earlier by unplugging it, or, now that we have access to the command prompt, just run
 
