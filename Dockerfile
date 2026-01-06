@@ -12,6 +12,4 @@ WORKDIR /soundcork/soundcork
 
 RUN cp .env.shared .env.private
 
-VOLUME /soundcork/soundcork/.env.private
-
 CMD fastapi ${TARGET} main.py
