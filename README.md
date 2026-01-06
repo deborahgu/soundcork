@@ -40,7 +40,7 @@ If you want to provide a custom env file (for content see [below](#configuring-t
 
 Then you can run a container from the image:
 ```
-podman run \
+sudo docker run \
   -dt \
   --rm \
   --replace \
