@@ -13,10 +13,12 @@ from soundcork.config import Settings
 from soundcork.datastore import DataStore
 from soundcork.marge import (
     account_full_xml,
+    add_device_to_account,
     add_recent,
     presets_xml,
     provider_settings_xml,
     recents_xml,
+    remove_device_from_account,
     software_update_xml,
     source_providers,
     update_preset,
@@ -189,6 +191,22 @@ async def post_account_recent(
     xml_resp = add_recent(datastore, account, device, xml)
     etag = datastore.etag_for_recents(account)
     return bose_xml_response(xml_resp, etag)
+
+
+@app.post("/marge/streaming/account/{account}/device/", tags=["marge"])
+async def post_account_device(account: str, request: Request):
+    validate_params(account)
+    xml = await request.body()
+    xml_resp = add_device_to_account(datastore, account, xml)
+    etag = datastore.etag_for_account(account)
+    return bose_xml_response(xml_resp, etag)
+
+
+@app.delete("/marge/streaming/account/{account}/device/{device}/", tags=["marge"])
+async def delete_account_device(account: str, device: str):
+    validate_params(account, device)
+    xml_resp = remove_device_from_account(datastore, account, device)
+    return {"ok": True}
 
 
 @app.get("/bmx/registry/v1/services", response_model_exclude_none=True, tags=["bmx"])
