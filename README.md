@@ -144,7 +144,7 @@ So now your have your account number of ```1234567``` and device ID of ```A0B1C2
 
 	mkdir -p /home/soundcork/db/1234567/devices/A0B1C2D3E4F5
 
-`Presets.xml`, `Recents.xml`, and `DeviceInfo.xml` can all be gotten via the web UI at http://{SoundTouchIp}:8080/presets, http://{SoundTouchIp}:8080/recents, and http://{SoundTouchIp}:8080/info, respectively. Fetch those URLs and save the returned XML as the apprpriate files. (If you have multiple SoundTouch devices, create a directory and `DeviceInfo.xml` file for each one. If you have multiple accounts that you keep separate, repeat this procedure for each account.)
+`Presets.xml`, `Recents.xml`, and `DeviceInfo.xml` can all be gotten via the web UI at `http://{SoundTouchIp}:8090/presets`, `http://{SoundTouchIp}:8090/recents`, and `http://{SoundTouchIp}:8090/info`, respectively. Fetch those URLs and save the returned XML as the apprpriate files. (If you have multiple SoundTouch devices, create a directory and `DeviceInfo.xml` file for each one. If you have multiple accounts that you keep separate, repeat this procedure for each account.)
 
 For Sources, there is some information that is stored on the devices themselves that isn't exposed via the web UI, so you have to go onto the device itself to get that file. `telnet` or `ssh` into the device and then transfer the `Sources.xml` file over to your soundcork db:
 
