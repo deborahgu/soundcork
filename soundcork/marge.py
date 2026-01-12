@@ -386,6 +386,32 @@ def software_update_xml() -> ET.Element:
     return su
 
 
-# TODO figure out etags
-# def etag_configured_sources(account, device) -> float:
-#    return path.getmtime(path.join(account_device_dir(account, device), "Sources.xml"))
+def add_device_to_account(
+    datastore: "DataStore", account: str, source_xml: str
+) -> ET.Element:
+
+    new_device_elem = ET.fromstring(source_xml)
+    device_id = new_device_elem.attrib.get("deviceid", "")
+    name = new_device_elem.find("name").text
+
+    # TODO implement
+    # datastore.add_device(account, device_id, name)
+
+    created_on = datetime.fromtimestamp(
+        datetime.now().timestamp(), timezone.utc
+    ).isoformat()
+
+    return_elem = ET.Element("device")
+    return_elem.attrib["deviceid"] = device_id
+    ET.SubElement(return_elem, "createdOn").text = created_on
+    ET.SubElement(return_elem, "ipaddress")
+    ET.SubElement(return_elem, "name").text = name
+    ET.SubElement(return_elem, "updatedOn").text = created_on
+
+    return return_elem
+
+
+def remove_device_from_account(datastore: "DataStore", account: str, device: str):
+    # TODO implement
+    # datastore.remove_device(account, device)
+    return {"ok"}
