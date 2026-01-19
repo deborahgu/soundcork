@@ -8,7 +8,7 @@ from soundcork.model import Audio, BmxPlaybackResponse, Stream
 
 # TODO: move into constants file eventually.
 TUNEIN_DESCRIBE = "https://opml.radiotime.com/describe.ashx?id=%s"
-TUNEIN_STREAM = "http://opml.radiotime.com/Tune.ashx?id=%s"
+TUNEIN_STREAM = "http://opml.radiotime.com/Tune.ashx?id=%s&formats=mp3,aac,ogg"
 
 
 # TODO:  determine how listen_id is used, if at all
