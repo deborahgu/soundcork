@@ -8,7 +8,12 @@ from http import HTTPStatus
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
-from soundcork.bmx import play_custom_stream, tunein_playback
+from soundcork.bmx import (
+    play_custom_stream,
+    tunein_playback,
+    tunein_playback_podcast,
+    tunein_podcast_info,
+)
 from soundcork.config import Settings
 from soundcork.datastore import DataStore
 from soundcork.marge import (
@@ -21,7 +26,7 @@ from soundcork.marge import (
     source_providers,
     update_preset,
 )
-from soundcork.model import BmxPlaybackResponse, BmxResponse
+from soundcork.model import BmxPlaybackResponse, BmxPodcastInfoResponse, BmxResponse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -205,9 +210,32 @@ def bmx_services() -> BmxResponse:
         return bmx_response
 
 
-@app.get("/bmx/tunein/v1/playback/station/{station_id}", tags=["bmx"])
+@app.get(
+    "/bmx/tunein/v1/playback/station/{station_id}",
+    response_model_exclude_none=True,
+    tags=["bmx"],
+)
 def bmx_playback(station_id: str) -> BmxPlaybackResponse:
     return tunein_playback(station_id)
+
+
+@app.get(
+    "/bmx/tunein/v1/playback/episodes/{episode_id}",
+    response_model_exclude_none=True,
+    tags=["bmx"],
+)
+def bmx_podcast_info(episode_id: str, request: Request) -> BmxPodcastInfoResponse:
+    encoded_name = request.query_params.get("encoded_name", "")
+    return tunein_podcast_info(episode_id, encoded_name)
+
+
+@app.get(
+    "/bmx/tunein/v1/playback/episode/{episode_id}",
+    response_model_exclude_none=True,
+    tags=["bmx"],
+)
+def bmx_playback_podcast(episode_id: str, request: Request) -> BmxPlaybackResponse:
+    return tunein_playback_podcast(episode_id)
 
 
 @app.get("/core02/svc-bmx-adapter-orion/prod/orion/station", tags=["bmx"])
