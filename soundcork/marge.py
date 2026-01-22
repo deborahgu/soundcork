@@ -131,6 +131,7 @@ def content_item_source_xml(
                 i for i in configured_sources if i.id == content_item.source_id
             )
         except StopIteration:
+            print(f"invalid source for content_item.source_id {content_item.source_id}")
             raise HTTPException(status_code=400, detail="Invalid source")
         return configured_source_xml(matching_src, datestr)
 
@@ -139,9 +140,16 @@ def content_item_source_xml(
             i
             for i in configured_sources
             if i.source_key_type == content_item.source
-            and i.source_key_account == content_item.source_account
+            and (
+                i.source_key_account is None
+                or content_item.source_account is None
+                or i.source_key_account == content_item.source_account
+            )
         )
     except StopIteration:
+        print(
+            f"invalid source for source key {content_item.source} account {content_item.source_account}"
+        )
         raise HTTPException(status_code=400, detail="Invalid source")
     return configured_source_xml(matching_src, datestr)
 
