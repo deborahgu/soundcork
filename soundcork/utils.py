@@ -1,11 +1,19 @@
 import logging
 import os
+import urllib.request
 from urllib.parse import urlparse
 
 import upnpclient
 from telnetlib3 import Telnet
 
 from soundcork.config import Settings
+from soundcork.constants import (
+    SPEAKER_DEVICE_INFO_PATH,
+    SPEAKER_HTTP_PORT,
+    SPEAKER_PRESETS_PATH,
+    SPEAKER_RECENTS_PATH,
+    SPEAKER_SOURCES_FILE_LOCATION,
+)
 from soundcork.datastore import DataStore
 
 logging.basicConfig(
@@ -29,7 +37,17 @@ def get_ssh_config() -> dict:
     }
 
 
-def send_file_to_speaker(filename: str, host: str, remote_path: str) -> None:
+def hostname_for_device(device: upnpclient.upnp.Device) -> str:
+    return urlparse(device.location).hostname
+
+
+def read_recents(device: upnpclient.upnp.Device) -> str:
+    return read_file_from_speaker_http(
+        hostname_for_device(device), SPEAKER_RECENTS_PATH
+    )
+
+
+def write_file_to_speaker(filename: str, host: str, remote_path: str) -> None:
     """Place a file on the remote speaker."""
     raise NotImplementedError
 
@@ -39,9 +57,15 @@ def read_file_from_speaker_ssh(filename: str, host: str, remote_path: str) -> No
     raise NotImplementedError
 
 
-def read_file_from_speaker_http(filename: str, host: str, remote_path: str) -> None:
+def read_file_from_speaker_http(host: str, path: str) -> str:
     """Read a file from the remote speaker, using their HTTP API."""
-    raise NotImplementedError
+    url = f"http://{host}:{SPEAKER_HTTP_PORT}{path}"
+    logger.info(f"checking {url}")
+    try:
+        return urllib.request.urlopen(url).read()
+    except Exception:
+        logger.info(f"no result for {url}")
+        return "none"
 
 
 def get_bose_devices() -> list[upnpclient.upnp.Device]:

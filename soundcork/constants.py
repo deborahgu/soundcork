@@ -58,8 +58,9 @@ RECENTS_FILE = "Recents.xml"
 SOURCES_FILE = "Sources.xml"
 
 # for device initialization via http
-SPEAKER_DEVICE_INFO_URL = "http://{hostname}:8090/info"
-SPEAKER_RECENTS_URL = "http://{hostname}:8090/recents"
-SPEAKER_PRESETS_URL = "http://{hostname}:8090/presets"
+SPEAKER_HTTP_PORT = 8090
+SPEAKER_DEVICE_INFO_PATH = "/info"
+SPEAKER_RECENTS_PATH = "/recents"
+SPEAKER_PRESETS_PATH = "/presets"
 # this one needs to be pulled from a device
 SPEAKER_SOURCES_FILE_LOCATION = "/mnt/nv/BoseApp-Persistence/1/Sources.xml"
