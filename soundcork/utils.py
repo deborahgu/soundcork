@@ -19,6 +19,17 @@ datastore = DataStore()
 settings = Settings()
 
 
+def get_bose_devices() -> list[upnpclient.upnp.Device]:
+    """Return a list of all Bose SoundTouch UPnP devices on the network"""
+    devices = upnpclient.discover()
+    bose_devices = [d for d in devices if "Bose SoundTouch" in d.model_description]
+    logger.info("Discovering upnp devices on the network")
+    logger.info(
+        f'Discovered Bose devices:\n- {"\n- ".join([b.friendly_name for b in bose_devices])}'
+    )
+    return bose_devices
+
+
 def send_file_to_speaker(filename: str, host: str, remote_path: str) -> None:
     """Place a file on the remote speaker."""
     ssh_config = {
@@ -45,12 +56,6 @@ def show_upnp_devices() -> None:
         if is_reachable(d):
             reachable = "* "
         print(f"{reachable}{d.friendly_name}")
-
-
-def get_bose_devices() -> list[upnpclient.upnp.Device]:
-    """Return a list of all Bose SoundTouch UPnP devices on the network"""
-    devices = upnpclient.discover()
-    return [d for d in devices if "Bose SoundTouch" in d.model_description]
 
 
 def is_reachable(device: upnpclient.upnp.Device) -> bool:

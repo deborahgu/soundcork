@@ -2,8 +2,6 @@ import logging
 import xml.etree.ElementTree as ET
 from os import path, walk
 
-import upnpclient
-
 from soundcork.config import Settings
 from soundcork.constants import (
     DEVICE_INFO_FILE,
@@ -33,37 +31,18 @@ class DataStore:
     """
 
     def __init__(self) -> None:
+        logger.info("Initiating Datastore")
+        self.data_dir = settings.data_dir
         # def __init__(self, data_dir: str, settings: Settings) -> None:
 
-        # self.data_dir = data_dir
-        self.bose_devices: list[upnpclient.upnp.Device]
-        logger.info("Initiating Datastore")
-
     def account_dir(self, account: str) -> str:
-        return path.join(settings.data_dir, account)
+        return path.join(self.data_dir, account)
 
     def account_devices_dir(self, account: str) -> str:
-        return path.join(settings.data_dir, account, DEVICES_DIR)
+        return path.join(self.data_dir, account, DEVICES_DIR)
 
     def account_device_dir(self, account: str, device: str) -> str:
         return path.join(self.account_devices_dir(account), device)
-
-    def discover_devices(self) -> None:
-        """Discovered upnp devices on the network
-
-        Righ now this doesn't do anything except put discovered devices on self.bose_devices
-        (see main.py for instantiation) to show how we'll put info on this datastore class.
-
-        Discovered devices may well NOT end up as class properties, since this method
-        will theoretically run very rarely and only on demand."""
-        upnp_devices = upnpclient.discover()
-        self.bose_devices = [
-            d for d in upnp_devices if "Bose SoundTouch" in d.model_description
-        ]
-        logger.info("Discovering upnp devices on the network")
-        logger.info(
-            f'Discovered Bose devices:\n- {"\n- ".join([b.friendly_name for b in self.bose_devices])}'
-        )
 
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Get the device info"""
