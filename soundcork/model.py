@@ -6,22 +6,14 @@ from pydantic import AliasChoices, BaseModel, Field
 
 class Link(BaseModel):
     href: str
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-=======
-=======
->>>>>>> origin/main
+
     use_internal_client: Optional[str] = Field(
         default=None,
         alias="useInternalClient",
         serialization_alias="useInternalClient",
         validation_alias=AliasChoices("useInternalClient", "use_internal_client"),
     )
-<<<<<<< HEAD
     templated: Optional[bool] = None
->>>>>>> Stashed changes
-=======
->>>>>>> origin/main
 
 
 class Links(BaseModel):
@@ -121,6 +113,7 @@ class BmxPlaybackResponse(BaseModel):
     duration: Optional[int] = None
     restrictions: Optional[dict] = None
 
+
 class Track(BaseModel):
     links: dict = Field(default=None, serialization_alias="_links")
     is_selected: bool = Field(default=None, serialization_alias="isSelected")
@@ -134,7 +127,6 @@ class BmxPodcastInfoResponse(BaseModel):
     repeat_disabled: bool = Field(default=False, serialization_alias="repeatDisabled")
     stream_type: str = Field(default=None, serialization_alias="streamType")
     tracks: list[Track]
-
 
 
 class BmxNowPlaying(BaseModel):
