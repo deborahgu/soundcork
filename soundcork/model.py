@@ -1,21 +1,27 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class Link(BaseModel):
     href: str
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 =======
+=======
+>>>>>>> origin/main
     use_internal_client: Optional[str] = Field(
         default=None,
         alias="useInternalClient",
         serialization_alias="useInternalClient",
         validation_alias=AliasChoices("useInternalClient", "use_internal_client"),
     )
+<<<<<<< HEAD
     templated: Optional[bool] = None
 >>>>>>> Stashed changes
+=======
+>>>>>>> origin/main
 
 
 class Links(BaseModel):
@@ -24,6 +30,12 @@ class Links(BaseModel):
     bmx_services_availability: Optional[Link] = None
     bmx_token: Optional[Link] = None
     self: Optional[Link] = None
+    bmx_availability: Optional[Link] = None
+    bmx_logout: Optional[Link] = None
+    bmx_reporting: Optional[Link] = None
+    bmx_favorite: Optional[Link] = None
+    bmx_nowplaying: Optional[Link] = None
+    bmx_track: Optional[Link] = None
 
 
 class IconSet(BaseModel):
@@ -95,18 +107,19 @@ class Audio(BaseModel):
 
 class BmxPlaybackResponse(BaseModel):
     links: Optional[Links] = Field(
-        default=None, alias="_links", serialization_alias="_links"
+        default=None,
+        alias="_links",
+        serialization_alias="_links",
+        validation_alias=AliasChoices("links", "_links"),
     )
+    artist: Optional[dict] = None
     audio: Audio
     imageUrl: str
     isFavorite: Optional[bool] = None
     name: str
     streamType: str
-<<<<<<< Updated upstream
-=======
     duration: Optional[int] = None
     restrictions: Optional[dict] = None
-
 
 class Track(BaseModel):
     links: dict = Field(default=None, serialization_alias="_links")
@@ -121,7 +134,7 @@ class BmxPodcastInfoResponse(BaseModel):
     repeat_disabled: bool = Field(default=False, serialization_alias="repeatDisabled")
     stream_type: str = Field(default=None, serialization_alias="streamType")
     tracks: list[Track]
->>>>>>> Stashed changes
+
 
 
 class BmxNowPlaying(BaseModel):

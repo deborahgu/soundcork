@@ -4,9 +4,6 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-<<<<<<< Updated upstream
-from soundcork.model import Audio, BmxPlaybackResponse, Stream
-=======
 from soundcork.model import (
     Audio,
     BmxNowPlaying,
@@ -16,11 +13,10 @@ from soundcork.model import (
     Track,
 )
 from soundcork.siriusxm_fastapi import SiriusXM
->>>>>>> Stashed changes
 
 # TODO: move into constants file eventually.
 TUNEIN_DESCRIBE = "https://opml.radiotime.com/describe.ashx?id=%s"
-TUNEIN_STREAM = "http://opml.radiotime.com/Tune.ashx?id=%s"
+TUNEIN_STREAM = "http://opml.radiotime.com/Tune.ashx?id=%s&formats=mp3,aac,ogg"
 
 
 # TODO:  determine how listen_id is used, if at all
@@ -98,6 +94,106 @@ def tunein_playback(station_id: str) -> BmxPlaybackResponse:
         isFavorite=False,
         name=name,
         streamType="liveRadio",
+    )
+    return resp
+
+
+def tunein_podcast_info(podcast_id: str, encoded_name: str) -> BmxPodcastInfoResponse:
+
+    name = base64.b64decode(encoded_name)
+    track = Track(
+        links={"bmx_track": {"href": f"/v1/playback/episode/{podcast_id}"}},
+        is_selected=False,
+        name=name,
+    )
+    resp = BmxPodcastInfoResponse(
+        links={
+            "self": {
+                "href": f"/v1/playback/episodes/{podcast_id}?encoded_name={encoded_name}"
+            },
+        },
+        name=name,
+        shuffle_disabled=True,
+        repeat_disabled=True,
+        stream_type="onDemand",
+        tracks=[track],
+    )
+    return resp
+
+
+# TODO:  determine how listen_id is used, if at all
+# TODO:  determine how stream_id is used, if at all
+# TODO:  see if there is a value to varying the timeout values
+def tunein_playback_podcast(podcast_id: str) -> BmxPlaybackResponse:
+
+    describe_url = TUNEIN_DESCRIBE % podcast_id
+    contents = urllib.request.urlopen(describe_url).read()
+    content_str = contents.decode("utf-8")
+
+    root = ET.fromstring(content_str)
+
+    body = root.find("body")
+
+    outline = body.find("outline")
+    topic = outline.find("topic")
+    title = topic.find("title").text
+    show_title = topic.find("show_title").text
+    duration = topic.find("duration").text
+    show_id = topic.find("show_id").text
+    logo = topic.find("logo").text
+
+    streamreq = TUNEIN_STREAM % podcast_id
+    stream_url_resp = urllib.request.urlopen(streamreq).read().decode("utf-8")
+
+    # these might be used by later calls to bmx_reporting and/or now-playing,
+    # so we might need to give them actual values
+    stream_id = "e3342"
+    listen_id = str(3432432423)
+    bmx_reporting_qs = urllib.parse.urlencode(
+        {
+            "stream_id": stream_id,
+            "guide_id": podcast_id,
+            "listen_id": listen_id,
+            "stream_type": "onDemand",
+        }
+    )
+    bmx_reporting = "/v1/report?" + bmx_reporting_qs
+
+    stream_url_list = stream_url_resp.splitlines()
+    stream_list = [
+        Stream(
+            links={"bmx_reporting": {"href": bmx_reporting}},
+            hasPlaylist=True,
+            isRealtime=False,
+            maxTimeout=60,
+            bufferingTimeout=20,
+            connectingTimeout=10,
+            streamUrl=stream_url,
+        )
+        for stream_url in stream_url_list
+    ]
+
+    audio = Audio(
+        hasPlaylist=True,
+        isRealtime=False,
+        maxTimeout=60,
+        streamUrl=stream_url_list[0],
+        streams=stream_list,
+    )
+    resp = BmxPlaybackResponse(
+        links={
+            "bmx_favorite": {"href": f"/v1/favorite/{show_id}"},
+            "bmx_reporting": {"href": bmx_reporting},
+        },
+        artist={"name": show_title},
+        audio=audio,
+        duration=int(duration),
+        imageUrl=logo,
+        isFavorite=False,
+        name=title,
+        shuffle_disabled=True,
+        repeat_disabled=True,
+        streamType="onDemand",
     )
     return resp
 
