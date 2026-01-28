@@ -6,6 +6,16 @@ from pydantic import BaseModel, Field
 
 class Link(BaseModel):
     href: str
+<<<<<<< Updated upstream
+=======
+    use_internal_client: Optional[str] = Field(
+        default=None,
+        alias="useInternalClient",
+        serialization_alias="useInternalClient",
+        validation_alias=AliasChoices("useInternalClient", "use_internal_client"),
+    )
+    templated: Optional[bool] = None
+>>>>>>> Stashed changes
 
 
 class Links(BaseModel):
@@ -67,6 +77,12 @@ class Stream(BaseModel):
     hasPlaylist: bool
     isRealtime: bool
     streamUrl: str
+    start_at_live_point: Optional[bool] = Field(
+        default=None,
+        alias="startAtLivePoint",
+        serialization_alias="startAtLivePoint",
+        validation_alias=AliasChoices("startAtLivePoint", "start_at_live_point"),
+    )
 
 
 class Audio(BaseModel):
@@ -86,6 +102,35 @@ class BmxPlaybackResponse(BaseModel):
     isFavorite: Optional[bool] = None
     name: str
     streamType: str
+<<<<<<< Updated upstream
+=======
+    duration: Optional[int] = None
+    restrictions: Optional[dict] = None
+
+
+class Track(BaseModel):
+    links: dict = Field(default=None, serialization_alias="_links")
+    is_selected: bool = Field(default=None, serialization_alias="isSelected")
+    name: str
+
+
+class BmxPodcastInfoResponse(BaseModel):
+    links: dict = Field(default=None, serialization_alias="_links")
+    name: str
+    shuffle_disabled: bool = Field(default=False, serialization_alias="shuffleDisabled")
+    repeat_disabled: bool = Field(default=False, serialization_alias="repeatDisabled")
+    stream_type: str = Field(default=None, serialization_alias="streamType")
+    tracks: list[Track]
+>>>>>>> Stashed changes
+
+
+class BmxNowPlaying(BaseModel):
+    links: dict = Field(default=None, serialization_alias="_links")
+    album: Optional[str] = None
+    artist: Optional[str] = None
+    ask_again_after: Optional[int] = None
+    image_url: Optional[str] = None
+    track: str
 
 
 class SourceProvider(BaseModel):

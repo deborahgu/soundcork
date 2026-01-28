@@ -1,3 +1,5 @@
+import asyncio
+import base64
 import logging
 import os
 import xml.etree.ElementTree as ET
@@ -8,7 +10,18 @@ from http import HTTPStatus
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
+<<<<<<< Updated upstream
 from soundcork.bmx import play_custom_stream, tunein_playback
+=======
+from soundcork.bmx import (
+    now_playing_siriusxm,
+    play_custom_stream,
+    play_siriusxm_station,
+    tunein_playback,
+    tunein_playback_podcast,
+    tunein_podcast_info,
+)
+>>>>>>> Stashed changes
 from soundcork.config import Settings
 from soundcork.datastore import DataStore
 from soundcork.marge import (
@@ -21,7 +34,17 @@ from soundcork.marge import (
     source_providers,
     update_preset,
 )
+<<<<<<< Updated upstream
 from soundcork.model import BmxPlaybackResponse, BmxResponse
+=======
+from soundcork.model import (
+    BmxNowPlaying,
+    BmxPlaybackResponse,
+    BmxPodcastInfoResponse,
+    BmxResponse,
+)
+from soundcork.siriusxm_fastapi import SiriusXM
+>>>>>>> Stashed changes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,6 +55,9 @@ logger = logging.getLogger(__name__)
 
 datastore = DataStore()
 settings = Settings()
+sxm = SiriusXM("username", "pw")
+# asyncio.run(sxm.startup())
+# asyncio.get_event_loop().create_task(sxm.startup())
 
 
 @asynccontextmanager
@@ -214,6 +240,54 @@ def bmx_playback(station_id: str) -> BmxPlaybackResponse:
 def custom_stream_playback(request: Request) -> BmxPlaybackResponse:
     data = request.query_params.get("data", "")
     return play_custom_stream(data)
+
+
+@app.get(
+    "/core02/svc-bmx-adapter-siriusxm-everest-eco1/prod/live-adapter/playback/station/{station_name}",
+    response_model_exclude_none=True,
+    tags=["bmx"],
+)
+def siriusxm_playback(station_name: str) -> BmxPlaybackResponse:
+    print("play_seriousxm_station")
+    return play_siriusxm_station(sxm, 33)
+
+
+@app.get(
+    "/core02/svc-bmx-adapter-siriusxm-everest-eco1/prod/live-adapter/now-playing/{station}",
+    response_model_exclude_none=True,
+    tags=["bmx"],
+)
+def siriusxm_playback(station: int) -> BmxNowPlaying:
+    return now_playing_siriusxm(sxm, station)
+
+
+@app.get("/listen/{channel_id}.m3u8")
+async def listen(channel_id: int):
+    channel_info = sxm.get_channel_info_by_number(channel_id)
+    data = sxm.get_channel(channel_info["id"])
+    if not data:
+        raise HTTPException(status_code=500, detail="Failed to get channel stream")
+    return Response(content=data, media_type="application/vnd.apple.mpegurl")
+
+
+@app.get("/listen/{channel_id}/{segment}")
+async def segment(channel_id: str, segment: str):
+    data = sxm.get_segment(channel_id, segment)
+    if not data:
+        raise HTTPException(status_code=500, detail="Failed to get segment")
+    return Response(content=data, media_type="audio/aac")
+
+
+@app.get("/key/{uuid}")
+async def key(uuid: str):
+    key_b64 = sxm.getAESkey(uuid)
+    if not key_b64:
+        raise HTTPException(status_code=500, detail="Failed to get AES key")
+    try:
+        key = base64.b64decode(key_b64)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AES key decode failed: {e}")
+    return Response(content=key, media_type="application/octet-stream")
 
 
 @app.get("/media/{filename}", tags=["bmx"])
