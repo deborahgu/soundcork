@@ -1,3 +1,4 @@
+import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from os import path, walk
@@ -19,6 +20,13 @@ if TYPE_CHECKING:
     from soundcork.datastore import DataStore
 
 # pyright: reportOptionalMemberAccess=false
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+
+logger = logging.getLogger(__name__)
 
 settings = Settings()
 

@@ -2,8 +2,6 @@ import logging
 import xml.etree.ElementTree as ET
 from os import path, walk
 
-import upnpclient
-
 from soundcork.config import Settings
 from soundcork.constants import (
     DEVICE_INFO_FILE,
@@ -33,37 +31,21 @@ class DataStore:
     """
 
     def __init__(self) -> None:
+        logger.info("Initiating Datastore")
+        self.data_dir = settings.data_dir
         # def __init__(self, data_dir: str, settings: Settings) -> None:
 
-        # self.data_dir = data_dir
-        self.bose_devices: list[upnpclient.upnp.Device]
-        logger.info("Initiating Datastore")
+    def initialize_data_directory(self) -> None:
+        raise NotImplementedError
 
     def account_dir(self, account: str) -> str:
-        return path.join(settings.data_dir, account)
+        return path.join(self.data_dir, account)
 
     def account_devices_dir(self, account: str) -> str:
-        return path.join(settings.data_dir, account, DEVICES_DIR)
+        return path.join(self.data_dir, account, DEVICES_DIR)
 
     def account_device_dir(self, account: str, device: str) -> str:
         return path.join(self.account_devices_dir(account), device)
-
-    def discover_devices(self) -> None:
-        """Discovered upnp devices on the network
-
-        Righ now this doesn't do anything except put discovered devices on self.bose_devices
-        (see main.py for instantiation) to show how we'll put info on this datastore class.
-
-        Discovered devices may well NOT end up as class properties, since this method
-        will theoretically run very rarely and only on demand."""
-        upnp_devices = upnpclient.discover()
-        self.bose_devices = [
-            d for d in upnp_devices if "Bose SoundTouch" in d.model_description
-        ]
-        logger.info("Discovering upnp devices on the network")
-        logger.info(
-            f'Discovered Bose devices:\n- {"\n- ".join([b.friendly_name for b in self.bose_devices])}'
-        )
 
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Get the device info"""
@@ -78,6 +60,7 @@ class DataStore:
         type = info_elem.find("type").text
         module_type = info_elem.find("moduleType").text
         components = info_elem.find("components").findall("component")
+
         for component in components:
             component_category = component.find("componentCategory").text
             if component_category == "SCM":
@@ -89,15 +72,20 @@ class DataStore:
             if network_info.attrib.get("type", "") == "SCM":
                 ip_address = network_info.find("ipAddress").text
 
-        return DeviceInfo(
-            device_id=device_id,
-            product_code=f"{type} {module_type}",
-            device_serial_number=str(device_serial_number),
-            product_serial_number=str(product_serial_number),
-            firmware_version=str(firmware_version),
-            ip_address=str(ip_address),
-            name=str(name),
-        )
+        try:
+            return DeviceInfo(
+                device_id=device_id,
+                product_code=f"{type} {module_type}",
+                device_serial_number=str(device_serial_number),  # type: ignore
+                product_serial_number=str(product_serial_number),  # type: ignore
+                firmware_version=str(firmware_version),  # type: ignore
+                ip_address=str(ip_address),  # type: ignore
+                name=str(name),
+            )
+        except NameError:
+            raise RuntimeError(
+                f"There are missing required fields in the device: {device_id}"
+            )
 
     def save_presets(self, account: str, device: str, presets_list: list[Preset]):
         save_file = path.join(self.account_dir(account), PRESETS_FILE)
