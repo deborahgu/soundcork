@@ -106,17 +106,17 @@ class BmxPlaybackResponse(BaseModel):
 
 
 class Track(BaseModel):
-    links: dict = Field(default=None, serialization_alias="_links")
-    is_selected: bool = Field(default=None, serialization_alias="isSelected")
+    links: dict = Field(serialization_alias="_links")
+    is_selected: bool = Field(serialization_alias="isSelected")
     name: str
 
 
 class BmxPodcastInfoResponse(BaseModel):
-    links: dict = Field(default=None, serialization_alias="_links")
+    links: dict = Field(serialization_alias="_links")
     name: str
     shuffle_disabled: bool = Field(default=False, serialization_alias="shuffleDisabled")
     repeat_disabled: bool = Field(default=False, serialization_alias="repeatDisabled")
-    stream_type: str = Field(default=None, serialization_alias="streamType")
+    stream_type: str = Field(serialization_alias="streamType")
     tracks: list[Track]
 
 
@@ -128,6 +128,15 @@ class SourceProvider(BaseModel):
 
 
 class ContentItem(BaseModel):
+    """ContentItem properties:
+
+    source (int, though sent as strings): ID for a type of source.
+        For example, local file storage.
+    source_id (int, though sent as strings): ID for an instance of a source.
+        For example, a connection to a particular UPnP server.
+        Note: Not all sources will have source IDs that vary (eg. TuneIn)
+    """
+
     id: str
     name: str
     source: Optional[str] = None

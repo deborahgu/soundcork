@@ -78,6 +78,7 @@ class DataStore:
         type = info_elem.find("type").text
         module_type = info_elem.find("moduleType").text
         components = info_elem.find("components").findall("component")
+
         for component in components:
             component_category = component.find("componentCategory").text
             if component_category == "SCM":
@@ -89,15 +90,20 @@ class DataStore:
             if network_info.attrib.get("type", "") == "SCM":
                 ip_address = network_info.find("ipAddress").text
 
-        return DeviceInfo(
-            device_id=device_id,
-            product_code=f"{type} {module_type}",
-            device_serial_number=str(device_serial_number),
-            product_serial_number=str(product_serial_number),
-            firmware_version=str(firmware_version),
-            ip_address=str(ip_address),
-            name=str(name),
-        )
+        try:
+            return DeviceInfo(
+                device_id=device_id,
+                product_code=f"{type} {module_type}",
+                device_serial_number=str(device_serial_number),  # type: ignore
+                product_serial_number=str(product_serial_number),  # type: ignore
+                firmware_version=str(firmware_version),  # type: ignore
+                ip_address=str(ip_address),  # type: ignore
+                name=str(name),
+            )
+        except NameError:
+            raise RuntimeError(
+                f"There are missing required fields in the device: {device_id}"
+            )
 
     def save_presets(self, account: str, device: str, presets_list: list[Preset]):
         save_file = path.join(self.account_dir(account), PRESETS_FILE)
