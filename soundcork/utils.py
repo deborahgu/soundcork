@@ -19,6 +19,31 @@ datastore = DataStore()
 settings = Settings()
 
 
+def get_ssh_config() -> dict:
+    return {
+        "StrictHostKeyChecking": "accept-new",
+        "HostkeyAlgorithms": "ssh-rsa,ssh-dss",
+        "PreferredAuthentications": "password",
+        "disabled_algorithms": {"pubkeys": []},
+        "allow_agent": False,
+    }
+
+
+def send_file_to_speaker(filename: str, host: str, remote_path: str) -> None:
+    """Place a file on the remote speaker."""
+    raise NotImplementedError
+
+
+def read_file_from_speaker_ssh(filename: str, host: str, remote_path: str) -> None:
+    """Read a file from the remote speaker, using ssh."""
+    raise NotImplementedError
+
+
+def read_file_from_speaker_http(filename: str, host: str, remote_path: str) -> None:
+    """Read a file from the remote speaker, using their HTTP API."""
+    raise NotImplementedError
+
+
 def get_bose_devices() -> list[upnpclient.upnp.Device]:
     """Return a list of all Bose SoundTouch UPnP devices on the network"""
     devices = upnpclient.discover()
@@ -28,19 +53,6 @@ def get_bose_devices() -> list[upnpclient.upnp.Device]:
         f'Discovered Bose devices:\n- {"\n- ".join([b.friendly_name for b in bose_devices])}'
     )
     return bose_devices
-
-
-def send_file_to_speaker(filename: str, host: str, remote_path: str) -> None:
-    """Place a file on the remote speaker."""
-    ssh_config = {
-        "StrictHostKeyChecking": "accept-new",
-        "HostkeyAlgorithms": "ssh-rsa,ssh-dss",
-        "PreferredAuthentications": "password",
-        "disabled_algorithms": {"pubkeys": []},
-        "allow_agent": False,
-    }
-    # not implemented yet
-    raise NotImplementedError
 
 
 def show_upnp_devices() -> None:

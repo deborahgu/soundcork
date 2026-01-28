@@ -35,6 +35,9 @@ class DataStore:
         self.data_dir = settings.data_dir
         # def __init__(self, data_dir: str, settings: Settings) -> None:
 
+    def initialize_data_directory(self) -> None:
+        raise NotImplementedError
+
     def account_dir(self, account: str) -> str:
         return path.join(self.data_dir, account)
 
