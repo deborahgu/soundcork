@@ -47,6 +47,18 @@ def read_recents(device: upnpclient.upnp.Device) -> str:
     )
 
 
+def read_device_info(device: upnpclient.upnp.Device) -> str:
+    return read_file_from_speaker_http(
+        hostname_for_device(device), SPEAKER_DEVICE_INFO_PATH
+    )
+
+
+def read_presets(device: upnpclient.upnp.Device) -> str:
+    return read_file_from_speaker_http(
+        hostname_for_device(device), SPEAKER_PRESETS_PATH
+    )
+
+
 def write_file_to_speaker(filename: str, host: str, remote_path: str) -> None:
     """Place a file on the remote speaker."""
     raise NotImplementedError

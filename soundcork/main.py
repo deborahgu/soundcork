@@ -29,7 +29,7 @@ from soundcork.marge import (
     update_preset,
 )
 from soundcork.model import BmxPlaybackResponse, BmxPodcastInfoResponse, BmxResponse
-from soundcork.utils import get_bose_devices, read_recents
+from soundcork.utils import get_bose_devices, read_device_info, read_recents
 
 logging.basicConfig(
     level=logging.INFO,
@@ -312,10 +312,26 @@ def validate_params(account="12345", device="ABCD3"):
 ################## configuration ############3
 
 
-@app.get("/scan", tags=["setup"])
+@app.get("/scan_recents", tags=["setup"])
 def test_scan_recents():
     devices = get_bose_devices()
     recents = []
     for device in devices:
         recents.append(read_recents(device))
     return recents
+
+
+@app.get("/scan", tags=["setup"])
+def scan_devices():
+    devices = get_bose_devices()
+    device_infos = {}
+    for device in devices:
+        info_elem = ET.fromstring(read_device_info(device))
+        device_infos[device.udn] = {
+            "device_id": info_elem.attrib.get("deviceID", ""),
+            "name": info_elem.find("name").text,
+            "type": info_elem.find("type").text,
+            "marge URL": info_elem.find("margeURL").text,
+            "account": info_elem.find("margeAccountUUID").text,
+        }
+    return device_infos
