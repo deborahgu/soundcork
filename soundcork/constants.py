@@ -56,3 +56,11 @@ RECENTS_FILE = "Recents.xml"
 # also each source should have an id but they don't seem to; should probably add these
 # values on initial copy of the Sources.xml file from the device.
 SOURCES_FILE = "Sources.xml"
+
+# for device initialization via http
+SPEAKER_HTTP_PORT = 8090
+SPEAKER_DEVICE_INFO_PATH = "/info"
+SPEAKER_RECENTS_PATH = "/recents"
+SPEAKER_PRESETS_PATH = "/presets"
+# this one needs to be pulled from a device
+SPEAKER_SOURCES_FILE_LOCATION = "/mnt/nv/BoseApp-Persistence/1/Sources.xml"
