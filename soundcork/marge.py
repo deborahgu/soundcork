@@ -374,7 +374,9 @@ def account_full_xml(account: str, datastore: "DataStore") -> ET.Element:
 
     ET.SubElement(account_elem, "mode").text = "global"
 
-    ET.SubElement(account_elem, "preferrendLanguage").text = "en"
+    # FIXME we can get this from the language endpoint but it returns a
+    # number rathen than a language code
+    ET.SubElement(account_elem, "preferredLanguage").text = "en"
     account_elem.append(provider_settings_xml(account))
     account_elem.append(
         all_sources_xml(
