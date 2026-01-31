@@ -29,7 +29,7 @@ from soundcork.marge import (
     update_preset,
 )
 from soundcork.model import BmxPlaybackResponse, BmxPodcastInfoResponse, BmxResponse
-from soundcork.utils import get_bose_devices, read_device_info, read_recents
+from soundcork.utils import add_device, get_bose_devices, read_device_info, read_recents
 
 logging.basicConfig(
     level=logging.INFO,
@@ -335,3 +335,12 @@ def scan_devices():
             "account": info_elem.find("margeAccountUUID").text,
         }
     return device_infos
+
+
+@app.post("/initialize_device/{device_id}", tags=["setup"])
+def initialize_device(device_id: str):
+    devices = get_bose_devices()
+    for device in devices:
+        info_elem = ET.fromstring(read_device_info(device))
+        if info_elem.attrib.get("deviceID", "") == device_id:
+            return {device_id: add_device(device)}

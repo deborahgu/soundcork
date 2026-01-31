@@ -1,6 +1,7 @@
 import logging
 import os
 import urllib.request
+import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
 
 import upnpclient
@@ -74,7 +75,7 @@ def read_file_from_speaker_http(host: str, path: str) -> str:
     url = f"http://{host}:{SPEAKER_HTTP_PORT}{path}"
     logger.info(f"checking {url}")
     try:
-        return urllib.request.urlopen(url).read()
+        return str(urllib.request.urlopen(url).read(), "utf-8")
     except Exception:
         logger.info(f"no result for {url}")
         return "none"
@@ -114,4 +115,31 @@ def is_reachable(device: upnpclient.upnp.Device) -> bool:
     except ConnectionRefusedError:
         return False
     conn.close()
+    return True
+
+
+def add_device(device: upnpclient.upnp.Device) -> bool:
+    info_elem = ET.fromstring(read_device_info(device))
+    device_id = info_elem.attrib.get("deviceID", "")
+    name = info_elem.find("name").text
+    account_id = info_elem.find("margeAccountUUID").text
+    if not datastore.account_exists(account_id):
+        recents = read_recents(device)
+        presets = read_presets(device)
+        # TBD
+        # sources = read_sources(device)
+        sources = ""
+        add_account(account_id, recents, presets, sources)
+
+    datastore.add_device(account_id, device_id, read_device_info(device))
+    return True
+
+
+def add_account(account_id: str, recents: str, presets: str, sources: str) -> bool:
+    if not datastore.create_account(account_id):
+        return False
+    datastore.save_presets_xml(account_id, presets)
+    datastore.save_recents_xml(account_id, recents)
+    datastore.save_configured_sources_xml(account_id, sources)
+
     return True
