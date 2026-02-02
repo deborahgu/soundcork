@@ -343,14 +343,12 @@ def provider_settings_xml(account: str) -> ET.Element:
 def account_full_xml(account: str, datastore: "DataStore") -> ET.Element:
     datestr = "2012-09-19T12:43:00.000+00:00"
 
-    account_dir = datastore.account_devices_dir(account)
-
     account_elem = ET.Element("account")
     account_elem.attrib["id"] = account
     ET.SubElement(account_elem, "accountStatus").text = "OK"
     devices_elem = ET.SubElement(account_elem, "devices")
     last_device_id = ""
-    for device_id in next(walk(account_dir))[1]:
+    for device_id in datastore.list_devices(account):
         last_device_id = device_id
         device_info = datastore.get_device_info(account, device_id)
 
