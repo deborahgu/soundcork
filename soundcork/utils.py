@@ -1,7 +1,7 @@
 import logging
-import os
 import urllib.request
 import xml.etree.ElementTree as ET
+from subprocess import run
 from urllib.parse import urlparse
 
 import upnpclient
@@ -28,18 +28,25 @@ datastore = DataStore()
 settings = Settings()
 
 
-def get_ssh_config() -> dict:
-    return {
-        "StrictHostKeyChecking": "accept-new",
-        "HostkeyAlgorithms": "ssh-rsa,ssh-dss",
-        "PreferredAuthentications": "password",
-        "disabled_algorithms": {"pubkeys": []},
-        "allow_agent": False,
-    }
+SSH_ARGS = [
+    "scp",
+    "-O",
+    "-o",
+    "StrictHostKeyChecking=accept-new",
+    "-o",
+    "HostkeyAlgorithms=+ssh-rsa,ssh-dss",
+    "-o",
+    "PreferredAuthentications=password",
+]
 
 
 def hostname_for_device(device: upnpclient.upnp.Device) -> str:
-    return urlparse(device.location).hostname
+    """Given a UPnP device, return hostname/IP
+
+    Raises AttributeError if there's something wrong with the Device object and
+    it has no location.
+    """
+    return urlparse(device.location).hostname  # type: ignore
 
 
 def read_recents(device: upnpclient.upnp.Device) -> str:
@@ -61,13 +68,43 @@ def read_presets(device: upnpclient.upnp.Device) -> str:
 
 
 def write_file_to_speaker(filename: str, host: str, remote_path: str) -> None:
-    """Place a file on the remote speaker."""
-    raise NotImplementedError
+    """Place a file on the remote speaker.
+
+    Unfortunately, the speakers' shell (BusyBox) supports scp but not sftp, while
+    all the Paramiko-based ssh libraries for Python (such as Fabric) only emulate scp over
+    sftp. As a result, we need to subprocess call out to scp, which hopefully is present
+    on the host system and hopefully uses a version with these arguments.
+    """
+    # TODO add timeout handling
+    logger.debug(f"copying {filename} to {host}")
+    result = run(
+        SSH_ARGS + [filename, f"root@{host}:{remote_path}"], capture_output=True
+    )
+    if result.returncode:
+        raise RuntimeError(
+            f"something went wrong copying {filename} to {host}: {result.stderr}"
+        )
 
 
-def read_file_from_speaker_ssh(filename: str, host: str, remote_path: str) -> None:
-    """Read a file from the remote speaker, using ssh."""
-    raise NotImplementedError
+def read_file_from_speaker_ssh(
+    filename: str, host: str, remote_path: str, local_path: str
+) -> None:
+    """Read a file from the remote speaker, using ssh.
+
+    Unfortunately, the speakers' shell (BusyBox) supports scp but not sftp, while
+    all the Paramiko-based ssh libraries for Python (such as Fabric) only emulate scp over
+    sftp. As a result, we need to subprocess call out to scp, which hopefully is present
+    on the host system and hopefully uses a version with these arguments.
+    """
+    # TODO add timeout handling
+    logger.debug(f"copying {filename} from {host}")
+    result = run(
+        SSH_ARGS + [f"root@{host}:{remote_path}", local_path], capture_output=True
+    )
+    if result.returncode:
+        raise RuntimeError(
+            f"something went wrong copying {filename} from {host}: {result.stderr}"
+        )
 
 
 def read_file_from_speaker_http(host: str, path: str) -> str:
@@ -121,17 +158,17 @@ def is_reachable(device: upnpclient.upnp.Device) -> bool:
 def add_device(device: upnpclient.upnp.Device) -> bool:
     info_elem = ET.fromstring(read_device_info(device))
     device_id = info_elem.attrib.get("deviceID", "")
-    name = info_elem.find("name").text
-    account_id = info_elem.find("margeAccountUUID").text
-    if not datastore.account_exists(account_id):
+    # If margeAccountUUID is not present, the .text will correctly raise an error here
+    account_id = info_elem.find("margeAccountUUID").text  # type: ignore
+    if not datastore.account_exists(account_id):  # type: ignore
         recents = read_recents(device)
         presets = read_presets(device)
         # TBD
         # sources = read_sources(device)
         sources = ""
-        add_account(account_id, recents, presets, sources)
+        add_account(account_id, recents, presets, sources)  # type: ignore
 
-    datastore.add_device(account_id, device_id, read_device_info(device))
+    datastore.add_device(account_id, device_id, read_device_info(device))  # type: ignore
     return True
 
 
