@@ -1,3 +1,10 @@
+"""Device management
+
+Code to interact with Bose SoundTouch UPnP devices. In almost all cases,
+these will be the physical SoundTouch speakers, running the SoundTouch
+software on a BusyBox system.
+"""
+
 import logging
 import urllib.request
 import xml.etree.ElementTree as ET
