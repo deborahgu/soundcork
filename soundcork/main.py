@@ -16,6 +16,12 @@ from soundcork.bmx import (
 )
 from soundcork.config import Settings
 from soundcork.datastore import DataStore
+from soundcork.devices import (
+    add_device,
+    get_bose_devices,
+    read_device_info,
+    read_recents,
+)
 from soundcork.marge import (
     account_full_xml,
     add_device_to_account,
@@ -29,7 +35,6 @@ from soundcork.marge import (
     update_preset,
 )
 from soundcork.model import BmxPlaybackResponse, BmxPodcastInfoResponse, BmxResponse
-from soundcork.utils import add_device, get_bose_devices, read_device_info, read_recents
 
 logging.basicConfig(
     level=logging.INFO,
