@@ -288,6 +288,7 @@ def add_recent(
     if matching_recent:
         # just update the time and move it to the front of the list
         matching_recent.utc_time = str(utc_time)
+        created_on = default_datestr
         recent_obj = matching_recent
     else:
         # need a new id

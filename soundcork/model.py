@@ -1,7 +1,12 @@
 from datetime import datetime
 from typing import List, Optional
 
+from fastapi import Response
 from pydantic import AliasChoices, BaseModel, Field
+
+
+class BoseXMLResponse(Response):
+    media_type = "application/vnd.bose.streaming-v1.2+xml"
 
 
 class Link(BaseModel):
