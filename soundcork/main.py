@@ -17,6 +17,7 @@ from soundcork.bmx import (
     tunein_podcast_info,
 )
 from soundcork.config import Settings
+from soundcork.constants import ACCOUNT_RE, DEVICE_RE
 from soundcork.datastore import DataStore
 from soundcork.devices import (
     add_device,
@@ -176,8 +177,8 @@ def etag_for_swupdate(request: Request) -> str:
     ],
 )
 def account_presets(
-    account: Annotated[str, Path(pattern="^\d{1,20}")],
-    device: Annotated[str, Path(pattern="^[0-9a-fA-F]{12}")],
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
     response: Response,
 ):
     xml = presets_xml(datastore, account, device)
@@ -198,8 +199,8 @@ def account_presets(
     ],
 )
 async def put_account_preset(
-    account: Annotated[str, Path(pattern="^\d{1,20}")],
-    device: Annotated[str, Path(pattern="^[0-9a-fA-F]{12}")],
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
     preset_number: int,
     request: Request,
 ):
@@ -222,8 +223,8 @@ async def put_account_preset(
     ],
 )
 def account_recents(
-    account: Annotated[str, Path(pattern="^\d{1,20}")],
-    device: Annotated[str, Path(pattern="^[0-9a-fA-F]{12}")],
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
 ):
     xml = recents_xml(datastore, account, device)
     return bose_xml_str(xml)
@@ -243,7 +244,7 @@ def account_recents(
         )
     ],
 )
-def account_provider_settings(account: Annotated[str, Path(pattern="^\d{1,20}")]):
+def account_provider_settings(account: Annotated[str, Path(pattern=ACCOUNT_RE)]):
     xml = provider_settings_xml(account)
     return bose_xml_str(xml)
 
@@ -254,7 +255,7 @@ def account_provider_settings(account: Annotated[str, Path(pattern="^\d{1,20}")]
     dependencies=[Depends(Etag(etag_gen=etag_for_swupdate, weak=False))],
     tags=["marge"],
 )
-def software_update(account: Annotated[str, Path(pattern="^\d{1,20}")]):
+def software_update(account: Annotated[str, Path(pattern=ACCOUNT_RE)]):
     xml = software_update_xml()
     return bose_xml_str(xml)
 
@@ -273,7 +274,7 @@ def software_update(account: Annotated[str, Path(pattern="^\d{1,20}")]):
         )
     ],
 )
-def account_full(account: Annotated[str, Path(pattern="^\d{1,20}")]) -> str:
+def account_full(account: Annotated[str, Path(pattern=ACCOUNT_RE)]) -> str:
     xml = account_full_xml(account, datastore)
     return bose_xml_str(xml)
 
@@ -285,8 +286,8 @@ def account_full(account: Annotated[str, Path(pattern="^\d{1,20}")]) -> str:
     dependencies=[Depends(Etag(etag_gen=etag_for_recents, weak=False))],
 )
 async def post_account_recent(
-    account: Annotated[str, Path(pattern="^\d{1,20}")],
-    device: Annotated[str, Path(pattern="^[0-9a-fA-F]{12}")],
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
     request: Request,
 ):
     xml = await request.body()
@@ -308,7 +309,7 @@ async def post_account_recent(
     ],
 )
 async def post_account_device(
-    account: Annotated[str, Path(pattern="^\d{1,20}")], request: Request
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)], request: Request
 ):
     xml = await request.body()
     xml_resp = add_device_to_account(datastore, account, xml)
@@ -317,8 +318,8 @@ async def post_account_device(
 
 @app.delete("/marge/streaming/account/{account}/device/{device}/", tags=["marge"])
 async def delete_account_device(
-    account: Annotated[str, Path(pattern="^\d{1,20}")],
-    device: Annotated[str, Path(pattern="^[0-9a-fA-F]{12}")],
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
 ):
     xml_resp = remove_device_from_account(datastore, account, device)
     return {"ok": True}
