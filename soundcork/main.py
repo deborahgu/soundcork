@@ -181,9 +181,7 @@ def account_presets(
     response: Response,
 ):
     xml = presets_xml(datastore, account, device)
-    return_xml = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>{ET.tostring(xml, encoding="unicode")}'
-
-    return return_xml
+    return bose_xml_str(xml)
 
 
 @app.put(
