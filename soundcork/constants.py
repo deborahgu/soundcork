@@ -38,6 +38,7 @@ PROVIDERS = [
     "RADIO.COM",
     "RADIO_COM",
     "SIRIUSXM_EVEREST",
+    "RADIO_BROWSER" # https://www.radio-browser.info
 ]
 
 # where we store associated devices.
