@@ -1,4 +1,5 @@
 import logging
+import re
 import xml.etree.ElementTree as ET
 from os import mkdir, path, walk
 from typing import Optional
@@ -279,15 +280,24 @@ class DataStore:
 
     def etag_for_presets(self, account: str) -> int:
         presets_file = path.join(self.account_dir(account), PRESETS_FILE)
-        return int(path.getmtime(presets_file) * 1000)
+        if path.exists(presets_file):
+            return int(path.getmtime(presets_file) * 1000)
+        else:
+            return 0
 
     def etag_for_sources(self, account: str) -> int:
-        presets_file = path.join(self.account_dir(account), SOURCES_FILE)
-        return int(path.getmtime(presets_file) * 1000)
+        sources_file = path.join(self.account_dir(account), SOURCES_FILE)
+        if path.exists(sources_file):
+            return int(path.getmtime(sources_file) * 1000)
+        else:
+            return 0
 
     def etag_for_recents(self, account: str) -> int:
         recents_file = path.join(self.account_dir(account), RECENTS_FILE)
-        return int(path.getmtime(recents_file) * 1000)
+        if path.exists(recents_file):
+            return int(path.getmtime(recents_file) * 1000)
+        else:
+            return 0
 
     def etag_for_account(self, account: str) -> int:
         return max(

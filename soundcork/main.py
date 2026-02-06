@@ -4,9 +4,11 @@ import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from datetime import datetime
 from http import HTTPStatus
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Path, Request, Response
 from fastapi.responses import FileResponse
+from fastapi_etag import Etag
 
 from soundcork.bmx import (
     play_custom_stream,
@@ -15,6 +17,7 @@ from soundcork.bmx import (
     tunein_podcast_info,
 )
 from soundcork.config import Settings
+from soundcork.constants import ACCOUNT_RE, DEVICE_RE
 from soundcork.datastore import DataStore
 from soundcork.devices import (
     add_device,
@@ -34,7 +37,12 @@ from soundcork.marge import (
     source_providers,
     update_preset,
 )
-from soundcork.model import BmxPlaybackResponse, BmxPodcastInfoResponse, BmxResponse
+from soundcork.model import (
+    BmxPlaybackResponse,
+    BmxPodcastInfoResponse,
+    BmxResponse,
+    BoseXMLResponse,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -139,83 +147,180 @@ def streamingsourceproviders():
     return response
 
 
-@app.get("/marge/streaming/account/{account}/device/{device}/presets", tags=["marge"])
-def account_presets(account: str, device: str):
+def etag_for_presets(request: Request) -> str:
+    return str(datastore.etag_for_presets(request.path_params.get("account")))
+
+
+def etag_for_recents(request: Request) -> str:
+    return str(datastore.etag_for_recents(request.path_params.get("account")))
+
+
+def etag_for_account(request: Request) -> str:
+    return str(datastore.etag_for_account(request.path_params.get("account")))
+
+
+def etag_for_swupdate(request: Request) -> str:
+    return "1663726921993"
+
+
+@app.get(
+    "/marge/streaming/account/{account}/device/{device}/presets",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+    dependencies=[
+        Depends(
+            Etag(
+                etag_gen=etag_for_presets,
+                weak=False,
+            )
+        )
+    ],
+)
+def account_presets(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
+    response: Response,
+):
     xml = presets_xml(datastore, account, device)
-    etag = datastore.etag_for_presets(account)
-    return bose_xml_response(xml, etag)
+    return bose_xml_str(xml)
 
 
 @app.put(
     "/marge/streaming/account/{account}/device/{device}/preset/{preset_number}",
+    response_class=BoseXMLResponse,
     tags=["marge"],
+    dependencies=[
+        Depends(
+            Etag(
+                etag_gen=etag_for_presets,
+                weak=False,
+            )
+        )
+    ],
 )
 async def put_account_preset(
-    account: str,
-    device: str,
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
     preset_number: int,
     request: Request,
 ):
-    validate_params(account, device)
     xml = await request.body()
     xml_resp = update_preset(datastore, account, device, preset_number, xml)
-    etag = datastore.etag_for_presets(account)
-    return bose_xml_response(xml_resp, etag)
+    return bose_xml_str(xml_resp)
 
 
-@app.get("/marge/streaming/account/{account}/device/{device}/recents", tags=["marge"])
-def account_recents(account: str, device: str):
-    validate_params(account, device)
-
+@app.get(
+    "/marge/streaming/account/{account}/device/{device}/recents",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+    dependencies=[
+        Depends(
+            Etag(
+                etag_gen=etag_for_recents,
+                weak=False,
+            )
+        )
+    ],
+)
+def account_recents(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
+):
     xml = recents_xml(datastore, account, device)
-    etag = datastore.etag_for_recents(account)
-    return bose_xml_response(xml, etag)
+    return bose_xml_str(xml)
 
 
-@app.get("/marge/streaming/account/{account}/provider_settings", tags=["marge"])
-def account_provider_settings(account: str):
+@app.get(
+    "/marge/streaming/account/{account}/provider_settings",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+    dependencies=[
+        Depends(
+            Etag(
+                etag_gen=etag_for_recents,
+                weak=False,
+                extra_headers={"method_name": "getProviderSettings"},
+            )
+        )
+    ],
+)
+def account_provider_settings(account: Annotated[str, Path(pattern=ACCOUNT_RE)]):
     xml = provider_settings_xml(account)
-    return bose_xml_response(xml, startup_timestamp, "getProviderSettings")
+    return bose_xml_str(xml)
 
 
-@app.get("/marge/streaming/software/update/account/{account}", tags=["marge"])
-def software_update(account: str):
+@app.get(
+    "/marge/streaming/software/update/account/{account}",
+    response_class=BoseXMLResponse,
+    dependencies=[Depends(Etag(etag_gen=etag_for_swupdate, weak=False))],
+    tags=["marge"],
+)
+def software_update(account: Annotated[str, Path(pattern=ACCOUNT_RE)]):
     xml = software_update_xml()
-    return bose_xml_response(xml)
+    return bose_xml_str(xml)
 
 
-@app.get("/marge/streaming/account/{account}/full", tags=["marge"])
-def account_full(account: str):
+@app.get(
+    "/marge/streaming/account/{account}/full",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+    dependencies=[
+        Depends(
+            Etag(
+                etag_gen=etag_for_account,
+                weak=False,
+                extra_headers={"method_name": "getFullAccount"},
+            )
+        )
+    ],
+)
+def account_full(account: Annotated[str, Path(pattern=ACCOUNT_RE)]) -> str:
     xml = account_full_xml(account, datastore)
-    etag = datastore.etag_for_account(account)
-    return bose_xml_response(xml, etag, "getFullAccount")
+    return bose_xml_str(xml)
 
 
-@app.post("/marge/streaming/account/{account}/device/{device}/recent", tags=["marge"])
+@app.post(
+    "/marge/streaming/account/{account}/device/{device}/recent",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+    dependencies=[Depends(Etag(etag_gen=etag_for_recents, weak=False))],
+)
 async def post_account_recent(
-    account: str,
-    device: str,
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
     request: Request,
 ):
-    validate_params(account)
     xml = await request.body()
     xml_resp = add_recent(datastore, account, device, xml)
-    etag = datastore.etag_for_recents(account)
-    return bose_xml_response(xml_resp, etag)
+    return bose_xml_str(xml_resp)
 
 
-@app.post("/marge/streaming/account/{account}/device/", tags=["marge"])
-async def post_account_device(account: str, request: Request):
-    validate_params(account)
+@app.post(
+    "/marge/streaming/account/{account}/device/",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+    dependencies=[
+        Depends(
+            Etag(
+                etag_gen=etag_for_account,
+                weak=False,
+            )
+        )
+    ],
+)
+async def post_account_device(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)], request: Request
+):
     xml = await request.body()
     xml_resp = add_device_to_account(datastore, account, xml)
-    etag = datastore.etag_for_account(account)
-    return bose_xml_response(xml_resp, etag)
+    return bose_xml_str(xml_resp)
 
 
 @app.delete("/marge/streaming/account/{account}/device/{device}/", tags=["marge"])
-async def delete_account_device(account: str, device: str):
-    validate_params(account, device)
+async def delete_account_device(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
+):
     xml_resp = remove_device_from_account(datastore, account, device)
     return {"ok": True}
 
@@ -288,30 +393,11 @@ def sw_update() -> Response:
         return response
 
 
-def bose_xml_response(xml: ET.Element, etag: int = 0, method: str = "") -> Response:
+def bose_xml_str(xml: ET.Element) -> str:
     # ET.tostring won't allow you to set standalone="yes"
     return_xml = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>{ET.tostring(xml, encoding="unicode")}'
-    response = Response(content=return_xml, media_type="application/xml")
-    # TODO: move content type to constants
-    response.headers["content-type"] = "application/vnd.bose.streaming-v1.2+xml"
 
-    if etag == 0:
-        etag = startup_timestamp
-
-    response.headers["etag"] = str(etag)
-    response.headers["method_name"] = method
-    return response
-
-
-def validate_params(account="12345", device="ABCD3"):
-    try:
-        int(account)
-    except ValueError:
-        raise HTTPException(status_code=500, detail="invalid account")
-    try:
-        int(device, 16)
-    except ValueError:
-        raise HTTPException(status_code=500, detail="invalid device id")
+    return return_xml
 
 
 ################## configuration ############3
