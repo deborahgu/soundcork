@@ -14,7 +14,6 @@
 - Soundcork supports source type RADIO_BROWSER to play radio stations.
 - Set the `location` attribute to `/stations/byuuid/{UUID}`.
 
-
 ```xml
 <ContentItem
   source="RADIO_BROWSER"
@@ -25,7 +24,10 @@
   <containerArt></containerArt>
 </ContentItem>
 ```
+### Playing the station
 
+To start the radio stream replace `<uuid>` and `<soundtouch>` and run curl like this:
 
-
-
+```bash
+curl -d '<ContentItem source="RADIO_BROWSER" type="stationurl" location="/stations/byuuid/<uuid>"/>' <soundtouch>:8090/select
+```
