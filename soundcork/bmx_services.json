@@ -188,11 +188,10 @@
         "color": "#000000",
         "description": "RadioBrowser is an open source internet radio directory. It provides access to thousands of internet radio stations worldwide. RadioBrowser is community driven and relies on user contributions to keep the station database up to date.",
         "icons": {
-          "defaultAlbumArt": "",
-          "largeSvg": "",
-          "monochromePng": "",
-          "monochromeSvg": "",
-          "smallSvg": ""
+          "largeSvg": "{MEDIA_SERVER}/orion-monochrome.svg",
+          "monochromePng": "{MEDIA_SERVER}/orion-monochrome_v2.png",
+          "monochromeSvg": "{MEDIA_SERVER}/orion-monochrome.svg",
+          "smallSvg": "{MEDIA_SERVER}/orion-monochrome.svg"
         },
         "name": "RadioBrowser"
       },
