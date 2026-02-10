@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -17,7 +18,7 @@ from soundcork.bmx import (
     tunein_podcast_info,
 )
 from soundcork.config import Settings
-from soundcork.constants import ACCOUNT_RE, DEVICE_RE
+from soundcork.constants import ACCOUNT_RE, DEVICE_RE, GROUP_RE
 from soundcork.datastore import DataStore
 from soundcork.devices import (
     add_device,
@@ -399,9 +400,7 @@ def bose_xml_str(xml: ET.Element) -> str:
 
     return return_xml
 
-
-################## configuration ############3
-
+################## configuration ############
 
 @app.get("/scan_recents", tags=["setup"])
 def test_scan_recents():
@@ -436,3 +435,173 @@ def add_device_to_datastore(device_id: str):
         if info_elem.attrib.get("deviceID", "") == device_id:
             success = add_device(device)
             return {device_id: success}
+
+################## groups ############
+
+def generate_group_id() -> str:
+    return f"{random.randint(0, 9999999):07d}"
+    
+@app.get(
+    "/marge/streaming/account/{account}/device/{device}/group",
+    response_class=BoseXMLResponse,
+    tags=["marge"]
+)
+async def device_group_status(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
+):
+    try:
+        result = datastore.get_device_group_xml(account, device)
+        #-- error ?
+        if result.startswith("Device") or result.startswith("Failed"):
+            return BoseXMLResponse(
+                content=f"<error>{result}</error>",
+                status_code=400
+            )
+        #-- otherwise
+        return BoseXMLResponse(content=result)
+    except Exception as e:
+        return BoseXMLResponse(
+            content=f"<error>Unexpected error: {e}</error>",
+            status_code=500
+        )
+
+@app.post(
+    "/marge/streaming/account/{account}/group",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+)
+async def add_group_endpoint(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    request: Request,
+):
+    try:
+        reqxml_bytes = await request.body()
+        reqxml_str = reqxml_bytes.decode("utf-8")
+        
+        try:
+            root = ET.fromstring(reqxml_str)
+        except ET.ParseError:
+            return BoseXMLResponse(
+                content="<error>Invalid XML payload</error>",
+                status_code=400,
+            )
+        #-- check must be done here, because we need to insert the id attribute
+        if root.tag != "group":
+            return BoseXMLResponse(
+                content="<error>Root element must be &lt;group&gt;</error>",
+                status_code=400,
+            )
+
+        group_id = generate_group_id()
+        root.set("id", group_id)
+
+        xml_with_id = ET.tostring(
+            root,
+            encoding="utf-8",
+            xml_declaration=True,
+        ).decode("utf-8")
+
+        error = datastore.add_group(account, group_id, xml_with_id)
+        if error:
+            return BoseXMLResponse(
+                content=f"<error>{error}</error>",
+                status_code=400,
+            )
+
+        return BoseXMLResponse(content=xml_with_id)
+
+    except UnicodeDecodeError:
+        return BoseXMLResponse(
+            content="<error>Invalid UTF-8 in request body</error>",
+            status_code=400,
+        )
+        
+@app.post(
+    "/marge/streaming/account/{account}/group/{group}",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+)
+async def mod_group_endpoint(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    group: Annotated[str, Path(pattern=GROUP_RE)],
+    request: Request,
+):
+    try:
+        body = await request.body()
+        xml_str = body.decode("utf-8")
+        root = ET.fromstring(xml_str)
+        #-- check group
+        if root.tag != "group":
+            return BoseXMLResponse(
+                content="<error>Root element must be &lt;group&gt;</error>",
+                status_code=400,
+            )
+        #-- check nanme element and masterDevice
+        name_elem = root.find("name")
+        master_elem = root.find("masterDeviceId")
+        if name_elem is None or not name_elem.text:
+            return BoseXMLResponse(
+                content="<error>Missing group name</error>",
+                status_code=400,
+            )
+        if master_elem is None or not master_elem.text:
+            return BoseXMLResponse(
+                content="<error>Missing masterDeviceId</error>",
+                status_code=400,
+            )
+        #-- change name
+        result = datastore.modify_group(
+            account=account,
+            group_id=group,
+            new_name=name_elem.text,
+            master_device_id=master_elem.text,
+        )
+
+        #-- error
+        if not result.lstrip().startswith("<?xml"):
+            return BoseXMLResponse(
+                content=f"<error>{result}</error>",
+                status_code=400,
+            )
+
+        #-- success, return file
+        return BoseXMLResponse(content=result)
+
+    except ET.ParseError:
+        return BoseXMLResponse(
+            content="<error>Invalid XML payload</error>",
+            status_code=400,
+        )
+
+    except UnicodeDecodeError:
+        return BoseXMLResponse(
+            content="<error>Invalid UTF-8 in request body</error>",
+            status_code=400,
+        )
+
+
+@app.delete(
+    "/marge/streaming/account/{account}/group/{group}",
+    tags=["marge"]
+)
+async def delete_group_endpoint(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    group: Annotated[str, Path(pattern=GROUP_RE)],
+):
+    try:
+        error = datastore.delete_group(account, group)
+        if error:
+            return BoseXMLResponse(
+                content=f"<error>{error}</error>",
+                status_code=400
+            )
+        return BoseXMLResponse(
+            content=f"<status>Group {group} deleted successfully</status>"
+        )
+
+    except Exception as e:
+        return BoseXMLResponse(
+            content=f"<error>Unexpected error: {e}</error>",
+            status_code=500
+        )
