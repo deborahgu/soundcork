@@ -491,7 +491,7 @@ class DataStore:
         )
 
         if not path.exists(group_file):
-            return "Group does not exist"
+            return "Group does not exist in account {account}"
 
         #-- get xml file
         try:
@@ -539,7 +539,7 @@ class DataStore:
         filepath = path.join(self.account_devices_dir(account), filename)
 
         if not path.exists(filepath):
-            return f"Group {group_id} does not exist"
+            return f"Group {group_id} does not exist in account {account}"
 
         try:
             remove(filepath)
@@ -557,7 +557,7 @@ class DataStore:
         - XML file of group if grouped
         - error if device does not exist or is no ST10
         """
-        #-- device existent?
+        #-- device existent (may be obsolete, is already checked in main.py)
         device_dir = path.join(self.account_devices_dir(account), device_id)
         info_path = path.join(device_dir, DEVICE_INFO_FILE)
         if not path.exists(info_path):

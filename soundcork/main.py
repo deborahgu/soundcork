@@ -438,9 +438,11 @@ def add_device_to_datastore(device_id: str):
 
 ################## groups ############
 
+#-- Helper function to create a group_id
 def generate_group_id() -> str:
     return f"{random.randint(0, 9999999):07d}"
-    
+
+#-- main endpoint to be queried by devices    
 @app.get(
     "/marge/streaming/account/{account}/device/{device}/group",
     response_class=BoseXMLResponse,
@@ -450,6 +452,19 @@ async def device_group_status(
     account: Annotated[str, Path(pattern=ACCOUNT_RE)],
     device: Annotated[str, Path(pattern=DEVICE_RE)],
 ):
+    #-- check account
+    if not datastore.account_exists(account):
+        return BoseXMLResponse(
+            content=f"<error>Account {account} not found</error>",
+                status_code=400
+            )
+    #-- check device
+    if not datastore.device_exists(account, device):
+        return BoseXMLResponse(
+            content=f"<error>Device {device} not found for account {account}</error>",
+                status_code=400
+            )
+    #-- 
     try:
         result = datastore.get_device_group_xml(account, device)
         #-- error ?
@@ -475,6 +490,13 @@ async def add_group_endpoint(
     account: Annotated[str, Path(pattern=ACCOUNT_RE)],
     request: Request,
 ):
+    #-- check account
+    if not datastore.account_exists(account):
+        return BoseXMLResponse(
+            content=f"<error>Account {account} not found</error>",
+                status_code=400
+            )
+    #-- 
     try:
         reqxml_bytes = await request.body()
         reqxml_str = reqxml_bytes.decode("utf-8")
@@ -527,6 +549,13 @@ async def mod_group_endpoint(
     group: Annotated[str, Path(pattern=GROUP_RE)],
     request: Request,
 ):
+    #-- check account
+    if not datastore.account_exists(account):
+        return BoseXMLResponse(
+            content=f"<error>Account {account} not found</error>",
+                status_code=400
+            )
+    #--
     try:
         body = await request.body()
         xml_str = body.decode("utf-8")
@@ -589,6 +618,13 @@ async def delete_group_endpoint(
     account: Annotated[str, Path(pattern=ACCOUNT_RE)],
     group: Annotated[str, Path(pattern=GROUP_RE)],
 ):
+    #-- check account
+    if not datastore.account_exists(account):
+        return BoseXMLResponse(
+            content=f"<error>Account {account} not found</error>",
+                status_code=400
+            )
+    #--
     try:
         error = datastore.delete_group(account, group)
         if error:
