@@ -3,6 +3,7 @@ import re
 import xml.etree.ElementTree as ET
 from os import mkdir, listdir, path, walk, remove
 from typing import Optional
+from io import BytesIO
 
 from soundcork.config import Settings
 from soundcork.constants import (
@@ -355,16 +356,37 @@ class DataStore:
         return True
            
 ######## groups #################
-    #-- list all existing groups
-    def list_groups(self, account_id) -> list[Optional[str]]:
-        groups = []
-        for group_id in next(walk(self.account_devices_dir(account_id)))[1]:
-            groups.append(group_id)
-        return groups
+    #-- Helper function to prettyprint XML
+    def _pretty_xml(self, root: ET.Element) -> str:
+        #-- add indentations
+        ET.indent(root, space="  ", level=0)
+        buf = BytesIO()
+        ET.ElementTree(root).write(buf, encoding="utf-8", xml_declaration=True)
+        return buf.getvalue().decode("utf-8")
         
-    #-- check if a group with given id exists
+    #-- Helper function to create a unique group_id
+    def _generate_group_id(self, account: str) -> str:
+        while True:
+            group_id = f"{random.randint(0, 9999999):07d}"
+            filepath = path.join(
+                self.account_devices_dir(account),
+                f"Group_{group_id}.xml"
+            )
+            if not path.exists(filepath):
+                return group_id
+
+    #-- list all existing groups
+    def list_groups(self, account: str) -> list[str]:
+        devices_dir = self.account_devices_dir(account)
+        groups = []
+        for fn in listdir(devices_dir):
+            if fn.startswith("Group_") and fn.endswith(".xml"):
+                groups.append(fn[len("Group_"):-len(".xml")])
+        return groups
+
+    #-- check if a group with given id exist
     def group_exists(self, account: str, group_id: str) -> bool:
-        return group_id in self.list_groups(account)
+        return path.exists(path.join(self.account_devices_dir(account), f"Group_{group_id}.xml"))
     
     #-- check if a given device is already grouped    
     def check_device_grouped(self, account: str, device_id: str) -> Optional[str]:
@@ -380,7 +402,7 @@ class DataStore:
                 continue  # kaputte Gruppe ignorieren
             for dev in root.findall(".//deviceId"):
                 if dev.text == device_id:
-                    # Group-ID aus Dateinamen ableiten
+                    # get group_id from filename
                     # Group_<id>.xml
                     return filename[len("Group_") : -len(".xml")]
         return None
@@ -432,15 +454,15 @@ class DataStore:
 
 
     #-- add a group, if a.) both devices are ungrouped and 
-    #                   b.) of type ST10 and 
-    #                   c.) the group id does not yet exist            
-    def add_group(self, account: str, group_id: str, group_info_xml: str) -> str:
+    #                   b.) of type ST10 and       
+    def add_group(self, account: str, group_info_xml: str) -> str:
         """
-        adds a group if it a.) both devices exist, b.) both are ST10 and c.) group_id is free
+        adds a group if it a.) both devices exist, b.) both are ST10 
         return value:
-        ""    → in case of success
-        "..." → error message
+        - XML string of created group on success
+        - error message on failure
         """
+        group_id = self._generate_group_id(account)
         filename = f"Group_{group_id}.xml"
         filepath = path.join(self.account_devices_dir(account), filename)
 
@@ -452,7 +474,7 @@ class DataStore:
             return str(e)
 
         #-- extract two deviceIds
-        device_ids = [d.text for d in root.findall(".//deviceId") if d.text]
+        device_ids = [d.text for d in root.findall("./roles/groupRole/deviceId") if d.text]
         if len(device_ids) != 2:
             return "Group must contain exactly two deviceId entries"
 
@@ -466,12 +488,17 @@ class DataStore:
         for dev_id in device_ids:
             if not self.check_device_type(account, dev_id):
                 return f"Device {dev_id} is not of type 'SoundTouch 10'"
+        
+        #-- done with tests
+        root.set("id", group_id)
+        xml_out = self._pretty_xml(root)
         #-- write to file
         with open(filepath, "w", encoding="utf-8") as f:
-            f.write(group_info_xml)
+            f.write(xml_out)
+        #-- return complete prettyprinted XML
+        return xml_out
 
-        return ""
-
+    #-- change the name of a group
     def modify_group(
         self,
         account: str,
@@ -482,8 +509,8 @@ class DataStore:
         """
         modifies name of a group
         return value:
-            ("", updated_xml) on success
-            ("error", None) on error
+        - XML string of created group on success
+        - error message on failure
         """
         group_file = path.join(
             self.account_devices_dir(account),
@@ -491,7 +518,7 @@ class DataStore:
         )
 
         if not path.exists(group_file):
-            return "Group does not exist in account {account}"
+            return f"Group does not exist in account {account}"
 
         #-- get xml file
         try:
@@ -514,12 +541,13 @@ class DataStore:
             name_elem = ET.SubElement(root, "name")
         name_elem.text = new_name
 
-        #-- stringify
-        xml_out = ET.tostring(
-            root,
-            encoding="utf-8",
-            xml_declaration=True,
-        ).decode("utf-8")
+        #-- stringify with prettyprint
+        xml_out = self._pretty_xml(root)
+        #xml_out = ET.tostring(
+        #    root,
+        #    encoding="utf-8",
+        #    xml_declaration=True,
+        #).decode("utf-8")
 
         #-- write to file 
         with open(group_file, "w", encoding="utf-8") as f:

@@ -438,10 +438,6 @@ def add_device_to_datastore(device_id: str):
 
 ################## groups ############
 
-#-- Helper function to create a group_id
-def generate_group_id() -> str:
-    return f"{random.randint(0, 9999999):07d}"
-
 #-- main endpoint to be queried by devices    
 @app.get(
     "/marge/streaming/account/{account}/device/{device}/group",
@@ -468,7 +464,7 @@ async def device_group_status(
     try:
         result = datastore.get_device_group_xml(account, device)
         #-- error ?
-        if result.startswith("Device") or result.startswith("Failed"):
+        if not result.lstrip().startswith("<?xml") and result.strip() != "<group/>":
             return BoseXMLResponse(
                 content=f"<error>{result}</error>",
                 status_code=400
@@ -515,23 +511,13 @@ async def add_group_endpoint(
                 status_code=400,
             )
 
-        group_id = generate_group_id()
-        root.set("id", group_id)
-
-        xml_with_id = ET.tostring(
-            root,
-            encoding="utf-8",
-            xml_declaration=True,
-        ).decode("utf-8")
-
-        error = datastore.add_group(account, group_id, xml_with_id)
-        if error:
+        result = datastore.add_group(account, reqxml_str)
+        if not result.lstrip().startswith("<?xml"):
             return BoseXMLResponse(
-                content=f"<error>{error}</error>",
+                content=f"<error>{result}</error>",
                 status_code=400,
             )
-
-        return BoseXMLResponse(content=xml_with_id)
+        return BoseXMLResponse(content=result)
 
     except UnicodeDecodeError:
         return BoseXMLResponse(
@@ -566,7 +552,7 @@ async def mod_group_endpoint(
                 content="<error>Root element must be &lt;group&gt;</error>",
                 status_code=400,
             )
-        #-- check nanme element and masterDevice
+        #-- check name element and masterDevice
         name_elem = root.find("name")
         master_elem = root.find("masterDeviceId")
         if name_elem is None or not name_elem.text:
@@ -612,6 +598,7 @@ async def mod_group_endpoint(
 
 @app.delete(
     "/marge/streaming/account/{account}/group/{group}",
+    response_class=BoseXMLResponse,
     tags=["marge"]
 )
 async def delete_group_endpoint(
