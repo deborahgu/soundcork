@@ -299,30 +299,48 @@ async def post_account_recent(
     "/marge/streaming/account/{account}/device/",
     response_class=BoseXMLResponse,
     tags=["marge"],
+    status_code=201,
     dependencies=[
         Depends(
             Etag(
                 etag_gen=etag_for_account,
                 weak=False,
+                extra_headers={
+                    "method_name": "addDevice",
+                    "access-control-expose-headers": "Credentials",
+                },
             )
         )
     ],
 )
 async def post_account_device(
-    account: Annotated[str, Path(pattern=ACCOUNT_RE)], request: Request
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    request: Request,
+    response: Response,
 ):
     xml = await request.body()
-    xml_resp = add_device_to_account(datastore, account, xml)
+    device_id, xml_resp = add_device_to_account(datastore, account, xml)
+    response.headers["Credentials"] = f"{request.headers.get('authorization')}"
+    response.headers["location"] = (
+        f"{settings.base_url}/marge/account/{account}/device/{device_id}"
+    )
     return bose_xml_str(xml_resp)
 
 
-@app.delete("/marge/streaming/account/{account}/device/{device}/", tags=["marge"])
+@app.delete("/marge/streaming/account/{account}/device/{device}", tags=["marge"])
 async def delete_account_device(
     account: Annotated[str, Path(pattern=ACCOUNT_RE)],
     device: Annotated[str, Path(pattern=DEVICE_RE)],
+    response: Response,
 ):
     xml_resp = remove_device_from_account(datastore, account, device)
-    return {"ok": True}
+    response.headers["method_name"] = "removeDevice"
+    response.headers["location"] = (
+        f"{settings.base_url}/marge/account/{account}/device/{device}"
+    )
+    response.body = ""
+    response.status_code = 200
+    return response
 
 
 @app.get("/bmx/registry/v1/services", response_model_exclude_none=True, tags=["bmx"])

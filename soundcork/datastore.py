@@ -1,7 +1,7 @@
 import logging
 import re
 import xml.etree.ElementTree as ET
-from os import mkdir, path, walk
+from os import mkdir, path, remove, rmdir, walk
 from typing import Optional
 
 from soundcork.config import Settings
@@ -352,3 +352,13 @@ class DataStore:
             "w",
         ) as device_info_file:
             device_info_file.write(device_info_xml)
+
+    def remove_device(self, account: str, device_id: str) -> bool:
+        logger.debug(f"removing device {device_id} from account {account}")
+        if not self.device_exists(account, device_id):
+            return False
+
+        # TODO: add error handling if you can't delete the files
+        remove(path.join(self.account_device_dir(account, device_id), DEVICE_INFO_FILE))
+        rmdir(path.join(self.account_devices_dir(account), device_id))
+        return True
