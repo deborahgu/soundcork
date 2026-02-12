@@ -79,6 +79,8 @@ When you're done with the virtual environment, you can type `deactivate` to leav
 		python -m build && \
 		pip install dist/*.whl
 		``` 
+    -NOTE: In the current development stage of the project, we may exhibit code changes without change of the version number. In case you update your local code, this build process has to be repeated, but with the last command modified to ```pip install dist/*.whl --force-reinstall```
+    - In the file ```soundcork/gunicorn_conf.py```, replace the binding address 127.0.0.1 by the IP address of your server
     - If using systemd, make a copy of `soundcork.service.example`, named `soundcork.service`
 	- modify the placeholder strings appropriately
 	- then mv to systemd and enable.
