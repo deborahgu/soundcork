@@ -1,5 +1,6 @@
 import logging
 import re
+import random
 import xml.etree.ElementTree as ET
 from os import mkdir, listdir, path, walk, remove
 from typing import Optional
