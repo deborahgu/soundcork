@@ -98,18 +98,14 @@ def update_preset(
 
     # load the preset to add
 
-    name = new_preset_elem.find("name").text.strip()
-    source_id = new_preset_elem.find("sourceid").text.strip()
+    name = strip_element_text(new_preset_elem.find("name"))
+    source_id = strip_element_text(new_preset_elem.find("sourceid"))
     # we could use username to match source maybe?
     # username = new_preset_elem.find("username").text
-    location = new_preset_elem.find("location").text.strip()
-    content_item_type = new_preset_elem.find("contentItemType").text
-    if content_item_type == None:
-        content_item_type = ""
-    else:
-        content_item_type = content_item_type.strip()
+    location = strip_element_text(new_preset_elem.find("location"))
+    content_item_type = strip_element_text(new_preset_elem.find("contentItemType"))
 
-    container_art = new_preset_elem.find("containerArt").text.strip()
+    container_art = strip_element_text(new_preset_elem.find("containerArt"))
 
     try:
         matching_src = next(src for src in conf_sources_list if src.id == source_id)
@@ -260,11 +256,7 @@ def add_recent(
     location = new_recent_elem.find("location").text
     is_presetable = "true"
 
-    type = new_recent_elem.find("contentItemType").text
-    if type == None:
-        type = ""
-    else:
-        type = type.strip()
+    type = strip_element_text(new_recent_elem.find("contentItemType"))
 
     try:
         matching_src = next(src for src in conf_sources_list if src.id == source_id)
@@ -434,3 +426,14 @@ def remove_device_from_account(datastore: "DataStore", account: str, device: str
     # TODO implement
     # datastore.remove_device(account, device)
     return {"ok"}
+
+
+def strip_element_text(elem: ET.Element) -> str:
+    if elem == None:
+        return ""
+    else:
+        text = elem.text
+        if not text:
+            return ""
+        else:
+            return text.strip()
