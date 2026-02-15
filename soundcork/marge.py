@@ -109,7 +109,11 @@ def update_preset(
     else:
         content_item_type = content_item_type.strip()
 
-    container_art = new_preset_elem.find("containerArt").text.strip()
+    container_art = new_preset_elem.find("containerArt").text
+    if container_art == None:
+        container_art = ""
+    else:
+        container_art = container_art.strip()
 
     try:
         matching_src = next(src for src in conf_sources_list if src.id == source_id)
