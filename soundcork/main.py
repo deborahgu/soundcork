@@ -477,6 +477,7 @@ async def device_group_status(
             status_code=500
         )
 
+#-- endpoint to add a group
 @app.post(
     "/marge/streaming/account/{account}/group",
     response_class=BoseXMLResponse,
@@ -524,7 +525,8 @@ async def add_group_endpoint(
             content="<error>Invalid UTF-8 in request body</error>",
             status_code=400,
         )
-        
+
+#-- endpoint mod_group
 @app.post(
     "/marge/streaming/account/{account}/group/{group}",
     response_class=BoseXMLResponse,
@@ -595,7 +597,7 @@ async def mod_group_endpoint(
             status_code=400,
         )
 
-
+#-- delete_group
 @app.delete(
     "/marge/streaming/account/{account}/group/{group}",
     response_class=BoseXMLResponse,
