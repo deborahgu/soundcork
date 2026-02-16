@@ -1,11 +1,22 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from fastapi import Response
+from pydantic import AliasChoices, BaseModel, Field
+
+
+class BoseXMLResponse(Response):
+    media_type = "application/vnd.bose.streaming-v1.2+xml"
 
 
 class Link(BaseModel):
     href: str
+    use_internal_client: Optional[str] = Field(
+        default=None,
+        alias="useInternalClient",
+        serialization_alias="useInternalClient",
+        validation_alias=AliasChoices("useInternalClient", "use_internal_client"),
+    )
 
 
 class Links(BaseModel):
@@ -14,6 +25,12 @@ class Links(BaseModel):
     bmx_services_availability: Optional[Link] = None
     bmx_token: Optional[Link] = None
     self: Optional[Link] = None
+    bmx_availability: Optional[Link] = None
+    bmx_logout: Optional[Link] = None
+    bmx_reporting: Optional[Link] = None
+    bmx_favorite: Optional[Link] = None
+    bmx_nowplaying: Optional[Link] = None
+    bmx_track: Optional[Link] = None
 
 
 class IconSet(BaseModel):
@@ -79,13 +96,33 @@ class Audio(BaseModel):
 
 class BmxPlaybackResponse(BaseModel):
     links: Optional[Links] = Field(
-        default=None, alias="_links", serialization_alias="_links"
+        default=None,
+        alias="_links",
+        serialization_alias="_links",
+        validation_alias=AliasChoices("links", "_links"),
     )
+    artist: Optional[dict] = None
     audio: Audio
     imageUrl: str
     isFavorite: Optional[bool] = None
     name: str
     streamType: str
+    duration: Optional[int] = None
+
+
+class Track(BaseModel):
+    links: dict = Field(serialization_alias="_links")
+    is_selected: bool = Field(serialization_alias="isSelected")
+    name: str
+
+
+class BmxPodcastInfoResponse(BaseModel):
+    links: dict = Field(serialization_alias="_links")
+    name: str
+    shuffle_disabled: bool = Field(default=False, serialization_alias="shuffleDisabled")
+    repeat_disabled: bool = Field(default=False, serialization_alias="repeatDisabled")
+    stream_type: str = Field(serialization_alias="streamType")
+    tracks: list[Track]
 
 
 class SourceProvider(BaseModel):
@@ -96,6 +133,15 @@ class SourceProvider(BaseModel):
 
 
 class ContentItem(BaseModel):
+    """ContentItem properties:
+
+    source (int, though sent as strings): ID for a type of source.
+        For example, local file storage.
+    source_id (int, though sent as strings): ID for an instance of a source.
+        For example, a connection to a particular UPnP server.
+        Note: Not all sources will have source IDs that vary (eg. TuneIn)
+    """
+
     id: str
     name: str
     source: Optional[str] = None

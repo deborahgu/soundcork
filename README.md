@@ -5,6 +5,8 @@ Intercept API for Bose SoundTouch after they turn off the servers
 
 This project is pre-alpha. We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for more information, and the project [milestones](https://github.com/deborahgu/soundcork/milestones?sort=title&direction=asc) for our goals.
 
+Read [SECURITY.md](SECURITY.md) carefully. This should only be run inside your home network, behind a firewall. (If you have a router at home, it probably has a firewall on it.) Don't put it on an open network.
+
 ## Background
 [Bose has announced that they are shutting down the servers for the SoundTouch system in February, 2026. ](https://www.bose.com/soundtouch-end-of-life) When those servers go away, certain network-based functionality currently available to SoundTouch devices will stop working.
 
@@ -54,7 +56,7 @@ or OS.)
 	```
 1. Install the pre-requisites
 	```bash
-	pip install requirements.txt
+	pip install -r requirements.txt
 	```
 
 When you're done with the virtual environment, you can type `deactivate` to leave that shell.
@@ -77,6 +79,8 @@ When you're done with the virtual environment, you can type `deactivate` to leav
 		python -m build && \
 		pip install dist/*.whl
 		``` 
+    -NOTE: In the current development stage of the project, we may exhibit code changes without change of the version number. In case you update your local code, this build process has to be repeated, but with the last command modified to ```pip install dist/*.whl --force-reinstall```
+    - In the file ```soundcork/gunicorn_conf.py```, replace the binding address 127.0.0.1 by the IP address of your server
     - If using systemd, make a copy of `soundcork.service.example`, named `soundcork.service`
 	- modify the placeholder strings appropriately
 	- then mv to systemd and enable.
@@ -144,7 +148,7 @@ So now your have your account number of ```1234567``` and device ID of ```A0B1C2
 
 	mkdir -p /home/soundcork/db/1234567/devices/A0B1C2D3E4F5
 
-`Presets.xml`, `Recents.xml`, and `DeviceInfo.xml` can all be gotten via the web UI at http://{SoundTouchIp}:8080/presets, http://{SoundTouchIp}:8080/recents, and http://{SoundTouchIp}:8080/info, respectively. Fetch those URLs and save the returned XML as the apprpriate files. (If you have multiple SoundTouch devices, create a directory and `DeviceInfo.xml` file for each one. If you have multiple accounts that you keep separate, repeat this procedure for each account.)
+`Presets.xml`, `Recents.xml`, and `DeviceInfo.xml` can all be gotten via the web UI at `http://{SoundTouchIp}:8090/presets`, `http://{SoundTouchIp}:8090/recents`, and `http://{SoundTouchIp}:8090/info`, respectively. Fetch those URLs and save the returned XML as the apprpriate files. (If you have multiple SoundTouch devices, create a directory and `DeviceInfo.xml` file for each one. If you have multiple accounts that you keep separate, repeat this procedure for each account.)
 
 For Sources, there is some information that is stored on the devices themselves that isn't exposed via the web UI, so you have to go onto the device itself to get that file. `telnet` or `ssh` into the device and then transfer the `Sources.xml` file over to your soundcork db:
 

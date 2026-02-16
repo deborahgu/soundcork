@@ -1,8 +1,8 @@
 import logging
+import re
 import xml.etree.ElementTree as ET
-from os import path, walk
-
-import upnpclient
+from os import mkdir, path, walk
+from typing import Optional
 
 from soundcork.config import Settings
 from soundcork.constants import (
@@ -33,37 +33,21 @@ class DataStore:
     """
 
     def __init__(self) -> None:
+        logger.info("Initiating Datastore")
+        self.data_dir = settings.data_dir
         # def __init__(self, data_dir: str, settings: Settings) -> None:
 
-        # self.data_dir = data_dir
-        self.bose_devices: list[upnpclient.upnp.Device]
-        logger.info("Initiating Datastore")
+    def initialize_data_directory(self) -> None:
+        raise NotImplementedError
 
     def account_dir(self, account: str) -> str:
-        return path.join(settings.data_dir, account)
+        return path.join(self.data_dir, account)
 
     def account_devices_dir(self, account: str) -> str:
-        return path.join(settings.data_dir, account, DEVICES_DIR)
+        return path.join(self.data_dir, account, DEVICES_DIR)
 
     def account_device_dir(self, account: str, device: str) -> str:
         return path.join(self.account_devices_dir(account), device)
-
-    def discover_devices(self) -> None:
-        """Discovered upnp devices on the network
-
-        Righ now this doesn't do anything except put discovered devices on self.bose_devices
-        (see main.py for instantiation) to show how we'll put info on this datastore class.
-
-        Discovered devices may well NOT end up as class properties, since this method
-        will theoretically run very rarely and only on demand."""
-        upnp_devices = upnpclient.discover()
-        self.bose_devices = [
-            d for d in upnp_devices if "Bose SoundTouch" in d.model_description
-        ]
-        logger.info("Discovering upnp devices on the network")
-        logger.info(
-            f'Discovered Bose devices:\n- {"\n- ".join([b.friendly_name for b in self.bose_devices])}'
-        )
 
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Get the device info"""
@@ -78,6 +62,7 @@ class DataStore:
         type = info_elem.find("type").text
         module_type = info_elem.find("moduleType").text
         components = info_elem.find("components").findall("component")
+
         for component in components:
             component_category = component.find("componentCategory").text
             if component_category == "SCM":
@@ -89,15 +74,20 @@ class DataStore:
             if network_info.attrib.get("type", "") == "SCM":
                 ip_address = network_info.find("ipAddress").text
 
-        return DeviceInfo(
-            device_id=device_id,
-            product_code=f"{type} {module_type}",
-            device_serial_number=str(device_serial_number),
-            product_serial_number=str(product_serial_number),
-            firmware_version=str(firmware_version),
-            ip_address=str(ip_address),
-            name=str(name),
-        )
+        try:
+            return DeviceInfo(
+                device_id=device_id,
+                product_code=f"{type} {module_type}",
+                device_serial_number=str(device_serial_number),  # type: ignore
+                product_serial_number=str(product_serial_number),  # type: ignore
+                firmware_version=str(firmware_version),  # type: ignore
+                ip_address=str(ip_address),  # type: ignore
+                name=str(name),
+            )
+        except NameError:
+            raise RuntimeError(
+                f"There are missing required fields in the device: {device_id}"
+            )
 
     def save_presets(self, account: str, device: str, presets_list: list[Preset]):
         save_file = path.join(self.account_dir(account), PRESETS_FILE)
@@ -122,6 +112,13 @@ class DataStore:
         ET.indent(presets_tree, space="    ", level=0)
         presets_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
         return presets_elem
+
+    # TODO: add error handling if you can't write the file
+    def save_presets_xml(self, account: str, presets_xml: str):
+        with open(
+            path.join(self.account_dir(account), PRESETS_FILE), "w"
+        ) as presets_file:
+            presets_file.write(presets_xml)
 
     def get_presets(self, account: str, device: str) -> list[Preset]:
         storedTree = ET.parse(path.join(self.account_dir(account), PRESETS_FILE))
@@ -232,6 +229,13 @@ class DataStore:
         recents_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
         return recents_elem
 
+    # TODO: add error handling if you can't write the file
+    def save_recents_xml(self, account: str, recents_xml: str):
+        with open(
+            path.join(self.account_dir(account), RECENTS_FILE), "w"
+        ) as recents_file:
+            recents_file.write(recents_xml)
+
     def get_configured_sources(
         self, account: str, device: str
     ) -> list[ConfiguredSource]:
@@ -267,17 +271,33 @@ class DataStore:
 
         return sources_list
 
+    # TODO: add error handling if you can't write the file
+    def save_configured_sources_xml(self, account: str, sources_xml: str):
+        with open(
+            path.join(self.account_dir(account), SOURCES_FILE), "w"
+        ) as sources_file:
+            sources_file.write(sources_xml)
+
     def etag_for_presets(self, account: str) -> int:
         presets_file = path.join(self.account_dir(account), PRESETS_FILE)
-        return int(path.getmtime(presets_file) * 1000)
+        if path.exists(presets_file):
+            return int(path.getmtime(presets_file) * 1000)
+        else:
+            return 0
 
     def etag_for_sources(self, account: str) -> int:
-        presets_file = path.join(self.account_dir(account), SOURCES_FILE)
-        return int(path.getmtime(presets_file) * 1000)
+        sources_file = path.join(self.account_dir(account), SOURCES_FILE)
+        if path.exists(sources_file):
+            return int(path.getmtime(sources_file) * 1000)
+        else:
+            return 0
 
     def etag_for_recents(self, account: str) -> int:
         recents_file = path.join(self.account_dir(account), RECENTS_FILE)
-        return int(path.getmtime(recents_file) * 1000)
+        if path.exists(recents_file):
+            return int(path.getmtime(recents_file) * 1000)
+        else:
+            return 0
 
     def etag_for_account(self, account: str) -> int:
         return max(
@@ -285,3 +305,50 @@ class DataStore:
             self.etag_for_sources(account),
             self.etag_for_recents(account),
         )
+
+    ######## create account
+
+    def list_accounts(self) -> list[Optional[str]]:
+        accounts = []
+        for account_id in next(walk(self.data_dir))[1]:
+            accounts.append(account_id)
+
+        return accounts
+
+    def list_devices(self, account_id) -> list[Optional[str]]:
+        devices = []
+        for device_id in next(walk(self.account_devices_dir(account_id)))[1]:
+            devices.append(device_id)
+
+        return devices
+
+    def account_exists(self, account: str) -> bool:
+        return account in self.list_accounts()
+
+    def device_exists(self, account: str, device_id: str) -> bool:
+        return device_id in self.list_devices(account)
+
+    def create_account(self, account: str) -> bool:
+        logger.info(f"creating account {account}")
+        if self.account_exists(account):
+            return False
+
+        # TODO: add error handling if you can't make the directory
+        mkdir(self.account_dir(account))
+        mkdir(self.account_devices_dir(account))
+        # create devices subdirectory
+        return True
+
+    def add_device(self, account: str, device_id: str, device_info_xml: str) -> bool:
+        if self.device_exists(account, device_id):
+            return False
+
+        # TODO: add error handling if you can't make the directory
+        mkdir(path.join(self.account_devices_dir(account), device_id))
+
+        # TODO: add error handling if you can't write the file
+        with open(
+            path.join(self.account_device_dir(account, device_id), DEVICE_INFO_FILE),
+            "w",
+        ) as device_info_file:
+            device_info_file.write(device_info_xml)
