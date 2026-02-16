@@ -7,13 +7,20 @@ After=network.target
 
 [Service]
 
-User=YOUR_USER_NAME_HERE
+PIDFile=/run/soundcork.pid
 
-Group=YOUR_GROUP_NAME_HERE
+# user soundcork should run as
+User=${USER}
 
-WorkingDirectory=YOUR_DIRECTORY_NAME_HERE
+# ${INSTALL_DIR} should be the root of your git checkout, so the resulting
+# WorkingDirectory will probably be something like .../soundcork/soundcork
+WorkingDirectory=${INSTALL_DIR}/soundcork
 
-ExecStart=YOUR_DIRECTORY_NAME_HERE/.venv/bin/gunicorn -c gunicorn_conf.py main:app
+# ditto on ${INSTALL_DIR}, though this time the resulting file should be
+# more like .../soundcork/.venv/bin/gunicorn
+# replace 0.0.0.0:8000 with 127.0.0.1:8000 if you are running behind
+# a webserver like nginx and don't want direct access from the outside
+ExecStart=${INSTALL_DIR}/.venv/bin/gunicorn -c gunicorn_conf.py -b 0.0.0.0:8000 main:app
 
 
 [Install]
