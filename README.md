@@ -43,7 +43,7 @@ manage virtual environments. These docs assume `venv`.
 	- Unix, Windows, and MacOS [installation and use guide for venv](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/).
 	- Your operating system might have some prerequisites here. On ubuntu, you may need:
 		```sh
-		sudo apt-install python3-pip python3.12-venv
+		sudo apt install python3-pip python3.12-venv
 		```
 1. Set up the virtual environment and run it. Run these commands in the
 directory where you've cloned the repository. (Adapt as needed for your shell
@@ -88,6 +88,14 @@ When you're done with the virtual environment, you can type `deactivate` to leav
 		sudo systemctl enable soundcork && \
 		sudo systemctl start soundcork
 		```
+    - To update the server, rebuild the project and restart. NOTE: In the current development stage of the project, we code changes may happen without a change of the version number. In these cases, or if you update your local code yourself, this build process has to be repeated, but with the last command modified to ```pip install dist/*.whl --force-reinstall```:
+      ```
+      git pull
+      pip install build && \
+      python -m build && \
+      pip install dist/*.whl --force-reinstall
+      sudo systemctl restart soundcork
+      ```
 
 You can verify the server by checking the `/docs` endpoint at your URL.
 
