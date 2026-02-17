@@ -88,6 +88,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from soundcork.proxy import ProxyMiddleware
+
+app.add_middleware(ProxyMiddleware)
+
 
 # @lru_cache
 # def get_settings():
