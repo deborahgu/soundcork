@@ -9,6 +9,7 @@ import logging
 import urllib.request
 import xml.etree.ElementTree as ET
 from subprocess import run
+from typing import Optional
 from urllib.parse import urlparse
 
 import upnpclient
@@ -136,7 +137,7 @@ def get_bose_devices() -> list[upnpclient.upnp.Device]:
     return bose_devices
 
 
-def get_device_by_id(device_id: str) -> upnpclient.upnp.Device:
+def get_device_by_id(device_id: str) -> Optional[upnpclient.upnp.Device]:
     devices = get_bose_devices()
     for device in devices:
         try:

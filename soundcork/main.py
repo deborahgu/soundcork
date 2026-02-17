@@ -299,7 +299,7 @@ async def post_account_recent(
     "/marge/streaming/account/{account}/device/",
     response_class=BoseXMLResponse,
     tags=["marge"],
-    status_code=201,
+    status_code=HTTPStatus.CREATED,
     dependencies=[
         Depends(
             Etag(
@@ -316,14 +316,10 @@ async def post_account_recent(
 async def post_account_device(
     account: Annotated[str, Path(pattern=ACCOUNT_RE)],
     request: Request,
-    response: Response,
 ):
     xml = await request.body()
     device_id, xml_resp = add_device_to_account(datastore, account, xml)
-    response.headers["Credentials"] = f"{request.headers.get('authorization')}"
-    response.headers["location"] = (
-        f"{settings.base_url}/marge/account/{account}/device/{device_id}"
-    )
+
     return bose_xml_str(xml_resp)
 
 
@@ -339,7 +335,7 @@ async def delete_account_device(
         f"{settings.base_url}/marge/account/{account}/device/{device}"
     )
     response.body = ""
-    response.status_code = 200
+    response.status_code = HTTPStatus.OK
     return response
 
 
