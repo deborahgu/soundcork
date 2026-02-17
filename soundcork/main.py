@@ -7,7 +7,7 @@ from http import HTTPStatus
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi_etag import Etag
 
 from soundcork.bmx import (
@@ -54,13 +54,20 @@ logger = logging.getLogger(__name__)
 datastore = DataStore()
 settings = Settings()
 
+from soundcork.spotify_service import SpotifyService
+from soundcork.zeroconf_primer import ZeroConfPrimer
+
+spotify_service = SpotifyService()
+zeroconf_primer = ZeroConfPrimer(spotify_service, datastore, settings)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting up soundcork")
-    # datastore.discover_devices()
+    zeroconf_primer.start_periodic()
     logger.info("done starting up server")
     yield
+    zeroconf_primer.stop_periodic()
     logger.debug("closing server")
 
 
@@ -88,10 +95,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from soundcork.mgmt import router as mgmt_router
 
-# @lru_cache
-# def get_settings():
-#     return Settings()
+app.include_router(mgmt_router)
+
+
+@app.middleware("http")
+async def register_speakers_middleware(request: Request, call_next):
+    """Capture account/device IDs from marge URLs for the Spotify primer."""
+    response = await call_next(request)
+
+    path = request.url.path
+    if "/marge/" in path and "/account/" in path and "/device/" in path:
+        parts = path.split("/")
+        try:
+            acc_idx = parts.index("account") + 1
+            dev_idx = parts.index("device") + 1
+            if acc_idx < len(parts) and dev_idx < len(parts):
+                zeroconf_primer.register_speaker(parts[acc_idx], parts[dev_idx])
+        except (ValueError, IndexError):
+            pass
+
+    return response
 
 
 startup_timestamp = int(datetime.now().timestamp() * 1000)
@@ -107,12 +132,59 @@ def read_root():
     tags=["marge"],
     status_code=HTTPStatus.OK,
 )
-def power_on():
-    # see https://github.com/fastapi/fastapi/discussions/8091 for the TODO here
-    # I wonder if the endpoint will work if I return HTTPStatus.IM_A_TEAPOT
-    # instead? I'd like to try it.
-
+def power_on(request: Request):
+    # Prime speakers for Spotify after boot.  The primer handles
+    # retry/backoff in a background thread so the response is fast.
+    source_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or None
+    zeroconf_primer.on_power_on(source_ip)
     return
+
+
+@app.post(
+    "/oauth/device/{device_id}/music/musicprovider/{provider_id}/token/{token_type}",
+    tags=["oauth"],
+    status_code=HTTPStatus.OK,
+)
+def oauth_token_refresh(device_id: str, provider_id: str, token_type: str):
+    """Spotify OAuth token refresh endpoint.
+
+    Intercepts the speaker's token refresh requests that would normally
+    go to streamingoauth.bose.com.  The speaker calls this when it needs
+    a fresh Spotify access token for playback.
+
+    Only handles provider 15 (Spotify).  Other providers return 404.
+    """
+    if provider_id != "15":
+        logger.info(
+            "OAuth token request for unsupported provider %s (device=%s)",
+            provider_id,
+            device_id,
+        )
+        return Response(status_code=404)
+
+    token = spotify_service.get_fresh_token_sync()
+    if not token:
+        logger.warning(
+            "OAuth token refresh failed — no Spotify token available (device=%s)",
+            device_id,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "no_token",
+                "error_description": "No Spotify account linked",
+            },
+        )
+
+    logger.info("OAuth token refresh for device %s (provider=Spotify)", device_id)
+    return JSONResponse(
+        content={
+            "access_token": token,
+            "token_type": "Bearer",
+            "expires_in": 3600,
+            "scope": "streaming user-read-email user-read-private playlist-read-private playlist-read-collaborative user-library-read user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-recently-played",
+        }
+    )
 
 
 @app.get("/marge/streaming/sourceproviders", tags=["marge"])
