@@ -68,3 +68,4 @@ SPEAKER_SOURCES_FILE_LOCATION = "/mnt/nv/BoseApp-Persistence/1/Sources.xml"
 # validation
 ACCOUNT_RE = "^\d{1,20}$"
 DEVICE_RE = "^[0-9a-fA-F]{12}$"
+GROUP_RE = "^\d{7}$"
