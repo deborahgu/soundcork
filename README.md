@@ -7,6 +7,10 @@ This project is pre-alpha. We welcome contributions! See [CONTRIBUTING.md](CONTR
 
 Read [SECURITY.md](SECURITY.md) carefully. This should only be run inside your home network, behind a firewall. (If you have a router at home, it probably has a firewall on it.) Don't put it on an open network.
 
+### Service status
+
+We'll maintain a forum post with the [Current Status of Bose Cloud Services](https://github.com/deborahgu/soundcork/discussions/181). Check there for updates. We will update whenever we learn new information.
+
 ## Background
 [Bose has announced that they are shutting down the servers for the SoundTouch system in February, 2026. ](https://www.bose.com/soundtouch-end-of-life) When those servers go away, certain network-based functionality currently available to SoundTouch devices will stop working.
 
