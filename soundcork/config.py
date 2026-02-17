@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     base_url: str = ""
     data_dir: str = ""
+    soundcork_mode: str = "local"
+    soundcork_log_dir: str = "./logs/traffic"
     model_config = SettingsConfigDict(
         # `.env.private` takes priority over `.env.shared`
         env_file=(".env.shared", ".env.private")
