@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from soundcork.config import Settings
 from soundcork.constants import PROVIDERS
+from soundcork.devices import get_device_by_id, read_device_info
 from soundcork.model import (
     ConfiguredSource,
     ContentItem,
@@ -404,9 +405,9 @@ def add_device_to_account(
     new_device_elem = ET.fromstring(source_xml)
     device_id = new_device_elem.attrib.get("deviceid", "")
     name = new_device_elem.find("name").text
-
-    # TODO implement
-    # datastore.add_device(account, device_id, name)
+    device = get_device_by_id(device_id)
+    device_xml = read_device_info(device)
+    datastore.add_device(account, device_id, device_xml)
 
     created_on = datetime.fromtimestamp(
         datetime.now().timestamp(), timezone.utc
@@ -419,14 +420,12 @@ def add_device_to_account(
     ET.SubElement(return_elem, "name").text = name
     ET.SubElement(return_elem, "updatedOn").text = created_on
 
-    return return_elem
+    return (device_id, return_elem)
 
 
 def remove_device_from_account(datastore: "DataStore", account: str, device: str):
-    # TODO implement
-    # datastore.remove_device(account, device)
-    return {"ok"}
-
+    removed = datastore.remove_device(account, device)
+    return {"ok": removed}
 
 def strip_element_text(elem: ET.Element) -> str:
     if elem == None:
