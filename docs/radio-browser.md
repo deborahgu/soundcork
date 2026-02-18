@@ -3,12 +3,6 @@
 - https://www.radio-browser.info is a community driven radio station database.
 - It provides an API to access the data and allows users to submit new stations or update existing ones.
 
-### Search for stations
-
-- Go to https://www.radio-browser.info and find a station you like.
-- Click on the station and copy the UUID from the URL.
-- e.g. `https://www.radio-browser.info/history/d28420a4-eccf-47a2-ace1-088c7e7cb7e0`
-
 ### RADIO_BROWSER
 
 - Soundcork supports source type RADIO_BROWSER to play radio stations.
@@ -16,14 +10,32 @@
 
 ```xml
 <ContentItem
-  source="RADIO_BROWSER"
-  type="stationurl"
-  isPresetable="true"
-  location="/stations/byuuid/9610c454-0601-11e8-ae97-52543be04c81">
-  <itemName>RADIO_BROWSER</itemName>
-  <containerArt></containerArt>
+        source="RADIO_BROWSER"
+        type="stationurl"
+        isPresetable="true"
+        location="/stations/byuuid/9610c454-0601-11e8-ae97-52543be04c81">
+    <itemName>RADIO_BROWSER</itemName>
+    <containerArt></containerArt>
 </ContentItem>
+ ```
+ 
+### Configure your sources
+
+- In order to play RADIO_BROWSER content items you need to add this to your `Sources.xml`.
+```xml
+<source>
+    <sourceKey type="RADIO_BROWSER" account="" />
+</source>
 ```
+- Depending on your setup you might have to reboot the device to activate the new source.
+- Validate via GET `/serviceAvailability` and GET `/sources` that the new source is available.
+
+### Search for stations
+
+- Go to https://www.radio-browser.info and find a station you like.
+- Click on the station and copy the UUID from the URL.
+- E.g. `https://www.radio-browser.info/history/d28420a4-eccf-47a2-ace1-088c7e7cb7e0`
+
 ### Playing the station
 
 To start the radio stream replace `<uuid>` and `<soundtouch>` and run curl like this:
