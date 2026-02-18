@@ -4,7 +4,9 @@ from http import HTTPStatus
 from typing import Annotated, Optional
 
 import httpx
-from fastapi import APIRouter, Path, Request, Response
+from fastapi import APIRouter, Path, Request, Query, Response
+from typing import Annotated
+
 
 from soundcork.constants import ACCOUNT_RE, DEVICE_RE, GROUP_RE
 from soundcork.model import BoseXMLResponse
@@ -338,7 +340,6 @@ def get_groups_router(datastore):
             return Response("<error>Missing newname</error>", media_type="application/xml", status_code=400)
         #-- exactly one must be set
         if (groupid is None and name is None) or (groupid is not None and name is not None):
-        return Response(
             return Response("<error>Use exactly one of groupid=... or name=...</error>", media_type="application/xml", status_code=400)
             
         #-- acquire GroupService.xml
@@ -402,7 +403,7 @@ def get_groups_router(datastore):
             return Response(
                 "<error>Use exactly one of groupid=... or name=...</error>",media_type="application/xml", status_code=400)
         #-- resolve groupid from name if needed
-        if groupid is None
+        if groupid is None:
             groupid = _group_id_by_name(datastore, account, name or "")
             if not groupid:
                 return Response("<error>Group name not found</error>", media_type="application/xml", status_code=404)
