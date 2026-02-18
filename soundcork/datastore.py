@@ -325,14 +325,14 @@ class DataStore:
     ######## create account
 
     def list_accounts(self) -> list[Optional[str]]:
-        accounts: list[str | None]
+        accounts: list[str | None] = []
         for account_id in next(walk(self.data_dir))[1]:
             accounts.append(account_id)
 
         return accounts
 
     def list_devices(self, account_id) -> list[Optional[str]]:
-        devices: list[str | None]
+        devices: list[str | None] = []
         for device_id in next(walk(self.account_devices_dir(account_id)))[1]:
             devices.append(device_id)
 
