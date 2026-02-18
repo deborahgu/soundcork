@@ -37,6 +37,10 @@ Assumingly all four servers listed there will be shut down. From testing, the `m
 
 ## Running, testing, and installing soundcork
 
+### Development
+
+See the [wiki](https://github.com/deborahgu/soundcork/wiki/) for developer guidelines.
+
 ### Installing
 
 This has been written and tested with Python 3.12. Eventually it will be bundled as an installable app but for now you'll want a virtual environment.
