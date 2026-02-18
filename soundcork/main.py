@@ -75,6 +75,10 @@ tags_metadata = [
         "description": "Communicates with the speaker.",
     },
     {
+        "name": "service",
+        "description": "Communicates with user applications.",
+    },
+    {
         "name": "bmx",
         "description": "Communicates with streaming radio services (eg. TuneIn).",
     },
@@ -87,9 +91,6 @@ app = FastAPI(
     openapi_tags=tags_metadata,
     lifespan=lifespan,
 )
-
-#-- include all routines for groups
-app.include_router(get_groups_router(datastore))
 
 # @lru_cache
 # def get_settings():
@@ -452,3 +453,6 @@ def add_device_to_datastore(device_id: str):
             success = add_device(device)
             return {device_id: success}
 
+#####################################################################################
+#-- include all routines for groups
+app.include_router(get_groups_router(datastore))

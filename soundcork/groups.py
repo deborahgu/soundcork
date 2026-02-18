@@ -138,10 +138,11 @@ def _extract_master_ip(group_xml: str) -> str:
 # Factory: creates router with access to datastore (Dependency Injection)
 # ----------------------------------------------------------------------
 def get_groups_router(datastore):
-    r = APIRouter(tags=["marge"])
+    marge = APIRouter(tags=["marge"])
+    service = APIRouter(tags=["service"])
 
     # ----------------- marge group endpoint to query group per device -----------------
-    @r.get(
+    @marge.get(
         "/marge/streaming/account/{account}/device/{device}/group",
         response_class=BoseXMLResponse,
         tags=["marge"],
@@ -164,7 +165,7 @@ def get_groups_router(datastore):
             return BoseXMLResponse(content=f"<error>Unexpected error: {e}</error>", status_code=500)
 
     # ----------------- marge group endpoint to add group  -----------------
-    @r.post(
+    @marge.post(
         "/marge/streaming/account/{account}/group",
         response_class=BoseXMLResponse,
         tags=["marge"],
@@ -197,7 +198,7 @@ def get_groups_router(datastore):
             return BoseXMLResponse(content="<error>Invalid UTF-8 in request body</error>", status_code=400)
             
    # ----------------- marge group endpoint to modify group  -----------------
-    @r.post(
+    @marge.post(
         "/marge/streaming/account/{account}/group/{group}",
         response_class=BoseXMLResponse,
         tags=["marge"],
@@ -243,7 +244,7 @@ def get_groups_router(datastore):
             return BoseXMLResponse(content="<error>Invalid UTF-8 in request body</error>", status_code=400)
             
     # ----------------- marge group endpoint to delete group  -----------------
-    @r.delete(
+    @marge.delete(
         "/marge/streaming/account/{account}/group/{group}",
         response_class=BoseXMLResponse,
         tags=["marge"],
@@ -264,12 +265,78 @@ def get_groups_router(datastore):
             return BoseXMLResponse(content=f"<error>Unexpected error: {e}</error>", status_code=500)
 
     ################# service endpoints ##################################
-    
+    #---------------- listgroups ----------------------------------------
+    # list all groups and their devices
+    # call as GET /service/account/{account}/listgroups
+    # returns <groups>...</groups>
+    @service.get("/service/account/{account}/listgroups", tags=["service"])
+    async def service_listgroups(
+        account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    ):
+        #-- get group ids
+        try:
+            group_ids = datastore.list_groups(account)
+        except Exception as e:
+            return Response(f"<error>{e}</error>", media_type="application/xml", status_code=400)
+
+        from xml.sax.saxutils import escape as _x
+        import os
+        import xml.etree.ElementTree as ET
+
+        parts: list[str] = []
+        parts.append('<?xml version="1.0" encoding="UTF-8"?>')
+        parts.append("<groups>")
+
+        devices_dir = datastore.account_devices_dir(account)
+
+        #-- iterate groups
+        for gid in group_ids:
+            group_file = os.path.join(devices_dir, f"Group_{gid}.xml")
+            try:
+                tree = ET.parse(group_file)
+                root = tree.getroot()
+            except Exception:
+                continue
+                
+            gname = root.findtext("name") or ""
+            parts.append(f'  <group id="{_x(gid)}">')
+            if gname:
+                parts.append(f"    <name>{_x(gname)}</name>")
+            parts.append("    <devices>")
+
+            #-- extract devices from groupRole elements
+            for role in root.findall(".//groupRole"):
+                dev_id = role.findtext("deviceId") or ""
+                dev_ip = role.findtext("ipAddress") or ""
+                dev_role = role.findtext("role") or ""
+                dev_name = ""
+
+                # resolve device name via datastore
+                if dev_id:
+                    try:
+                        info = datastore.get_device_info(account, dev_id)
+                        dev_name = info.name
+                        if not dev_ip:
+                            dev_ip = info.ip_address
+                    except Exception:
+                        pass
+
+                parts.append(
+                    f'      <device id="{_x(dev_id)}" ip="{_x(dev_ip)}" role="{_x(dev_role)}">{_x(dev_name)}</device>'
+                )
+
+            parts.append("    </devices>")
+            parts.append("  </group>")
+        parts.append("</groups>")
+        xml = "\n".join(parts) + "\n"
+        return Response(xml, media_type="application/xml", status_code=200)
+
+
     #---------------- creategroup ----------------------------------------
     # create a stereo pair (=group) 
     # call as GET /service/account/{account}/creategroup?master={device1}&slave={device2}
     # returns GROUP_OK or GROUP_ERROR
-    @r.get("/service/account/{account}/creategroup", tags=["service"])
+    @service.get("/service/account/{account}/creategroup", tags=["service"])
     async def service_creategroup(
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
         master: Annotated[str | None, Query()] = None,
@@ -324,7 +391,7 @@ def get_groups_router(datastore):
     # call as GET /service/account/{account}/modgroup?groupid={groupid}&newname={newname}
     #   or as PUT /service/account/{account}/modgroup?name={name}&newname={newname}
     # returns GROUP_OK or GROUP_ERROR
-    @r.get("/service/account/{account}/modgroup", tags=["service"])
+    @service.get("/service/account/{account}/modgroup", tags=["service"])
     async def service_modgroup(
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
         newname: Annotated[str | None, Query()] = None,
@@ -389,7 +456,7 @@ def get_groups_router(datastore):
     # call as GET /service/account/{account}/removegroup?groupid={groupid} 
     #   or as GET /service/account/{account}/removegroup?name={name} 
     # returns GROUP_OK or GROUP_ERROR
-    @r.get("/service/account/{account}/removegroup", tags=["service"])
+    @service.get("/service/account/{account}/removegroup", tags=["service"])
     async def service_removegroup(
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
         groupid: Annotated[str | None, Query()] = None,
@@ -437,4 +504,7 @@ def get_groups_router(datastore):
             return Response(f"<error>Removed on box, but datastore delete failed</error>", media_type="application/xml", status_code=500)
         return _xml_status(True)
 
-    return r
+    merged = APIRouter()
+    merged.include_router(marge)
+    merged.include_router(service)
+    return merged
