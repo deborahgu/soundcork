@@ -11,6 +11,7 @@ from soundcork.model import (
     Stream,
     Track,
 )
+from soundcork.utils import strip_element_text
 
 # TODO: move into constants file eventually.
 TUNEIN_DESCRIBE = "https://opml.radiotime.com/describe.ashx?id=%s"
@@ -27,18 +28,23 @@ def tunein_playback(station_id: str) -> BmxPlaybackResponse:
 
     root = ET.fromstring(content_str)
 
-    body = root.find("body")
+    try:
+        body = root.find("body")
+        outline = body.find("outline")  # type: ignore
+        station_elem = outline.find("station")  # type: ignore
+    except Exception as e:
+        # TODO narrow this exception
+        outline = None
+        station_elem = None
 
-    outline = body.find("outline")
-    station_elem = outline.find("station")
-    name = station_elem.find("name").text
-    logo = station_elem.find("logo").text
+    name = strip_element_text(station_elem.find("name")) if station_elem else ""
+    logo = strip_element_text(station_elem.find("logo")) if station_elem else ""
 
     # not using these now but leaving the code in for use later
-    current_song_elem = station_elem.find("current_song")
-    current_song = current_song_elem.text if current_song_elem != None else ""
-    current_artist_elem = station_elem.find("current_artist")
-    current_artist = current_artist_elem.text if current_artist_elem != None else ""
+    # current_song_elem = station_elem.find("current_song")
+    # current_song = current_song_elem.text if current_song_elem != None else ""
+    # current_artist_elem = station_elem.find("current_artist")
+    # current_artist = current_artist_elem.text if current_artist_elem != None else ""
 
     streamreq = TUNEIN_STREAM % station_id
     stream_url_resp = urllib.request.urlopen(streamreq).read().decode("utf-8")
@@ -98,7 +104,7 @@ def tunein_playback(station_id: str) -> BmxPlaybackResponse:
 
 def tunein_podcast_info(podcast_id: str, encoded_name: str) -> BmxPodcastInfoResponse:
 
-    name = base64.urlsafe_b64decode(encoded_name)
+    name = str(base64.urlsafe_b64decode(encoded_name), "utf-8")
     track = Track(
         links={"bmx_track": {"href": f"/v1/playback/episode/{podcast_id}"}},
         is_selected=False,
@@ -130,15 +136,19 @@ def tunein_playback_podcast(podcast_id: str) -> BmxPlaybackResponse:
 
     root = ET.fromstring(content_str)
 
-    body = root.find("body")
-
-    outline = body.find("outline")
-    topic = outline.find("topic")
-    title = topic.find("title").text
-    show_title = topic.find("show_title").text
-    duration = topic.find("duration").text
-    show_id = topic.find("show_id").text
-    logo = topic.find("logo").text
+    try:
+        body = root.find("body")
+        outline = body.find("outline")  # type: ignore
+        topic = outline.find("topic")  # type: ignore
+    except Exception as e:
+        # TODO narrow this exception
+        outline = None
+        topic = None
+    title = strip_element_text(topic.find("title")) if topic else ""
+    show_title = strip_element_text(topic.find("show_title")) if topic else ""
+    duration = strip_element_text(topic.find("duration")) if topic else ""
+    show_id = strip_element_text(topic.find("show_id")) if topic else ""
+    logo = strip_element_text(topic.find("logo")) if topic else ""
 
     streamreq = TUNEIN_STREAM % podcast_id
     stream_url_resp = urllib.request.urlopen(streamreq).read().decode("utf-8")

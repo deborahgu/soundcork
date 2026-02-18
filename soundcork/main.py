@@ -148,15 +148,15 @@ def streamingsourceproviders():
 
 
 def etag_for_presets(request: Request) -> str:
-    return str(datastore.etag_for_presets(request.path_params.get("account")))
+    return str(datastore.etag_for_presets(str(request.path_params.get("account"))))
 
 
 def etag_for_recents(request: Request) -> str:
-    return str(datastore.etag_for_recents(request.path_params.get("account")))
+    return str(datastore.etag_for_recents(str(request.path_params.get("account"))))
 
 
 def etag_for_account(request: Request) -> str:
-    return str(datastore.etag_for_account(request.path_params.get("account")))
+    return str(datastore.etag_for_account(str(request.path_params.get("account"))))
 
 
 def etag_for_swupdate(request: Request) -> str:
@@ -318,7 +318,7 @@ async def post_account_device(
     request: Request,
 ):
     xml = await request.body()
-    device_id, xml_resp = add_device_to_account(datastore, account, xml)
+    device_id, xml_resp = add_device_to_account(datastore, account, str(xml))
 
     return bose_xml_str(xml_resp)
 
@@ -334,7 +334,7 @@ async def delete_account_device(
     response.headers["location"] = (
         f"{settings.base_url}/marge/account/{account}/device/{device}"
     )
-    response.body = ""
+    response.body = b""
     response.status_code = HTTPStatus.OK
     return response
 
@@ -428,16 +428,17 @@ def test_scan_recents():
 
 @app.get("/scan", tags=["setup"])
 def scan_devices():
+    """Unlikely to be used in production, but has been useful during development."""
     devices = get_bose_devices()
     device_infos = {}
     for device in devices:
         info_elem = ET.fromstring(read_device_info(device))
         device_infos[device.udn] = {
             "device_id": info_elem.attrib.get("deviceID", ""),
-            "name": info_elem.find("name").text,
-            "type": info_elem.find("type").text,
-            "marge URL": info_elem.find("margeURL").text,
-            "account": info_elem.find("margeAccountUUID").text,
+            "name": info_elem.find("name").text,  # type: ignore
+            "type": info_elem.find("type").text,  # type: ignore
+            "marge URL": info_elem.find("margeURL").text,  # type: ignore
+            "account": info_elem.find("margeAccountUUID").text,  # type: ignore
         }
     return device_infos
 

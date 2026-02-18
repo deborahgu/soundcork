@@ -1,5 +1,4 @@
 import logging
-import re
 import xml.etree.ElementTree as ET
 from os import mkdir, path, remove, rmdir, walk
 from typing import Optional
@@ -13,6 +12,7 @@ from soundcork.constants import (
     SOURCES_FILE,
 )
 from soundcork.model import ConfiguredSource, DeviceInfo, Preset, Recent
+from soundcork.utils import strip_element_text
 
 # pyright: reportOptionalMemberAccess=false
 
@@ -58,30 +58,44 @@ class DataStore:
         info_elem = stored_tree.getroot()
         # info_elem = root.find("info")
         device_id = info_elem.attrib.get("deviceID", "")
-        name = info_elem.find("name").text
-        type = info_elem.find("type").text
-        module_type = info_elem.find("moduleType").text
-        components = info_elem.find("components").findall("component")
+        name = strip_element_text(info_elem.find("name"))
+        type = strip_element_text(info_elem.find("type"))
+        module_type = strip_element_text(info_elem.find("moduleType"))
+
+        try:
+            components = info_elem.find("components").findall("component")  # type: ignore
+        except Exception:
+            # TODO narrow exception class
+            components = []
 
         for component in components:
-            component_category = component.find("componentCategory").text
+            component_category = strip_element_text(component.find("componentCategory"))
             if component_category == "SCM":
-                firmware_version = component.find("softwareVersion").text
-                device_serial_number = component.find("serialNumber").text
+                firmware_version = strip_element_text(component.find("softwareVersion"))
+                device_serial_number = strip_element_text(
+                    component.find("serialNumber")
+                )
             elif component_category == "PackagedProduct":
-                product_serial_number = component.find("serialNumber").text
-        for network_info in info_elem.findall("networkInfo"):
-            if network_info.attrib.get("type", "") == "SCM":
-                ip_address = network_info.find("ipAddress").text
+                product_serial_number = strip_element_text(
+                    component.find("serialNumber")
+                )
+
+        try:
+            for network_info in info_elem.findall("networkInfo"):
+                if network_info.attrib.get("type", "") == "SCM":
+                    ip_address = strip_element_text(network_info.find("ipAddress"))
+        except Exception:
+            # TODO narrow exception class
+            ip_address = ""
 
         try:
             return DeviceInfo(
                 device_id=device_id,
                 product_code=f"{type} {module_type}",
-                device_serial_number=str(device_serial_number),  # type: ignore
-                product_serial_number=str(product_serial_number),  # type: ignore
-                firmware_version=str(firmware_version),  # type: ignore
-                ip_address=str(ip_address),  # type: ignore
+                device_serial_number=str(device_serial_number),
+                product_serial_number=str(product_serial_number),
+                firmware_version=str(firmware_version),
+                ip_address=str(ip_address),
                 name=str(name),
             )
         except NameError:
@@ -95,8 +109,8 @@ class DataStore:
         for preset in presets_list:
             preset_elem = ET.SubElement(presets_elem, "preset")
             preset_elem.attrib["id"] = preset.id
-            preset_elem.attrib["createdOn"] = preset.created_on
-            preset_elem.attrib["updatedOn"] = preset.updated_on
+            preset_elem.attrib["createdOn"] = preset.created_on or ""
+            preset_elem.attrib["updatedOn"] = preset.updated_on or ""
             content_item_elem = ET.SubElement(preset_elem, "ContentItem")
             if preset.source:
                 content_item_elem.attrib["source"] = preset.source
@@ -132,13 +146,13 @@ class DataStore:
             updated_on = preset.attrib.get("updatedOn", "")
             content_item = preset.find("ContentItem")
             # If name is not present, the .text will correctly raise an error here
-            name = content_item.find("itemName").text
-            source = content_item.attrib["source"]
-            type = content_item.attrib.get("type", "")
-            location = content_item.attrib.get("location", "")
-            source_account = content_item.attrib.get("sourceAccount", "")
-            is_presetable = content_item.attrib.get("isPresetable", "")
-            container_art_elem = content_item.find("containerArt")
+            name = content_item.find("itemName").text  # type: ignore
+            source = content_item.attrib["source"]  # type: ignore
+            type = content_item.attrib.get("type", "")  # type: ignore
+            location = content_item.attrib.get("location", "")  # type: ignore
+            source_account = content_item.attrib.get("sourceAccount", "")  # type: ignore
+            is_presetable = content_item.attrib.get("isPresetable", "")  # type: ignore
+            container_art_elem = content_item.find("containerArt")  # type: ignore
             # have to 'is not None' because bool(Element) returns false
             # if the element has no children
             if container_art_elem is not None and container_art_elem.text:
@@ -173,14 +187,15 @@ class DataStore:
             id = recent.attrib.get("id", "1")
             device_id = recent.attrib.get("deviceID", "")
             utc_time = recent.attrib.get("utcTime", "")
+            # if contentItem is not present, the .find will correctly raise an error here
             content_item = recent.find("contentItem")
-            name = content_item.find("itemName").text or "test"
-            source = content_item.attrib.get("source", "")
-            type = content_item.attrib.get("type", "")
-            location = content_item.attrib.get("location", "")
-            source_account = content_item.attrib.get("sourceAccount")
-            is_presetable = content_item.attrib.get("isPresetable")
-            container_art_elem = content_item.find("containerArt")
+            name = content_item.find("itemName").text or "test"  # type: ignore
+            source = content_item.attrib.get("source", "")  # type: ignore
+            type = content_item.attrib.get("type", "")  # type: ignore
+            location = content_item.attrib.get("location", "")  # type: ignore
+            source_account = content_item.attrib.get("sourceAccount")  # type: ignore
+            is_presetable = content_item.attrib.get("isPresetable")  # type: ignore
+            container_art_elem = content_item.find("containerArt")  # type: ignore
             if container_art_elem is not None:
                 container_art = container_art_elem.text
             else:
@@ -255,9 +270,10 @@ class DataStore:
                 last_id += 1
             secret = source_elem.attrib.get("secret", "")
             secret_type = source_elem.attrib.get("secretType", "")
+            # if sourceKey is not present, the .find will correctly raise an error here
             source_key_elem = source_elem.find("sourceKey")
-            source_key_account = source_key_elem.attrib.get("account", "")
-            source_key_type = source_key_elem.attrib.get("type", "")
+            source_key_account = source_key_elem.attrib.get("account", "")  # type: ignore
+            source_key_type = source_key_elem.attrib.get("type", "")  # type: ignore
             sources_list.append(
                 ConfiguredSource(
                     display_name=display_name,
@@ -309,14 +325,14 @@ class DataStore:
     ######## create account
 
     def list_accounts(self) -> list[Optional[str]]:
-        accounts = []
+        accounts: list[str | None]
         for account_id in next(walk(self.data_dir))[1]:
             accounts.append(account_id)
 
         return accounts
 
     def list_devices(self, account_id) -> list[Optional[str]]:
-        devices = []
+        devices: list[str | None]
         for device_id in next(walk(self.account_devices_dir(account_id)))[1]:
             devices.append(device_id)
 
@@ -352,6 +368,8 @@ class DataStore:
             "w",
         ) as device_info_file:
             device_info_file.write(device_info_xml)
+
+        return True
 
     def remove_device(self, account: str, device_id: str) -> bool:
         logger.debug(f"removing device {device_id} from account {account}")

@@ -1,7 +1,9 @@
-black==25.9.0
+black==25.9.0  # dev only
 fastapi[standard]==0.120.1
 fastapi-etag==0.4.0
 gunicorn==23.0.0
+isort==7.0.0  # dev only
+mypy==1.19.1  # dev only
 pydantic-settings==2.11.0
 telnetlib3==2.0.8
 upnpclient==1.0.3

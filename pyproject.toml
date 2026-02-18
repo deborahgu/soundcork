@@ -23,3 +23,18 @@ dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.packages]
 find = {}
+
+[tool.black]
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+known_first_party = ["soundcork"]
+combine_as_imports = true
+include_trailing_comma = true
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+
+
+[tool.pydantic-mypy]

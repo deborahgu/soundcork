@@ -1,7 +1,6 @@
 import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from os import path, walk
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
@@ -16,6 +15,7 @@ from soundcork.model import (
     Recent,
     SourceProvider,
 )
+from soundcork.utils import strip_element_text
 
 if TYPE_CHECKING:
     from soundcork.datastore import DataStore
@@ -49,16 +49,12 @@ def preset_xml(preset: Preset, conf_sources_list: list[ConfiguredSource]) -> ET.
     preset_element.attrib["buttonNumber"] = preset.id
 
     try:
-        created_on = datetime.fromtimestamp(
-            int(preset.created_on), timezone.utc
-        ).isoformat()
+        created_on = datetime.fromtimestamp(int(preset.created_on), timezone.utc).isoformat()  # type: ignore
     except:
         created_on = default_datestr
 
     try:
-        updated_on = datetime.fromtimestamp(
-            int(preset.updated_on), timezone.utc
-        ).isoformat()
+        updated_on = datetime.fromtimestamp(int(preset.updated_on), timezone.utc).isoformat()  # type: ignore
     except:
         updated_on = default_datestr
 
@@ -214,9 +210,7 @@ def recents_xml(datastore: "DataStore", account: str, device: str) -> ET.Element
         ).isoformat()
 
         try:
-            created_on = datetime.fromtimestamp(
-                int(recent.created_on), timezone.utc
-            ).isoformat()
+            created_on = datetime.fromtimestamp(int(recent.created_on), timezone.utc).isoformat()  # type: ignore
         except:
             created_on = default_datestr
 
@@ -252,9 +246,9 @@ def add_recent(
     # these values are all assumed to be required for this to be
     # a valid Recent XML source; if any of these are not present
     # they should produce an exception
-    name = new_recent_elem.find("name").text
-    source_id = new_recent_elem.find("sourceid").text
-    location = new_recent_elem.find("location").text
+    name = new_recent_elem.find("name").text  # type:ignore
+    source_id = new_recent_elem.find("sourceid").text  # type:ignore
+    location = new_recent_elem.find("location").text  # type:ignore
     is_presetable = "true"
 
     type = strip_element_text(new_recent_elem.find("contentItemType"))
@@ -348,6 +342,8 @@ def account_full_xml(account: str, datastore: "DataStore") -> ET.Element:
     devices_elem = ET.SubElement(account_elem, "devices")
     last_device_id = ""
     for device_id in datastore.list_devices(account):
+        if not device_id:
+            continue
         last_device_id = device_id
         device_info = datastore.get_device_info(account, device_id)
 
@@ -400,12 +396,15 @@ def software_update_xml() -> ET.Element:
 
 def add_device_to_account(
     datastore: "DataStore", account: str, source_xml: str
-) -> ET.Element:
+) -> tuple[str, ET.Element]:
 
     new_device_elem = ET.fromstring(source_xml)
     device_id = new_device_elem.attrib.get("deviceid", "")
-    name = new_device_elem.find("name").text
+    # Name is required and should raise an exception if missing
+    name = new_device_elem.find("name").text  # type:ignore
     device = get_device_by_id(device_id)
+    if not device:
+        raise RuntimeError(f"Unknown device {device_id}")
     device_xml = read_device_info(device)
     datastore.add_device(account, device_id, device_xml)
 
@@ -426,13 +425,3 @@ def add_device_to_account(
 def remove_device_from_account(datastore: "DataStore", account: str, device: str):
     removed = datastore.remove_device(account, device)
     return {"ok": removed}
-
-def strip_element_text(elem: ET.Element) -> str:
-    if elem == None:
-        return ""
-    else:
-        text = elem.text
-        if not text:
-            return ""
-        else:
-            return text.strip()
