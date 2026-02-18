@@ -265,24 +265,27 @@ def get_groups_router(datastore):
     
     #---------------- creategroup ----------------------------------------
     # create a stereo pair (=group) 
-    # call as PUT /marge/streaming/account/{account}/service/creategroup?master={device1}&slave={device2}
+    # call as GET /service/account/{account}/creategroup?master={device1}&slave={device2}
     # returns GROUP_OK or GROUP_ERROR
-    @r.put("/marge/streaming/account/{account}/service/creategroup", tags=["marge"])
+    @r.get("/service/account/{account}/creategroup", tags=["service"])
     async def service_creategroup(
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
-        request: Request,
+        master: Annotated[str | None, Query()] = None,
+        slave:  Annotated[str | None, Query()] = None,
     ):
-        master_id = (request.query_params.get("master") or "").strip()
-        slave_id  = (request.query_params.get("slave") or "").strip()
+        #-- parameters
+        master_id = (master or "").strip()
+        slave_id  = (slave or "").strip()
         if not master_id or not slave_id:
             return Response("<error>Use ?master=...&slave=...</error>", media_type="application/xml", status_code=400)
-
+        
+        #-- acquire IPs
         try:
             master_info = datastore.get_device_info(account, master_id)
             slave_info  = datastore.get_device_info(account, slave_id)
         except Exception as e:
             return Response(f"<error>{e}</error>", media_type="application/xml", status_code=400)
-
+        #-- build XML payload
         xml_no_id = _build_group_payload_no_id(
             name=f"{master_info.name} + {slave_info.name}",
             master_id=master_id,
@@ -290,20 +293,20 @@ def get_groups_router(datastore):
             slave_id=slave_id,
             slave_ip=slave_info.ip_address,
         )
-
         shim = _BodyRequestShim(xml_no_id.encode("utf-8"))
+        
+        #-- create in datastore
         resp = await add_group_endpoint(account=account, request=shim)  # reuse
         xml_with_id = _extract_resp_text(resp).strip()
-
         if "<error" in xml_with_id and "<group" not in xml_with_id:
             return Response(xml_with_id, media_type="application/xml", status_code=409)
 
+        #-- submit to both boxes
         results = await asyncio.gather(
             _box_call(master_info.ip_address, "POST", BOSE_ADDGROUP, xml_with_id),
             _box_call(slave_info.ip_address,  "POST", BOSE_ADDGROUP, xml_with_id),
             return_exceptions=True,
         )
-
         ok = True
         for r0 in results:
             if isinstance(r0, Exception):
@@ -312,33 +315,37 @@ def get_groups_router(datastore):
                 status, text = r0
                 if status != 200 or "GROUP_OK" not in text:
                     ok = False
-
         return _xml_status(ok)
 
     #---------------- modgroup ----------------------------------------
     # rename a stereo pair (=group) 
-    # call as PUT /marge/streaming/account/{account}/service/modgroup?groupid={groupid}&newname={newname}
-    #   or as PUT /marge/streaming/account/{account}/service/modgroup?name={name}&newname={newname}
+    # call as GET /service/account/{account}/modgroup?groupid={groupid}&newname={newname}
+    #   or as PUT /service/account/{account}/modgroup?name={name}&newname={newname}
     # returns GROUP_OK or GROUP_ERROR
-    @r.put("/marge/streaming/account/{account}/service/modgroup", tags=["marge"])
+    @r.get("/service/account/{account}/modgroup", tags=["service"])
     async def service_modgroup(
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
-        request: Request,
+        newname: Annotated[str | None, Query()] = None,
+        groupid: Annotated[str | None, Query()] = None,
+        name:    Annotated[str | None, Query()] = None,
     ):
-        newname = (request.query_params.get("newname") or "").strip()
-        groupid = (request.query_params.get("groupid") or "").strip() or None
-        name    = (request.query_params.get("name") or "").strip() or None
-
+        #-- parameters
+        newname = (newname or "").strip()
+        groupid = (groupid or "").strip() or None
+        name    = (name or "").strip() or None
+        #-- missing newname
         if not newname:
             return Response("<error>Missing newname</error>", media_type="application/xml", status_code=400)
-        if not groupid and not name:
-            return Response("<error>Use groupid=... or name=...</error>", media_type="application/xml", status_code=400)
-
+        #-- exactly one must be set
+        if (groupid is None and name is None) or (groupid is not None and name is not None):
+        return Response(
+            return Response("<error>Use exactly one of groupid=... or name=...</error>", media_type="application/xml", status_code=400)
+            
+        #-- acquire GroupService.xml
         if not groupid:
             groupid = _group_id_by_name(datastore, account, name or "")
             if not groupid:
                 return Response("<error>Group name not found</error>", media_type="application/xml", status_code=404)
-
         try:
             stored_xml = _group_xml_by_id(datastore, account, groupid)
             master_dev = _extract_master_device_id(stored_xml)
@@ -349,24 +356,23 @@ def get_groups_router(datastore):
                 return Response("<error>Stored group must contain exactly two ipAddress entries</error>", media_type="application/xml", status_code=500)
         except Exception as e:
             return Response(f"<error>{e}</error>", media_type="application/xml", status_code=400)
-
+            
+        #-- build new XML payload
         g = ET.Element("group")
         ET.SubElement(g, "name").text = newname
         ET.SubElement(g, "masterDeviceId").text = master_dev
         mod_payload = f'<?xml version="1.0" encoding="UTF-8" ?>{ET.tostring(g, encoding="unicode")}'
-
         shim = _BodyRequestShim(mod_payload.encode("utf-8"))
         resp = await mod_group_endpoint(account=account, group=groupid, request=shim)  # reuse
         updated_xml = _extract_resp_text(resp).strip()
-
         if "<error" in updated_xml and "<group" not in updated_xml:
             return Response(updated_xml, media_type="application/xml", status_code=409)
 
+        #-- update both boxes
         results = await asyncio.gather(
             *(_box_call(ip, "POST", BOSE_UPDATEGROUP, updated_xml) for ip in ips),
             return_exceptions=True,
         )
-
         ok = True
         for r0 in results:
             if isinstance(r0, Exception):
@@ -375,30 +381,33 @@ def get_groups_router(datastore):
                 status, _text = r0
                 if status != 200:
                     ok = False
-
         return _xml_status(ok)
         
     #---------------- removegroup ----------------------------------------
     # remove a stereo pair (=group) 
-    # call as GET /marge/streaming/account/{account}/service/removegroup?groupid={groupid} 
-    #   or as GET /marge/streaming/account/{account}/service/removegroup?name={name} 
+    # call as GET /service/account/{account}/removegroup?groupid={groupid} 
+    #   or as GET /service/account/{account}/removegroup?name={name} 
     # returns GROUP_OK or GROUP_ERROR
-    @r.put("/marge/streaming/account/{account}/service/removegroup", tags=["marge"])
+    @r.get("/service/account/{account}/removegroup", tags=["service"])
     async def service_removegroup(
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
-        request: Request,
+        groupid: Annotated[str | None, Query()] = None,
+        name:    Annotated[str | None, Query()] = None,
     ):
-        groupid = (request.query_params.get("groupid") or "").strip() or None
-        name    = (request.query_params.get("name") or "").strip() or None
-
-        if not groupid and not name:
-            return Response("<error>Use groupid=... or name=...</error>", media_type="application/xml", status_code=400)
-
-        if not groupid:
+        #-- parameters
+        groupid = (groupid or "").strip() or None
+        name    = (name or "").strip() or None
+        #-- exactly one must be set
+        if (groupid is None and name is None) or (groupid is not None and name is not None):
+            return Response(
+                "<error>Use exactly one of groupid=... or name=...</error>",media_type="application/xml", status_code=400)
+        #-- resolve groupid from name if needed
+        if groupid is None
             groupid = _group_id_by_name(datastore, account, name or "")
             if not groupid:
                 return Response("<error>Group name not found</error>", media_type="application/xml", status_code=404)
-
+        
+        #-- acquire GroupService.xml
         try:
             stored_xml = _group_xml_by_id(datastore, account, groupid)
             master_ip = _extract_master_ip(stored_xml)
@@ -407,7 +416,7 @@ def get_groups_router(datastore):
         except Exception as e:
             return Response(f"<error>{e}</error>", media_type="application/xml", status_code=400)
 
-        # 1) zuerst Box löschen (GET)
+        #-- delete group at the box first
         try:
             status, text = await _box_call(master_ip, "GET", BOSE_REMOVEGROUP)
         except Exception as e:
@@ -419,14 +428,12 @@ def get_groups_router(datastore):
                 media_type="application/xml",
                 status_code=500,
             )
-
-        # 2) erst dann datastore löschen
+        #-- only if successful delete also in datastore
         resp = await delete_group_endpoint(account=account, group=groupid)  # reuse
-        # delete_group_endpoint liefert BoseXMLResponse; Fehler sind dort als <error> mit status_code gesetzt
-        # Wir behandeln alles != 2xx als Fehler:
+        #-- delete_group_endpoint returns BoseXMLResponse; errors are marked <error>{error}</error>
+        #-- all return codes != 200 are treated as error
         if getattr(resp, "status_code", 200) >= 300:
             return Response(f"<error>Removed on box, but datastore delete failed</error>", media_type="application/xml", status_code=500)
-
         return _xml_status(True)
 
     return r
