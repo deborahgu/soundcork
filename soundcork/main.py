@@ -299,6 +299,7 @@ async def post_account_recent(
     "/marge/streaming/account/{account}/device/",
     response_class=BoseXMLResponse,
     tags=["marge"],
+    status_code=201,
     dependencies=[
         Depends(
             Etag(
