@@ -143,7 +143,7 @@ def get_groups_router(datastore):
 
     # ----------------- marge group endpoint to query group per device -----------------
     @marge.get(
-        "/marge/streaming/account/{account}/device/{device}/group",
+        "/marge/streaming/account/{account}/device/{device}/group/",
         response_class=BoseXMLResponse,
         tags=["marge"],
     )
@@ -166,7 +166,7 @@ def get_groups_router(datastore):
 
     # ----------------- marge group endpoint to add group  -----------------
     @marge.post(
-        "/marge/streaming/account/{account}/group",
+        "/marge/streaming/account/{account}/group/",
         response_class=BoseXMLResponse,
         tags=["marge"],
     )
@@ -192,7 +192,8 @@ def get_groups_router(datastore):
             result = datastore.add_group(account, reqxml_str)
             if not result.lstrip().startswith("<?xml"):
                 return BoseXMLResponse(content=f"<error>{result}</error>", status_code=400)
-            return BoseXMLResponse(content=result)
+            #--- mod
+            return BoseXMLResponse(content=result, status_code=201)
 
         except UnicodeDecodeError:
             return BoseXMLResponse(content="<error>Invalid UTF-8 in request body</error>", status_code=400)
