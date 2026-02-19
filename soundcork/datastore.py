@@ -1,7 +1,11 @@
 import logging
+import re
+import random
 import xml.etree.ElementTree as ET
-from os import mkdir, path, remove, rmdir, walk
+from os import mkdir, rmdir, listdir, path, walk, remove
+
 from typing import Optional
+from io import BytesIO
 
 from soundcork.config import Settings
 from soundcork.constants import (
@@ -368,7 +372,6 @@ class DataStore:
             "w",
         ) as device_info_file:
             device_info_file.write(device_info_xml)
-
         return True
 
     def remove_device(self, account: str, device_id: str) -> bool:
@@ -380,3 +383,257 @@ class DataStore:
         remove(path.join(self.account_device_dir(account, device_id), DEVICE_INFO_FILE))
         rmdir(path.join(self.account_devices_dir(account), device_id))
         return True
+           
+######## groups #################
+    #-- Helper function to prettyprint XML
+    def _pretty_xml(self, root: ET.Element) -> str:
+        #-- add indentations
+        ET.indent(root, space="  ", level=0)
+        buf = BytesIO()
+        ET.ElementTree(root).write(buf, encoding="utf-8", xml_declaration=True)
+        return buf.getvalue().decode("utf-8")
+        
+    #-- Helper function to create a unique group_id
+    def _generate_group_id(self, account: str) -> str:
+        while True:
+            group_id = f"{random.randint(0, 9999999):07d}"
+            filepath = path.join(
+                self.account_devices_dir(account),
+                f"Group_{group_id}.xml"
+            )
+            if not path.exists(filepath):
+                return group_id
+
+    #-- list all existing groups
+    def list_groups(self, account: str) -> list[str]:
+        devices_dir = self.account_devices_dir(account)
+        groups = []
+        for fn in listdir(devices_dir):
+            if fn.startswith("Group_") and fn.endswith(".xml"):
+                groups.append(fn[len("Group_"):-len(".xml")])
+        return groups
+
+    #-- check if a group with given id exist
+    def group_exists(self, account: str, group_id: str) -> bool:
+        return path.exists(path.join(self.account_devices_dir(account), f"Group_{group_id}.xml"))
+    
+    #-- check if a given device is already grouped    
+    def check_device_grouped(self, account: str, device_id: str) -> Optional[str]:
+        devices_dir = self.account_devices_dir(account)
+        for filename in listdir(devices_dir):
+            if not filename.startswith("Group_") or not filename.endswith(".xml"):
+                continue
+            filepath = path.join(devices_dir, filename)
+            try:
+                tree = ET.parse(filepath)
+                root = tree.getroot()
+            except ET.ParseError:
+                continue  # kaputte Gruppe ignorieren
+            for dev in root.findall(".//deviceId"):
+                if dev.text == device_id:
+                    # get group_id from filename
+                    # Group_<id>.xml
+                    return filename[len("Group_") : -len(".xml")]
+        return None
+
+    #-- check if a device with given id is of type ST10    
+    def check_device_type(self, account: str, device_id: str) -> bool:
+        info_path = path.join(
+            self.account_devices_dir(account),
+            device_id,
+            DEVICE_INFO_FILE,
+        )
+
+        if not path.exists(info_path):
+            return False
+        try:
+            tree = ET.parse(info_path)
+            root = tree.getroot()
+        except ET.ParseError:
+            return False
+        dev_type = root.find("type")
+        return dev_type is not None and dev_type.text == "SoundTouch 10"
+
+    #-- validate group xml        
+    def validate_group_xml(self, xml_content: str) -> ET.Element:
+        try:
+            root = ET.fromstring(xml_content)
+        except ET.ParseError as e:
+            raise ValueError(f"Invalid XML: {e}")
+
+        #-- <name>
+        name = root.find("name")
+        if name is None or not name.text or not name.text.strip():
+            raise ValueError("Missing or empty <name> element")
+
+        #-- <masterDeviceId>
+        master = root.find("masterDeviceId")
+        if master is None or not master.text:
+            raise ValueError("Missing <masterDeviceId> element")
+
+        # <roles>/<groupRole>/<deviceId>
+        device_ids = [d.text for d in root.findall("./roles/groupRole/deviceId") if d.text]
+        if not device_ids:
+            raise ValueError("No <groupRole>/<deviceId> entries found")
+
+        if master.text not in device_ids:
+            raise ValueError("masterDeviceId must appear in group roles")
+
+        return root
+
+
+    #-- add a group, if a.) both devices are ungrouped and 
+    #                   b.) of type ST10 and       
+    def add_group(self, account: str, group_info_xml: str) -> str:
+        """
+        adds a group if it a.) both devices exist, b.) both are ST10 
+        return value:
+        - XML string of created group on success
+        - error message on failure
+        """
+        group_id = self._generate_group_id(account)
+        filename = f"Group_{group_id}.xml"
+        filepath = path.join(self.account_devices_dir(account), filename)
+
+        if path.exists(filepath):
+            return "Group already exists"
+        try:
+            root = self.validate_group_xml(group_info_xml)
+        except ValueError as e:
+            return str(e)
+
+        #-- extract two deviceIds
+        device_ids = [d.text for d in root.findall("./roles/groupRole/deviceId") if d.text]
+        if len(device_ids) != 2:
+            return "Group must contain exactly two deviceId entries"
+
+        #-- are these already grouped?
+        for dev_id in device_ids:
+            grouped_in = self.check_device_grouped(account, dev_id)
+            if grouped_in:
+                return f"Device {dev_id} is already part of group {grouped_in}"
+
+        #-- are these ST10 devices?
+        for dev_id in device_ids:
+            if not self.check_device_type(account, dev_id):
+                return f"Device {dev_id} is not of type 'SoundTouch 10'"
+        
+        #-- done with tests
+        root.set("id", group_id)
+        xml_out = self._pretty_xml(root)
+        #-- write to file
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(xml_out)
+        #-- return complete prettyprinted XML
+        return xml_out
+
+    #-- change the name of a group
+    def modify_group(
+        self,
+        account: str,
+        group_id: str,
+        new_name: str,
+        master_device_id: str,
+        ) -> str:
+        """
+        modifies name of a group
+        return value:
+        - XML string of created group on success
+        - error message on failure
+        """
+        group_file = path.join(
+            self.account_devices_dir(account),
+            f"Group_{group_id}.xml"
+        )
+
+        if not path.exists(group_file):
+            return f"Group does not exist in account {account}"
+
+        #-- get xml file
+        try:
+            tree = ET.parse(group_file)
+            root = tree.getroot()
+        except ET.ParseError:
+            return "Stored group XML is invalid"
+
+        #-- check master device
+        stored_master = root.findtext("masterDeviceId")
+        if not stored_master:
+            return "Group has no masterDeviceId"
+
+        if stored_master != master_device_id:
+            return "masterDeviceId does not match group master"
+
+        #-- <name> replacement
+        name_elem = root.find("name")
+        if name_elem is None:
+            name_elem = ET.SubElement(root, "name")
+        name_elem.text = new_name
+
+        #-- stringify with prettyprint
+        xml_out = self._pretty_xml(root)
+        #xml_out = ET.tostring(
+        #    root,
+        #    encoding="utf-8",
+        #    xml_declaration=True,
+        #).decode("utf-8")
+
+        #-- write to file 
+        with open(group_file, "w", encoding="utf-8") as f:
+            f.write(xml_out)
+
+        return xml_out
+
+    #-- delete a group if it exists
+    def delete_group(self, account: str, group_id: str) -> str:
+        """
+        deletes a group if it exists.
+        return value:
+        ""    → in case of success
+        "..." → error message
+        """
+        filename = f"Group_{group_id}.xml"
+        filepath = path.join(self.account_devices_dir(account), filename)
+
+        if not path.exists(filepath):
+            return f"Group {group_id} does not exist in account {account}"
+
+        try:
+            remove(filepath)
+        except Exception as e:
+            return f"Failed to delete group {group_id}: {e}"
+
+        return ""
+
+    #-- check group status of a device
+    def get_device_group_xml(self, account: str, device_id: str) -> str:
+        """
+        check group status of a device      
+        return value::
+        - XML <group/> if ungrouped
+        - XML file of group if grouped
+        - error if device does not exist or is no ST10
+        """
+        #-- device existent (may be obsolete, is already checked in main.py)
+        device_dir = path.join(self.account_devices_dir(account), device_id)
+        info_path = path.join(device_dir, DEVICE_INFO_FILE)
+        if not path.exists(info_path):
+            return f"Device {device_id} does not exist"
+
+        #-- type=ST10 ? 
+        if not self.check_device_type(account, device_id):
+            return f"Device {device_id} is not of type 'SoundTouch 10'"
+
+        #-- check status
+        grouped_in = self.check_device_grouped(account, device_id)
+        if not grouped_in:
+            return "<group/>"
+
+        #-- get xml file of group
+        group_file = path.join(self.account_devices_dir(account), f"Group_{grouped_in}.xml")
+        try:
+            with open(group_file, "r", encoding="utf-8") as f:
+                xml_content = f.read()
+            return xml_content
+        except Exception as e:
+            return f"Failed to read group {grouped_in}: {e}"

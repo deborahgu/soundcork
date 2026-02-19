@@ -1,5 +1,6 @@
 import logging
 import os
+
 import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -17,7 +18,7 @@ from soundcork.bmx import (
     tunein_podcast_info,
 )
 from soundcork.config import Settings
-from soundcork.constants import ACCOUNT_RE, DEVICE_RE
+from soundcork.constants import ACCOUNT_RE, DEVICE_RE, GROUP_RE
 from soundcork.datastore import DataStore
 from soundcork.devices import (
     add_device,
@@ -44,16 +45,16 @@ from soundcork.model import (
     BoseXMLResponse,
 )
 
+from soundcork.groups import get_groups_router
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-
 datastore = DataStore()
 settings = Settings()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -62,7 +63,6 @@ async def lifespan(app: FastAPI):
     logger.info("done starting up server")
     yield
     logger.debug("closing server")
-
 
 description = """
 This emulates the SoundTouch servers so you don't need connectivity
@@ -73,6 +73,10 @@ tags_metadata = [
     {
         "name": "marge",
         "description": "Communicates with the speaker.",
+    },
+    {
+        "name": "service",
+        "description": "Communicates with user applications.",
     },
     {
         "name": "bmx",
@@ -87,7 +91,6 @@ app = FastAPI(
     openapi_tags=tags_metadata,
     lifespan=lifespan,
 )
-
 
 # @lru_cache
 # def get_settings():
@@ -413,9 +416,7 @@ def bose_xml_str(xml: ET.Element) -> str:
 
     return return_xml
 
-
-################## configuration ############3
-
+################## configuration ############
 
 @app.get("/scan_recents", tags=["setup"])
 def test_scan_recents():
@@ -451,3 +452,7 @@ def add_device_to_datastore(device_id: str):
         if info_elem.attrib.get("deviceID", "") == device_id:
             success = add_device(device)
             return {device_id: success}
+
+#####################################################################################
+#-- include all routines for groups
+app.include_router(get_groups_router(datastore))
