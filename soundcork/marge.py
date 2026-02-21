@@ -1,6 +1,7 @@
 import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
@@ -126,12 +127,47 @@ def update_preset(
         container_art=container_art,
     )
 
-    presets_list[preset_number - 1] = preset_obj
+    preset_number_str = str(preset_number)
+    matching_preset = None
+    for preset in presets_list:
+        if preset.id == preset_number_str:
+            matching_preset = preset
+            break
+
+    if matching_preset:
+        presets_list.remove(matching_preset)
+
+    presets_list.append(preset_obj)
 
     datastore.save_presets(account, device, presets_list)
 
     preset_element = preset_xml(preset_obj, conf_sources_list)
     return preset_element
+
+
+def delete_preset(
+    datastore: "DataStore",
+    account: str,
+    device: str,
+    preset_number: int,
+) -> bool:
+    presets_list = datastore.get_presets(account, device)
+
+    preset_number_str = str(preset_number)
+    matching_preset = None
+    for preset in presets_list:
+        if preset.id == preset_number_str:
+            matching_preset = preset
+            break
+
+    if not matching_preset:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Preset not found")
+
+    presets_list.remove(matching_preset)
+
+    datastore.save_presets(account, device, presets_list)
+
+    return True
 
 
 def content_item_source_xml(
