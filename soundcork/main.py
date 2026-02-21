@@ -318,7 +318,7 @@ async def post_account_device(
     request: Request,
 ):
     xml = await request.body()
-    device_id, xml_resp = add_device_to_account(datastore, account, str(xml))
+    device_id, xml_resp = add_device_to_account(datastore, account, xml.decode())
 
     return bose_xml_str(xml_resp)
 
