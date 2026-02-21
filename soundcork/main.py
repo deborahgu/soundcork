@@ -29,6 +29,7 @@ from soundcork.marge import (
     account_full_xml,
     add_device_to_account,
     add_recent,
+    delete_preset,
     presets_xml,
     provider_settings_xml,
     recents_xml,
@@ -207,6 +208,20 @@ async def put_account_preset(
     xml = await request.body()
     xml_resp = update_preset(datastore, account, device, preset_number, xml)
     return bose_xml_str(xml_resp)
+
+
+@app.delete(
+    "/marge/streaming/account/{account}/device/{device}/preset/{preset_number}",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+)
+def delete_account_preset(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
+    preset_number: int,
+):
+    delete_preset(datastore, account, device, preset_number)
+    return None
 
 
 @app.get(

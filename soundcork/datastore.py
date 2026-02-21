@@ -106,6 +106,7 @@ class DataStore:
     def save_presets(self, account: str, device: str, presets_list: list[Preset]):
         save_file = path.join(self.account_dir(account), PRESETS_FILE)
         presets_elem = ET.Element("presets")
+        presets_list.sort(key=lambda preset: int(preset.id))
         for preset in presets_list:
             preset_elem = ET.SubElement(presets_elem, "preset")
             preset_elem.attrib["id"] = preset.id
