@@ -35,6 +35,7 @@ from soundcork.marge import (
     remove_device_from_account,
     software_update_xml,
     source_providers,
+    update_device_poweron,
     update_preset,
 )
 from soundcork.model import (
@@ -107,11 +108,9 @@ def read_root():
     tags=["marge"],
     status_code=HTTPStatus.OK,
 )
-def power_on():
-    # see https://github.com/fastapi/fastapi/discussions/8091 for the TODO here
-    # I wonder if the endpoint will work if I return HTTPStatus.IM_A_TEAPOT
-    # instead? I'd like to try it.
-
+async def power_on(request: Request):
+    xml = await request.body()
+    update_device_poweron(datastore, xml)
     return
 
 
@@ -318,7 +317,7 @@ async def post_account_device(
     request: Request,
 ):
     xml = await request.body()
-    device_id, xml_resp = add_device_to_account(datastore, account, str(xml))
+    device_id, xml_resp = add_device_to_account(datastore, account, xml.decode())
 
     return bose_xml_str(xml_resp)
 
