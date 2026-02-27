@@ -69,6 +69,7 @@ class DataStore:
         return self.device_info_from_device_info_xml(info_elem)
 
     def save_device_info(self, device: DeviceInfo, account: str) -> ET.Element:
+    """Saves definition of a Device associated with an Account"""
         save_file = path.join(
             self.account_device_dir(account, device.device_id), DEVICE_INFO_FILE
         )
@@ -286,16 +287,26 @@ class DataStore:
             sources_file.write(sources_xml)
 
     def find_device(self, device_id: str) -> tuple[DeviceInfo | None, str | None]:
+    """Looks for Device in datastore.
+    
+    Given a device_id, looks for it
+    1. first, if associated with an account
+    2. if not, then as a device that's ever been powered on
+    
+    Returns:
+        A tuple of the DeviceInfo object, if found, with the Account ID,
+        if it exists. 
+   """
         for account_id in self.list_accounts():
-            if account_id != None:
-                for device in self.list_devices(account_id):
-                    if device == device_id:
-                        return self.get_device_info(account_id, device), account_id
-        for device in self.list_poweron_devices():
-            if device == device_id:
-                return self.get_poweron_device_info(device), None
+            if account_id:
+                for id in self.list_devices(account_id):
+                    if id == device_id:
+                        return self.get_device_info(account_id, id), account_id
+        for id in self.list_poweron_devices():
+            if id == device_id:
+                return self.get_poweron_device_info(id), None
 
-        return None, ""
+        return None, None
 
     def get_poweron_device_info(self, device: str) -> DeviceInfo:
         poweron_elem = ET.parse(
@@ -314,7 +325,7 @@ class DataStore:
         ) as poweron_file:
             poweron_file.write(poweron_xml)
 
-    def device_info_from_poweron(self, poweron_elem: ET.Element) -> DeviceInfo:
+    def device_info_from_poweron_xml(self, poweron_elem: ET.Element) -> DeviceInfo:
         device_elem = poweron_elem.find("device")
         if device_elem != None:
             device_id = device_elem.attrib.get("id", "")
@@ -425,6 +436,7 @@ class DataStore:
     def list_accounts(self) -> list[Optional[str]]:
         accounts: list[str | None] = []
         for account_id in next(walk(self.data_dir))[1]:
+            # Check if the ID is digits to distinguish between accounts and power_on devices.
             if account_id.isdigit():
                 accounts.append(account_id)
 
@@ -438,6 +450,11 @@ class DataStore:
         return devices
 
     def list_poweron_devices(self) -> list[str]:
+         """List all devices Soundcork has seen power on
+         
+         Returns:
+         - List[device_ids: str]: IDs for every device Soundcork has seen
+         """
         devices: list[str] = []
         for device_id in next(walk(self.poweron_devices_dir()))[1]:
             devices.append(device_id)
