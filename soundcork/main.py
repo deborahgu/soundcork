@@ -406,6 +406,15 @@ def sw_update() -> Response:
         return response
 
 
+@app.post("/v1/scmudc/{deviceid}", tags=["stats"], status_code=HTTPStatus.OK)
+def stats_scmudc(deviceid: str):
+    """Returns 200 for the analytics endpoint.
+    
+    This isn't an endpoint we use, but it's noisy when it fails. Return 200.
+    """
+    return
+
+
 def bose_xml_str(xml: ET.Element) -> str:
     # ET.tostring won't allow you to set standalone="yes"
     return_xml = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>{ET.tostring(xml, encoding="unicode")}'
