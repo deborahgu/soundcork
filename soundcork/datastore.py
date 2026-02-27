@@ -1,7 +1,10 @@
 import logging
 import xml.etree.ElementTree as ET
+from http import HTTPStatus
 from os import mkdir, path, remove, rmdir, walk
 from typing import Optional
+
+from fastapi import HTTPException
 
 from soundcork.config import Settings
 from soundcork.constants import (
@@ -40,14 +43,25 @@ class DataStore:
     def initialize_data_directory(self) -> None:
         raise NotImplementedError
 
-    def account_dir(self, account: str) -> str:
-        return path.join(self.data_dir, account)
+    def account_dir(self, account: str, create: bool = False) -> str:
+        dir = path.join(self.data_dir, account)
+        if not path.exists(dir) and not create:
+            raise HTTPException(HTTPStatus.NOT_FOUND, f"Account {account} not found")
+        return dir
 
     def account_devices_dir(self, account: str) -> str:
         return path.join(self.data_dir, account, DEVICES_DIR)
 
-    def account_device_dir(self, account: str, device: str) -> str:
-        return path.join(self.account_devices_dir(account), device)
+    def account_device_dir(
+        self, account: str, device: str, create: bool = False
+    ) -> str:
+        dir = path.join(self.account_devices_dir(account), device)
+        if not path.exists(dir) and not create:
+            raise HTTPException(
+                HTTPStatus.NOT_FOUND,
+                f"Device {device} does not belong to account {account}",
+            )
+        return dir
 
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Get the device info"""
@@ -350,7 +364,7 @@ class DataStore:
             return False
 
         # TODO: add error handling if you can't make the directory
-        mkdir(self.account_dir(account))
+        mkdir(self.account_dir(account, True))
         mkdir(self.account_devices_dir(account))
         # create devices subdirectory
         return True
