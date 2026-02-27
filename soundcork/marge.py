@@ -443,7 +443,7 @@ def remove_device_from_account(datastore: "DataStore", account: str, device: str
 
 def update_device_poweron(datastore: "DataStore", poweron_xml: bytes):
     poweron_elem = ET.fromstring(poweron_xml)
-    device = datastore.device_info_from_poweron(poweron_elem)
+    device = datastore.device_info_from_poweron_xml(poweron_elem)
     logger.info(f"device={device}")
     current_device, account_id = datastore.find_device(device.device_id)
     if current_device and account_id:

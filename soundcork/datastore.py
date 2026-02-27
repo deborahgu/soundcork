@@ -42,12 +42,14 @@ class DataStore:
         raise NotImplementedError
 
     def poweron_devices_dir(self) -> str:
+        """returns the top-level directory that stores poweron info for all devices"""
         pdd = path.join(self.data_dir, DEVICES_DIR)
         if not path.exists(pdd):
             mkdir(pdd)
         return pdd
 
     def poweron_device_dir(self, device_id: str) -> str:
+        """returns the directory that stores the poweron file for the given device"""
         return path.join(self.poweron_devices_dir(), device_id)
 
     def account_dir(self, account: str) -> str:
@@ -69,7 +71,7 @@ class DataStore:
         return self.device_info_from_device_info_xml(info_elem)
 
     def save_device_info(self, device: DeviceInfo, account: str) -> ET.Element:
-    """Saves definition of a Device associated with an Account"""
+        """Saves definition of a Device associated with an Account"""
         save_file = path.join(
             self.account_device_dir(account, device.device_id), DEVICE_INFO_FILE
         )
@@ -287,16 +289,16 @@ class DataStore:
             sources_file.write(sources_xml)
 
     def find_device(self, device_id: str) -> tuple[DeviceInfo | None, str | None]:
-    """Looks for Device in datastore.
-    
-    Given a device_id, looks for it
-    1. first, if associated with an account
-    2. if not, then as a device that's ever been powered on
-    
-    Returns:
-        A tuple of the DeviceInfo object, if found, with the Account ID,
-        if it exists. 
-   """
+        """Looks for Device in datastore.
+
+        Given a device_id, looks for it
+        1. first, if associated with an account
+        2. if not, then as a device that's ever been powered on
+
+        Returns:
+            A tuple of the DeviceInfo object, if found, with the Account ID,
+            if it exists.
+        """
         for account_id in self.list_accounts():
             if account_id:
                 for id in self.list_devices(account_id):
@@ -312,10 +314,10 @@ class DataStore:
         poweron_elem = ET.parse(
             path.join(self.poweron_device_dir(device), POWERON_FILE)
         ).getroot()
-        return self.device_info_from_poweron(poweron_elem)
+        return self.device_info_from_poweron_xml(poweron_elem)
 
-    def save_poweron(self, device: str, poweron_xml: str):
-        device_dir = self.poweron_device_dir(device)
+    def save_poweron(self, device_id: str, poweron_xml: str):
+        device_dir = self.poweron_device_dir(device_id)
         if not path.exists(device_dir):
             mkdir(device_dir)
 
@@ -355,6 +357,11 @@ class DataStore:
         )
 
     def device_info_from_device_info_xml(self, info_elem: ET.Element) -> DeviceInfo:
+        """
+        converts a DeviceInfo.xml formatted element into a DeviceInfo object.
+        usually sourced either from {account}/devices/{deviceid}/DeviceInfo.xml
+        or from http://{deviceip}:8090/info
+        """
         device_id = info_elem.attrib.get("deviceID", "")
         name = strip_element_text(info_elem.find("name"))
         type = strip_element_text(info_elem.find("type"))
@@ -450,11 +457,11 @@ class DataStore:
         return devices
 
     def list_poweron_devices(self) -> list[str]:
-         """List all devices Soundcork has seen power on
-         
-         Returns:
-         - List[device_ids: str]: IDs for every device Soundcork has seen
-         """
+        """List all devices Soundcork has seen power on
+
+        Returns:
+        - List[device_ids: str]: IDs for every device Soundcork has seen
+        """
         devices: list[str] = []
         for device_id in next(walk(self.poweron_devices_dir()))[1]:
             devices.append(device_id)
