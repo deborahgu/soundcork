@@ -159,7 +159,7 @@ spec:
                   number: 8000
 ```
 
-> **Note:** We use Traefik IngressRoute in our setup. Adapt the ingress for your controller (nginx, Traefik, etc.).
+> **Note:** This setups is for Traefik IngressRoute. Adapt the ingress for your controller (nginx, Traefik, etc.).
 
 ### Apply
 
