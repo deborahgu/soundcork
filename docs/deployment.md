@@ -208,15 +208,6 @@ sudo systemctl enable --now soundcork
 
 > **Note:** Make sure `PYTHONPATH` includes the project root and that the working directory is set correctly in your service file or shell environment.
 
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `base_url` | `""` | Public URL of your SoundCork instance (e.g., `https://soundcork.example.com`) |
-| `data_dir` | `""` | Path to the speaker data directory |
-| `SOUNDCORK_MODE` | `local` | `local` (recommended) or `proxy` — see [Architecture](architecture.md) |
-| `SOUNDCORK_LOG_DIR` | `./logs/traffic` | Directory for traffic logs (proxy mode only) |
-
 ## Container Image
 
 - **Image:** `ghcr.io/deborahgu/soundcork:main`
