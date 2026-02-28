@@ -20,7 +20,7 @@ Create a `docker-compose.yml`:
 ```yaml
 services:
   soundcork:
-    image: ghcr.io/timvw/soundcork:main
+    image: ghcr.io/deborahgu/soundcork:main
     ports:
       - "8000:8000"
     environment:
