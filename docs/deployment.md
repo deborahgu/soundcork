@@ -219,7 +219,7 @@ sudo systemctl enable --now soundcork
 
 ## Container Image
 
-- **Image:** `ghcr.io/timvw/soundcork:main`
+- **Image:** `ghcr.io/deborahgu/soundcork:main`
 - **Multi-architecture:** `linux/amd64` + `linux/arm64` (works on Raspberry Pi)
 - Built automatically via GitHub Actions on every push to main
 - Source: see `.github/workflows/docker-publish.yml`
