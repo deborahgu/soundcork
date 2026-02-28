@@ -42,7 +42,7 @@ docker compose up -d
 
 ## Option 3: Kubernetes
 
-This is our production setup. Customize the hostname, volume paths, and ingress controller for your environment.
+Customize the hostname, volume paths, and ingress controller for your environment.
 
 ### Namespace
 
