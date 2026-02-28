@@ -75,7 +75,7 @@ spec:
     spec:
       containers:
         - name: soundcork
-          image: ghcr.io/timvw/soundcork:main
+          image: ghcr.io/deborahgu/soundcork:main
           ports:
             - containerPort: 8000
           env:
