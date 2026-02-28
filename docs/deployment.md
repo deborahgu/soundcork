@@ -10,7 +10,7 @@ docker run -d --name soundcork \
   -v /path/to/your/data:/soundcork/data \
   -e base_url=http://your-server:8000 \
   -e data_dir=/soundcork/data \
-  ghcr.io/timvw/soundcork:main
+  ghcr.io/deborahgu/soundcork:main
 ```
 
 ## Option 2: Docker Compose
