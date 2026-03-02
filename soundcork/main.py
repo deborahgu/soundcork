@@ -424,7 +424,7 @@ def sw_update() -> Response:
 @app.post("/v1/scmudc/{deviceid}", tags=["stats"], status_code=HTTPStatus.OK)
 def stats_scmudc(deviceid: str):
     """Returns 200 for the analytics endpoint.
-    
+
     This isn't an endpoint we use, but it's noisy when it fails. Return 200.
     """
     return
@@ -474,3 +474,9 @@ def add_device_to_datastore(device_id: str):
         if info_elem.attrib.get("deviceID", "") == device_id:
             success = add_device(device)
             return {device_id: success}
+
+
+@app.get("/marge/streaming/device/{device_id}/streaming_token")
+def streaming_token(device_id: str, response: Response):
+    response.headers["Authorization"] = "swordfish"
+    return

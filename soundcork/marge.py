@@ -227,7 +227,7 @@ def configured_source_xml(conf_source: ConfiguredSource) -> ET.Element:
         PROVIDERS.index(conf_source.source_key_type) + 1
     )
     ET.SubElement(source, "sourcename").text = conf_source.display_name
-    ET.SubElement(source, "sourcesettings")
+    ET.SubElement(source, "sourceSettings")
     ET.SubElement(source, "updatedOn").text = default_datestr
     ET.SubElement(source, "username").text = conf_source.source_key_account
 
