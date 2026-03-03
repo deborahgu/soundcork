@@ -172,6 +172,8 @@ class ConfiguredSource(BaseModel):
     secret_type: str
     source_key_type: str
     source_key_account: str
+    created_on: str
+    updated_on: str
 
 
 class DeviceInfo(BaseModel):

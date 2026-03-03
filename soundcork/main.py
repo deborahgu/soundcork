@@ -353,6 +353,15 @@ async def delete_account_device(
     return response
 
 
+@app.get("/marge/streaming/device/{device_id}/streaming_token", tags="marge")
+def streaming_token(device_id: str, response: Response):
+    response.headers["Authorization"] = "c3dvcmRmaXNoCg=="
+    etag = int(datetime.now().timestamp() * 1000)
+    response.headers["ETag"] = str(etag)
+
+    return
+
+
 @app.get("/bmx/registry/v1/services", response_model_exclude_none=True, tags=["bmx"])
 def bmx_services() -> BmxResponse:
 
@@ -474,9 +483,3 @@ def add_device_to_datastore(device_id: str):
         if info_elem.attrib.get("deviceID", "") == device_id:
             success = add_device(device)
             return {device_id: success}
-
-
-@app.get("/marge/streaming/device/{device_id}/streaming_token")
-def streaming_token(device_id: str, response: Response):
-    response.headers["Authorization"] = "swordfish"
-    return

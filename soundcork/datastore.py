@@ -279,6 +279,9 @@ class DataStore:
                 last_id += 1
             secret = source_elem.attrib.get("secret", "")
             secret_type = source_elem.attrib.get("secretType", "")
+            created_on = strip_element_text(source_elem.find("createdOn"))
+            updated_on = strip_element_text(source_elem.find("updatedOn"))
+
             # if sourceKey is not present, the .find will correctly raise an error here
             source_key_elem = source_elem.find("sourceKey")
             source_key_account = source_key_elem.attrib.get("account", "")  # type: ignore
@@ -291,6 +294,8 @@ class DataStore:
                     secret_type=secret_type,
                     source_key_type=source_key_type,
                     source_key_account=source_key_account,
+                    created_on=created_on,
+                    updated_on=updated_on,
                 )
             )
 
