@@ -362,9 +362,6 @@ def test_get_presets_parses_xml_from_mocked_parse(
     sample_device: DeviceInfo,
     monkeypatch,
 ):
-    monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
-    monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
-
     xml = ET.fromstring(
         """
         <presets>
@@ -383,6 +380,8 @@ def test_get_presets_parses_xml_from_mocked_parse(
         </presets>
         """
     )
+    monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
+    monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
 
     loaded = datastore.get_presets("12345", sample_device.device_id)
 
@@ -398,8 +397,6 @@ def test_get_recents_parses_xml_from_mocked_parse(
     sample_device: DeviceInfo,
     monkeypatch,
 ):
-    monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
-    monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
     xml = ET.fromstring(
         f"""
         <recents>
@@ -418,6 +415,8 @@ def test_get_recents_parses_xml_from_mocked_parse(
         </recents>
         """
     )
+    monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
+    monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
 
     loaded = datastore.get_recents("12345", sample_device.device_id)
 
@@ -433,8 +432,6 @@ def test_get_configured_sources_parses_and_generates_missing_id(
     sample_device: DeviceInfo,
     monkeypatch,
 ):
-    monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
-    monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
     xml = ET.fromstring(
         """
         <sources>
@@ -451,6 +448,8 @@ def test_get_configured_sources_parses_and_generates_missing_id(
         </sources>
         """
     )
+    monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
+    monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
 
     loaded = datastore.get_configured_sources("12345", sample_device.device_id)
 
