@@ -38,3 +38,10 @@ plugins = ["pydantic.mypy"]
 
 
 [tool.pydantic-mypy]
+
+[tool.pytest]
+minversion = "9.0"
+addopts = ["-ra", "--cov=soundcork", "--cov-report=term-missing:skip-covered"]
+testpaths = [
+    "tests",
+]
