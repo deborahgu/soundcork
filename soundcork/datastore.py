@@ -1,7 +1,10 @@
 import logging
+import random
+import re
 import xml.etree.ElementTree as ET
 from http import HTTPStatus
-from os import mkdir, path, remove, rmdir, walk
+from io import BytesIO
+from os import listdir, mkdir, path, remove, rmdir, walk
 from typing import Optional
 
 from fastapi import HTTPException
@@ -15,7 +18,7 @@ from soundcork.constants import (
     RECENTS_FILE,
     SOURCES_FILE,
 )
-from soundcork.model import ConfiguredSource, DeviceInfo, Preset, Recent
+from soundcork.model import ConfiguredSource, DeviceInfo, Group, Preset, Recent
 from soundcork.utils import strip_element_text
 
 # pyright: reportOptionalMemberAccess=false
@@ -519,3 +522,214 @@ class DataStore:
         remove(path.join(self.account_device_dir(account, device_id), DEVICE_INFO_FILE))
         rmdir(path.join(self.account_devices_dir(account), device_id))
         return True
+
+    ######## groups #################
+
+    # -- Helper function to create a unique group_id
+    def _generate_group_id(self, account: str) -> str:
+        while True:
+            group_id = f"{random.randint(0, 9999999):07d}"
+            filepath = path.join(
+                self.account_devices_dir(account), f"Group_{group_id}.xml"
+            )
+            if not path.exists(filepath):
+                return group_id
+
+    # -- list all existing groups
+    def list_groups(self, account: str) -> list[Group]:
+        devices_dir = self.account_devices_dir(account)
+        groups = []
+        for fn in listdir(devices_dir):
+            if fn.startswith("Group_") and fn.endswith(".xml"):
+                group = self.get_group(account, fn)
+                if group:
+                    groups.append(group)
+        return groups
+
+    # -- check if a group with given id exist
+    def group_exists(self, account: str, group_id: str) -> bool:
+        return path.exists(
+            path.join(self.account_devices_dir(account), f"Group_{group_id}.xml")
+        )
+
+    def device_is_groupable(self, device_info: DeviceInfo) -> bool:
+        return device_info.product_code == "SoundTouch 10"
+
+    # -- validate group xml
+    def validate_group_xml(self, xml_content: str) -> ET.Element:
+        try:
+            root = ET.fromstring(xml_content)
+        except ET.ParseError as e:
+            raise ValueError(f"Invalid XML: {e}")
+
+        # -- <name>
+        name = root.find("name")
+        if name is None or not name.text or not name.text.strip():
+            raise ValueError("Missing or empty <name> element")
+
+        # -- <masterDeviceId>
+        master = root.find("masterDeviceId")
+        if master is None or not master.text:
+            raise ValueError("Missing <masterDeviceId> element")
+
+        # <roles>/<groupRole>/<deviceId>
+        device_ids = [
+            d.text for d in root.findall("./roles/groupRole/deviceId") if d.text
+        ]
+        if not device_ids:
+            raise ValueError("No <groupRole>/<deviceId> entries found")
+
+        if master.text not in device_ids:
+            raise ValueError("masterDeviceId must appear in group roles")
+
+        return root
+
+    # -- add a group, if a.) both devices are ungrouped and
+    #                   b.) of type ST10 and
+    def add_group(self, account: str, group: Group) -> ET.Element:
+        """
+        adds a group if it a.) both devices exist, b.) both are ST10
+        return value:
+        - XML string of created group on success
+        - raises exception on failure
+        """
+
+        group_id = self._generate_group_id(account)
+        group.id = group_id
+        device_ids = [group.left_id, group.right_id]
+        # -- are these already grouped?
+        for dev_id in device_ids:
+            existing_group = self.group_for_device(account, dev_id)
+            if existing_group:
+                raise HTTPException(
+                    HTTPStatus.BAD_REQUEST,
+                    f"Device {dev_id} is already part of group {existing_group.id}",
+                )
+
+        # -- are these ST10 devices?
+        for dev_id in device_ids:
+            device_info = self.get_device_info(account, dev_id)
+            if not device_info:
+                raise HTTPException(
+                    HTTPStatus.BAD_REQUEST, f"Device {dev_id} does not exists"
+                )
+            if not self.device_is_groupable(device_info):
+                raise HTTPException(
+                    HTTPStatus.BAD_REQUEST,
+                    f"Device {dev_id} is not of type 'SoundTouch 10'",
+                )
+
+        # -- done with tests
+        return self.save_group(account, group_id, group)
+
+    def save_group(self, account: str, group_id: str, group: Group) -> ET.Element:
+
+        filename = f"Group_{group_id}.xml"
+        filepath = path.join(self.account_devices_dir(account), filename)
+        group_xml = self.group_to_xml(group)
+
+        ET.indent(group_xml, space="    ", level=0)
+        ET.ElementTree(group_xml).write(
+            filepath, xml_declaration=True, encoding="UTF-8"
+        )
+        return group_xml
+
+    def get_group(self, account: str, group_id: str) -> Group | None:
+        filename = f"Group_{group_id}.xml"
+        filepath = path.join(self.account_devices_dir(account), filename)
+        if path.exists(filepath):
+            stored_tree = ET.parse(filepath)
+            info_elem = stored_tree.getroot()
+            return self.group_from_xml(group_id, info_elem)
+        else:
+            return None
+
+    # -- delete a group if it exists
+    def delete_group(self, account: str, group_id: str) -> str:
+        """
+        deletes a group if it exists.
+        return value:
+        ""    → in case of success
+        raises exception in case of error
+        """
+        filename = f"Group_{group_id}.xml"
+        filepath = path.join(self.account_devices_dir(account), filename)
+
+        if not path.exists(filepath):
+            raise HTTPException(
+                HTTPStatus.NOT_FOUND,
+                f"Group {group_id} does not exist in account {account}",
+            )
+
+        try:
+            remove(filepath)
+        except Exception as e:
+            raise HTTPException(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                f"Failed to delete group {group_id}: {e}",
+            )
+
+        return ""
+
+    # -- check group status of a device
+    def group_for_device(self, account: str, device_id: str) -> Group | None:
+        """
+        check group status of a device
+        return value::
+        - XML <group/> if ungrouped
+        - XML file of group if grouped
+        - error if device does not exist or is no ST10
+        """
+        device_info = self.get_device_info(account, device_id)
+        if not device_info:
+            return None
+
+        if not self.device_is_groupable(device_info):
+            return None
+
+        all_groups = self.list_groups(account)
+        for g in all_groups:
+            if g.left_id == device_id or g.right_id == device_id:
+                return g
+        return None
+
+    def group_to_xml(self, group: Group) -> ET.Element:
+        group_elem = ET.Element("group")
+        ET.SubElement(group_elem, "name").text = group.name
+        ET.SubElement(group_elem, "masterDeviceId").text = group.master_id
+        roles = ET.SubElement(group_elem, "roles")
+
+        gr1 = ET.SubElement(roles, "groupRole")
+        ET.SubElement(gr1, "deviceId").text = group.left_id
+        ET.SubElement(gr1, "role").text = "LEFT"
+        ET.SubElement(gr1, "ipAddress").text = group.left_ip
+
+        gr2 = ET.SubElement(roles, "groupRole")
+        ET.SubElement(gr2, "deviceId").text = group.right_id
+        ET.SubElement(gr2, "role").text = "RIGHT"
+        ET.SubElement(gr2, "ipAddress").text = group.right_ip
+        return group_elem
+
+    def group_from_xml(self, group_id: str, group_elem: ET.Element) -> Group:
+        name = strip_element_text(group_elem.find("name"))
+        master_id = strip_element_text(group_elem.find("masterDeviceId"))
+        roles_elem = group_elem.find("roles")
+        if not roles_elem == None:
+            for role_elem in roles_elem.findall("groupRole"):
+                role = strip_element_text(role_elem.find("role"))
+                if role == "LEFT":
+                    left_id = strip_element_text(role_elem.find("deviceId"))
+                    left_ip = strip_element_text(role_elem.find("ipAddress"))
+                elif role == "RIGHT":
+                    right_id = strip_element_text(role_elem.find("deviceId"))
+                    right_ip = strip_element_text(role_elem.find("ipAddress"))
+
+        return Group(
+            id=group_id,
+            name=name,
+            master_id=master_id,
+            left_id=left_id,
+            left_ip=left_ip,
+            right_id=right_id,
+            right_ip=right_ip,
+        )

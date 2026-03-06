@@ -184,3 +184,13 @@ class DeviceInfo(BaseModel):
     firmware_version: str
     ip_address: str
     name: str
+
+
+class Group(BaseModel):
+    id: str
+    name: str
+    master_id: str
+    left_id: str
+    left_ip: str
+    right_id: str
+    right_ip: str
