@@ -1,18 +1,22 @@
 import logging
 import xml.etree.ElementTree as ET
-from os import path, walk
+from http import HTTPStatus
+from os import mkdir, path, remove, rmdir, walk
+from typing import Optional
 
-import upnpclient
+from fastapi import HTTPException
 
 from soundcork.config import Settings
 from soundcork.constants import (
     DEVICE_INFO_FILE,
     DEVICES_DIR,
+    POWERON_FILE,
     PRESETS_FILE,
     RECENTS_FILE,
     SOURCES_FILE,
 )
 from soundcork.model import ConfiguredSource, DeviceInfo, Preset, Recent
+from soundcork.utils import strip_element_text
 
 # pyright: reportOptionalMemberAccess=false
 
@@ -33,37 +37,43 @@ class DataStore:
     """
 
     def __init__(self) -> None:
+        logger.info("Initiating Datastore")
+        self.data_dir = settings.data_dir
         # def __init__(self, data_dir: str, settings: Settings) -> None:
 
-        # self.data_dir = data_dir
-        self.bose_devices: list[upnpclient.upnp.Device]
-        logger.info("Initiating Datastore")
+    def initialize_data_directory(self) -> None:
+        raise NotImplementedError
 
-    def account_dir(self, account: str) -> str:
-        return path.join(settings.data_dir, account)
+    def poweron_devices_dir(self) -> str:
+        """returns the top-level directory that stores poweron info for all devices"""
+        pdd = path.join(self.data_dir, DEVICES_DIR)
+        if not path.exists(pdd):
+            mkdir(pdd)
+        return pdd
+
+    def poweron_device_dir(self, device_id: str) -> str:
+        """returns the directory that stores the poweron file for the given device"""
+        return path.join(self.poweron_devices_dir(), device_id)
+
+    def account_dir(self, account: str, create: bool = False) -> str:
+        dir = path.join(self.data_dir, account)
+        if not path.exists(dir) and not create:
+            raise HTTPException(HTTPStatus.NOT_FOUND, f"Account {account} not found")
+        return dir
 
     def account_devices_dir(self, account: str) -> str:
-        return path.join(settings.data_dir, account, DEVICES_DIR)
+        return path.join(self.data_dir, account, DEVICES_DIR)
 
-    def account_device_dir(self, account: str, device: str) -> str:
-        return path.join(self.account_devices_dir(account), device)
-
-    def discover_devices(self) -> None:
-        """Discovered upnp devices on the network
-
-        Righ now this doesn't do anything except put discovered devices on self.bose_devices
-        (see main.py for instantiation) to show how we'll put info on this datastore class.
-
-        Discovered devices may well NOT end up as class properties, since this method
-        will theoretically run very rarely and only on demand."""
-        upnp_devices = upnpclient.discover()
-        self.bose_devices = [
-            d for d in upnp_devices if "Bose SoundTouch" in d.model_description
-        ]
-        logger.info("Discovering upnp devices on the network")
-        logger.info(
-            f'Discovered Bose devices:\n- {"\n- ".join([b.friendly_name for b in self.bose_devices])}'
-        )
+    def account_device_dir(
+        self, account: str, device: str, create: bool = False
+    ) -> str:
+        dir = path.join(self.account_devices_dir(account), device)
+        if not path.exists(dir) and not create:
+            raise HTTPException(
+                HTTPStatus.NOT_FOUND,
+                f"Device {device} does not belong to account {account}",
+            )
+        return dir
 
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Get the device info"""
@@ -72,41 +82,44 @@ class DataStore:
             path.join(self.account_device_dir(account, device), DEVICE_INFO_FILE)
         )
         info_elem = stored_tree.getroot()
-        # info_elem = root.find("info")
-        device_id = info_elem.attrib.get("deviceID", "")
-        name = info_elem.find("name").text
-        type = info_elem.find("type").text
-        module_type = info_elem.find("moduleType").text
-        components = info_elem.find("components").findall("component")
-        for component in components:
-            component_category = component.find("componentCategory").text
-            if component_category == "SCM":
-                firmware_version = component.find("softwareVersion").text
-                device_serial_number = component.find("serialNumber").text
-            elif component_category == "PackagedProduct":
-                product_serial_number = component.find("serialNumber").text
-        for network_info in info_elem.findall("networkInfo"):
-            if network_info.attrib.get("type", "") == "SCM":
-                ip_address = network_info.find("ipAddress").text
+        return self.device_info_from_device_info_xml(info_elem)
 
-        return DeviceInfo(
-            device_id=device_id,
-            product_code=f"{type} {module_type}",
-            device_serial_number=str(device_serial_number),
-            product_serial_number=str(product_serial_number),
-            firmware_version=str(firmware_version),
-            ip_address=str(ip_address),
-            name=str(name),
+    def save_device_info(self, device: DeviceInfo, account: str) -> ET.Element:
+        """Saves definition of a Device associated with an Account"""
+        save_file = path.join(
+            self.account_device_dir(account, device.device_id), DEVICE_INFO_FILE
         )
+        info_elem = ET.Element("info")
+        info_elem.attrib["deviceID"] = device.device_id
+        ET.SubElement(info_elem, "name").text = device.name
+        ET.SubElement(info_elem, "type").text = device.product_code
+        components_elem = ET.SubElement(info_elem, "components")
+        scm_elem = ET.SubElement(components_elem, "component")
+        ET.SubElement(scm_elem, "componentCategory").text = "SCM"
+        ET.SubElement(scm_elem, "softwareVersion").text = device.firmware_version
+        ET.SubElement(scm_elem, "serialNumber").text = device.device_serial_number
+        product_elem = ET.SubElement(components_elem, "component")
+        ET.SubElement(product_elem, "componentCategory").text = "PackagedProduct"
+        ET.SubElement(product_elem, "serialNumber").text = device.product_serial_number
+        network_elem = ET.SubElement(info_elem, "networkInfo")
+        network_elem.attrib["type"] = "SCM"
+        ET.SubElement(network_elem, "macAddress").text = device.device_id
+        ET.SubElement(network_elem, "ipAddress").text = device.ip_address
+
+        info_tree = ET.ElementTree(info_elem)
+        ET.indent(info_tree, space="    ", level=0)
+        info_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
+        return info_elem
 
     def save_presets(self, account: str, device: str, presets_list: list[Preset]):
         save_file = path.join(self.account_dir(account), PRESETS_FILE)
         presets_elem = ET.Element("presets")
+        presets_list.sort(key=lambda preset: int(preset.id))
         for preset in presets_list:
             preset_elem = ET.SubElement(presets_elem, "preset")
             preset_elem.attrib["id"] = preset.id
-            preset_elem.attrib["createdOn"] = preset.created_on
-            preset_elem.attrib["updatedOn"] = preset.updated_on
+            preset_elem.attrib["createdOn"] = preset.created_on or ""
+            preset_elem.attrib["updatedOn"] = preset.updated_on or ""
             content_item_elem = ET.SubElement(preset_elem, "ContentItem")
             if preset.source:
                 content_item_elem.attrib["source"] = preset.source
@@ -123,6 +136,13 @@ class DataStore:
         presets_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
         return presets_elem
 
+    # TODO: add error handling if you can't write the file
+    def save_presets_xml(self, account: str, presets_xml: str):
+        with open(
+            path.join(self.account_dir(account), PRESETS_FILE), "w"
+        ) as presets_file:
+            presets_file.write(presets_xml)
+
     def get_presets(self, account: str, device: str) -> list[Preset]:
         storedTree = ET.parse(path.join(self.account_dir(account), PRESETS_FILE))
         root = storedTree.getroot()
@@ -135,13 +155,13 @@ class DataStore:
             updated_on = preset.attrib.get("updatedOn", "")
             content_item = preset.find("ContentItem")
             # If name is not present, the .text will correctly raise an error here
-            name = content_item.find("itemName").text
-            source = content_item.attrib["source"]
-            type = content_item.attrib.get("type", "")
-            location = content_item.attrib.get("location", "")
-            source_account = content_item.attrib.get("sourceAccount", "")
-            is_presetable = content_item.attrib.get("isPresetable", "")
-            container_art_elem = content_item.find("containerArt")
+            name = content_item.find("itemName").text  # type: ignore
+            source = content_item.attrib["source"]  # type: ignore
+            type = content_item.attrib.get("type", "")  # type: ignore
+            location = content_item.attrib.get("location", "")  # type: ignore
+            source_account = content_item.attrib.get("sourceAccount", "")  # type: ignore
+            is_presetable = content_item.attrib.get("isPresetable", "")  # type: ignore
+            container_art_elem = content_item.find("containerArt")  # type: ignore
             # have to 'is not None' because bool(Element) returns false
             # if the element has no children
             if container_art_elem is not None and container_art_elem.text:
@@ -176,14 +196,15 @@ class DataStore:
             id = recent.attrib.get("id", "1")
             device_id = recent.attrib.get("deviceID", "")
             utc_time = recent.attrib.get("utcTime", "")
+            # if contentItem is not present, the .find will correctly raise an error here
             content_item = recent.find("contentItem")
-            name = content_item.find("itemName").text or "test"
-            source = content_item.attrib.get("source", "")
-            type = content_item.attrib.get("type", "")
-            location = content_item.attrib.get("location", "")
-            source_account = content_item.attrib.get("sourceAccount")
-            is_presetable = content_item.attrib.get("isPresetable")
-            container_art_elem = content_item.find("containerArt")
+            name = content_item.find("itemName").text or "test"  # type: ignore
+            source = content_item.attrib.get("source", "")  # type: ignore
+            type = content_item.attrib.get("type", "")  # type: ignore
+            location = content_item.attrib.get("location", "")  # type: ignore
+            source_account = content_item.attrib.get("sourceAccount")  # type: ignore
+            is_presetable = content_item.attrib.get("isPresetable")  # type: ignore
+            container_art_elem = content_item.find("containerArt")  # type: ignore
             if container_art_elem is not None:
                 container_art = container_art_elem.text
             else:
@@ -232,6 +253,13 @@ class DataStore:
         recents_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
         return recents_elem
 
+    # TODO: add error handling if you can't write the file
+    def save_recents_xml(self, account: str, recents_xml: str):
+        with open(
+            path.join(self.account_dir(account), RECENTS_FILE), "w"
+        ) as recents_file:
+            recents_file.write(recents_xml)
+
     def get_configured_sources(
         self, account: str, device: str
     ) -> list[ConfiguredSource]:
@@ -251,9 +279,13 @@ class DataStore:
                 last_id += 1
             secret = source_elem.attrib.get("secret", "")
             secret_type = source_elem.attrib.get("secretType", "")
+            created_on = strip_element_text(source_elem.find("createdOn"))
+            updated_on = strip_element_text(source_elem.find("updatedOn"))
+
+            # if sourceKey is not present, the .find will correctly raise an error here
             source_key_elem = source_elem.find("sourceKey")
-            source_key_account = source_key_elem.attrib.get("account", "")
-            source_key_type = source_key_elem.attrib.get("type", "")
+            source_key_account = source_key_elem.attrib.get("account", "")  # type: ignore
+            source_key_type = source_key_elem.attrib.get("type", "")  # type: ignore
             sources_list.append(
                 ConfiguredSource(
                     display_name=display_name,
@@ -262,22 +294,162 @@ class DataStore:
                     secret_type=secret_type,
                     source_key_type=source_key_type,
                     source_key_account=source_key_account,
+                    created_on=created_on,
+                    updated_on=updated_on,
                 )
             )
 
         return sources_list
 
+    # TODO: add error handling if you can't write the file
+    def save_configured_sources_xml(self, account: str, sources_xml: str):
+        with open(
+            path.join(self.account_dir(account), SOURCES_FILE), "w"
+        ) as sources_file:
+            sources_file.write(sources_xml)
+
+    def find_device(self, device_id: str) -> tuple[DeviceInfo | None, str | None]:
+        """Looks for Device in datastore.
+
+        Given a device_id, looks for it
+        1. first, if associated with an account
+        2. if not, then as a device that's ever been powered on
+
+        Returns:
+            A tuple of the DeviceInfo object, if found, with the Account ID,
+            if it exists.
+        """
+        for account_id in self.list_accounts():
+            if account_id:
+                for id in self.list_devices(account_id):
+                    if id == device_id:
+                        return self.get_device_info(account_id, id), account_id
+        for id in self.list_poweron_devices():
+            if id == device_id:
+                return self.get_poweron_device_info(id), None
+
+        return None, None
+
+    def get_poweron_device_info(self, device: str) -> DeviceInfo:
+        poweron_elem = ET.parse(
+            path.join(self.poweron_device_dir(device), POWERON_FILE)
+        ).getroot()
+        return self.device_info_from_poweron_xml(poweron_elem)
+
+    def save_poweron(self, device_id: str, poweron_xml: str):
+        device_dir = self.poweron_device_dir(device_id)
+        if not path.exists(device_dir):
+            mkdir(device_dir)
+
+        with open(
+            path.join(device_dir, POWERON_FILE),
+            "w",
+        ) as poweron_file:
+            poweron_file.write(poweron_xml)
+
+    def device_info_from_poweron_xml(self, poweron_elem: ET.Element) -> DeviceInfo:
+        device_elem = poweron_elem.find("device")
+        if device_elem != None:
+            device_id = device_elem.attrib.get("id", "")
+            device_serial_number = strip_element_text(device_elem.find("serialnumber"))
+            firmware_version = strip_element_text(device_elem.find("firmware-version"))
+            product_elem = device_elem.find("product")
+            if product_elem != None:
+                product_code = product_elem.attrib.get("product_code", "")
+                product_type = product_elem.attrib.get("type", "")
+                product_serial_number = strip_element_text(
+                    product_elem.find("serialnumber")
+                )
+        diagnostic_elem = poweron_elem.find("diagnostic-data")
+        if diagnostic_elem != None:
+            landscape_elem = diagnostic_elem.find("device-landscape")
+            if landscape_elem != None:
+                ip_address = strip_element_text(landscape_elem.find("ip-address"))
+
+        return DeviceInfo(
+            device_id=device_id,
+            product_code=product_code,
+            device_serial_number=device_serial_number,
+            product_serial_number=str(product_serial_number),
+            firmware_version=str(firmware_version),
+            ip_address=str(ip_address),
+            name="",
+        )
+
+    def device_info_from_device_info_xml(self, info_elem: ET.Element) -> DeviceInfo:
+        """
+        converts a DeviceInfo.xml formatted element into a DeviceInfo object.
+        usually sourced either from {account}/devices/{deviceid}/DeviceInfo.xml
+        or from http://{deviceip}:8090/info
+        """
+        device_id = info_elem.attrib.get("deviceID", "")
+        name = strip_element_text(info_elem.find("name"))
+        type = strip_element_text(info_elem.find("type"))
+        module_type = strip_element_text(info_elem.find("moduleType"))
+
+        try:
+            components = info_elem.find("components").findall("component")  # type: ignore
+        except Exception:
+            # TODO narrow exception class
+            components = []
+
+        for component in components:
+            component_category = strip_element_text(component.find("componentCategory"))
+            if component_category == "SCM":
+                firmware_version = strip_element_text(component.find("softwareVersion"))
+                device_serial_number = strip_element_text(
+                    component.find("serialNumber")
+                )
+            elif component_category == "PackagedProduct":
+                product_serial_number = strip_element_text(
+                    component.find("serialNumber")
+                )
+
+        try:
+            for network_info in info_elem.findall("networkInfo"):
+                if network_info.attrib.get("type", "") == "SCM":
+                    ip_address = strip_element_text(network_info.find("ipAddress"))
+        except Exception:
+            # TODO narrow exception class
+            ip_address = ""
+
+        try:
+            return DeviceInfo(
+                device_id=device_id,
+                product_code=f"{type} {module_type}",
+                device_serial_number=str(device_serial_number),
+                product_serial_number=str(product_serial_number),
+                firmware_version=str(firmware_version),
+                ip_address=str(ip_address),
+                name=str(name),
+            )
+        except NameError:
+            raise RuntimeError(
+                f"There are missing required fields in the device: {device_id}"
+            )
+
+    #### ETags
+
     def etag_for_presets(self, account: str) -> int:
         presets_file = path.join(self.account_dir(account), PRESETS_FILE)
-        return int(path.getmtime(presets_file) * 1000)
+        if path.exists(presets_file):
+            return int(path.getmtime(presets_file) * 1000)
+        else:
+            return 0
 
     def etag_for_sources(self, account: str) -> int:
-        presets_file = path.join(self.account_dir(account), SOURCES_FILE)
-        return int(path.getmtime(presets_file) * 1000)
+        sources_file = path.join(self.account_dir(account), SOURCES_FILE)
+        if path.exists(sources_file):
+            return int(path.getmtime(sources_file) * 1000)
+        else:
+            return 0
 
     def etag_for_recents(self, account: str) -> int:
         recents_file = path.join(self.account_dir(account), RECENTS_FILE)
-        return int(path.getmtime(recents_file) * 1000)
+        if path.exists(recents_file):
+            return int(path.getmtime(recents_file) * 1000)
+        else:
+            return 0
 
     def etag_for_account(self, account: str) -> int:
         return max(
@@ -285,3 +457,71 @@ class DataStore:
             self.etag_for_sources(account),
             self.etag_for_recents(account),
         )
+
+    ######## create account
+
+    def list_accounts(self) -> list[Optional[str]]:
+        accounts: list[str | None] = []
+        for account_id in next(walk(self.data_dir))[1]:
+            # Check if the ID is digits to distinguish between accounts and power_on devices.
+            if account_id.isdigit():
+                accounts.append(account_id)
+
+        return accounts
+
+    def list_devices(self, account_id) -> list[Optional[str]]:
+        devices: list[str | None] = []
+        for device_id in next(walk(self.account_devices_dir(account_id)))[1]:
+            devices.append(device_id)
+
+        return devices
+
+    def list_poweron_devices(self) -> list[str]:
+        """List all devices Soundcork has seen power on
+
+        Returns:
+        - List[device_ids: str]: IDs for every device Soundcork has seen
+        """
+        devices: list[str] = []
+        for device_id in next(walk(self.poweron_devices_dir()))[1]:
+            devices.append(device_id)
+
+        return devices
+
+    def account_exists(self, account: str) -> bool:
+        return account in self.list_accounts()
+
+    def device_exists(self, account: str, device_id: str) -> bool:
+        return device_id in self.list_devices(account)
+
+    def create_account(self, account: str) -> bool:
+        logger.info(f"creating account {account}")
+        if self.account_exists(account):
+            return False
+
+        # TODO: add error handling if you can't make the directory
+        mkdir(self.account_dir(account, True))
+        mkdir(self.account_devices_dir(account))
+        # create devices subdirectory
+        return True
+
+    def add_device(self, account: str, device_id: str, device: DeviceInfo) -> bool:
+        if self.device_exists(account, device_id):
+            return False
+
+        # TODO: add error handling if you can't make the directory
+        mkdir(path.join(self.account_devices_dir(account), device_id))
+
+        self.save_device_info(device, account)
+
+        return True
+
+    def remove_device(self, account: str, device_id: str) -> bool:
+        logger.debug(f"removing device {device_id} from account {account}")
+        if not self.device_exists(account, device_id):
+            return False
+
+        # TODO: add error handling if you can't delete the files
+        remove(path.join(self.account_device_dir(account, device_id), DEVICE_INFO_FILE))
+        rmdir(path.join(self.account_devices_dir(account), device_id))
+        return True

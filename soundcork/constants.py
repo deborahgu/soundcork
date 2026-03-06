@@ -38,6 +38,7 @@ PROVIDERS = [
     "RADIO.COM",
     "RADIO_COM",
     "SIRIUSXM_EVEREST",
+    "RADIO_BROWSER",  # https://www.radio-browser.info
 ]
 
 # where we store associated devices.
@@ -45,6 +46,8 @@ DEVICES_DIR = "devices"
 
 # retrieved per-device via {deviceip}:8090/info
 DEVICE_INFO_FILE = "DeviceInfo.xml"
+# sent to power_on endpoint
+POWERON_FILE = "PowerOn.xml"
 # retrieved per account via {deviceip}:8090/presets
 PRESETS_FILE = "Presets.xml"
 # retrieved per account via {deviceip}:8090/recents
@@ -56,3 +59,15 @@ RECENTS_FILE = "Recents.xml"
 # also each source should have an id but they don't seem to; should probably add these
 # values on initial copy of the Sources.xml file from the device.
 SOURCES_FILE = "Sources.xml"
+
+# for device initialization via http
+SPEAKER_HTTP_PORT = 8090
+SPEAKER_DEVICE_INFO_PATH = "/info"
+SPEAKER_RECENTS_PATH = "/recents"
+SPEAKER_PRESETS_PATH = "/presets"
+# this one needs to be pulled from a device
+SPEAKER_SOURCES_FILE_LOCATION = "/mnt/nv/BoseApp-Persistence/1/Sources.xml"
+
+# validation
+ACCOUNT_RE = "^\d{1,20}$"
+DEVICE_RE = "^[0-9a-fA-F]{12}$"

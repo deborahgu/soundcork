@@ -9,6 +9,7 @@ run in a public network, including, but not limited to:
 
 - authenticated calls
 - data sanitization
+- connecting to the speakers
 
 # Reporting Security Issues
 

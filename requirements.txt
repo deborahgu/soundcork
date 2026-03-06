@@ -1,5 +1,9 @@
-fastapi[standard]==0.120.1
-pydantic-settings==2.11.0
-black==25.9.0
+black==26.1.0  # dev only
+fastapi[standard]==0.129.0
+fastapi-etag==0.4.0
 gunicorn==23.0.0
+isort==8.0.0  # dev only
+mypy==1.19.1  # dev only
+pydantic-settings==2.13.1
+telnetlib3==3.0.2
 upnpclient==1.0.3
