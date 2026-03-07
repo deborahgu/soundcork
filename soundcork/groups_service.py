@@ -10,10 +10,8 @@ from soundcork.constants import ACCOUNT_RE, DEVICE_RE, GROUP_RE
 from soundcork.datastore import DataStore
 from soundcork.marge import add_group, modify_group
 
-# -- Router
 router = APIRouter(tags=["service"])
 
-# -- Bose box endpoints
 BOSE_PORT = 8090
 BOSE_ADDGROUP = "/addGroup"  # POST + XML
 BOSE_UPDATEGROUP = "/updateGroup"  # POST + XML
@@ -157,22 +155,20 @@ def _extract_master_ip(group_xml: str) -> str:
     return ips[0] if ips else ""
 
 
-# ----------------------------------------------------------------------
-# Factory: creates router with access to datastore (Dependency Injection)
-# ----------------------------------------------------------------------
 def get_groups_service_router(datastore: DataStore):
+    """Create the groups-service router with an injected datastore dependency."""
     service = APIRouter(tags=["service"])
     from soundcork.main import bose_xml_str
 
-    ################# service endpoints ##################################
-    # ---------------- listgroups ----------------------------------------
-    # list all groups and their devices
-    # call as GET /service/account/{account}/listgroups
-    # returns <groups>...</groups>
     @service.get("/service/account/{account}/listgroups", tags=["service"])
     async def service_listgroups(
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
     ):
+        """List all groups for an account as XML.
+
+        Endpoint: GET /service/account/{account}/listgroups
+        Response: <groups>...</groups>
+        """
         # -- get group ids
         try:
             groups = datastore.list_groups(account)
@@ -240,16 +236,17 @@ def get_groups_service_router(datastore: DataStore):
         xml = "\n".join(parts) + "\n"
         return Response(xml, media_type="application/xml", status_code=200)
 
-    # ---------------- creategroup ----------------------------------------
-    # create a stereo pair (=group)
-    # call as GET /service/account/{account}/creategroup?master={device1}&slave={device2}
-    # returns GROUP_OK or GROUP_ERROR
     @service.get("/service/account/{account}/creategroup", tags=["service"])
     async def service_creategroup(
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
         master: Annotated[str | None, Query()] = None,
         slave: Annotated[str | None, Query()] = None,
     ):
+        """Create a stereo pair and propagate it to both devices.
+
+        Endpoint: GET /service/account/{account}/creategroup?master={device1}&slave={device2}
+        Response: GROUP_OK or GROUP_ERROR status XML.
+        """
         # -- parameters
         master_id = (master or "").strip()
         slave_id = (slave or "").strip()
@@ -305,11 +302,6 @@ def get_groups_service_router(datastore: DataStore):
                     ok = False
         return _xml_status(ok)
 
-    # ---------------- modgroup ----------------------------------------
-    # rename a stereo pair (=group)
-    # call as GET /service/account/{account}/modgroup?groupid={groupid}&newname={newname}
-    #   or as PUT /service/account/{account}/modgroup?name={name}&newname={newname}
-    # returns GROUP_OK or GROUP_ERROR
     @service.get("/service/account/{account}/modgroup", tags=["service"])
     async def service_modgroup(
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
@@ -317,6 +309,12 @@ def get_groups_service_router(datastore: DataStore):
         groupid: Annotated[str | None, Query()] = None,
         name: Annotated[str | None, Query()] = None,
     ):
+        """Rename an existing stereo group
+
+        Endpoints:
+        - GET /service/account/{account}/modgroup?groupid={groupid}&newname={newname}
+        Response: GROUP_OK or GROUP_ERROR status XML.
+        """
         # -- parameters
         newname = (newname or "").strip()
         groupid = (groupid or "").strip() or None
@@ -403,21 +401,24 @@ def get_groups_service_router(datastore: DataStore):
                     ok = False
         return _xml_status(ok)
 
-    # ---------------- removegroup ----------------------------------------
-    # remove a stereo pair (=group)
-    # call as GET /service/account/{account}/removegroup?groupid={groupid}
-    #   or as GET /service/account/{account}/removegroup?name={name}
-    # returns GROUP_OK or GROUP_ERROR
     @service.get("/service/account/{account}/removegroup", tags=["service"])
     async def service_removegroup(
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
         groupid: Annotated[str | None, Query()] = None,
         name: Annotated[str | None, Query()] = None,
     ):
-        # -- parameters
+        """Remove a stereo pair group
+
+        Endpoints:
+        - GET /service/account/{account}/removegroup?groupid={groupid}
+        - GET /service/account/{account}/removegroup?name={name}
+        Query: exactly one of groupid or name.
+        Response: GROUP_OK or GROUP_ERROR
+        """
         groupid = (groupid or "").strip() or None
         name = (name or "").strip() or None
-        # -- exactly one must be set
+
+        # exactly one must be set
         if (groupid is None and name is None) or (
             groupid is not None and name is not None
         ):
@@ -436,7 +437,7 @@ def get_groups_service_router(datastore: DataStore):
                     status_code=404,
                 )
 
-        # -- acquire GroupService.xml
+        # acquire GroupService.xml
         try:
             stored_xml = _group_xml_by_id(datastore, account, groupid)
             master_ip = _extract_master_ip(stored_xml)
@@ -453,7 +454,7 @@ def get_groups_service_router(datastore: DataStore):
                 status_code=HTTPStatus.BAD_REQUEST,
             )
 
-        # -- delete group at the box first
+        # delete group at the box first
         try:
             status, text = await _box_call(master_ip, "GET", BOSE_REMOVEGROUP)
         except Exception as e:
@@ -469,7 +470,7 @@ def get_groups_service_router(datastore: DataStore):
                 media_type="application/xml",
                 status_code=500,
             )
-        # -- only if successful delete also in datastore
+        # only if successful delete also in datastore
         try:
             datastore.delete_group(account, groupid)
         except Exception as e:
