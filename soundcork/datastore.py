@@ -65,11 +65,17 @@ class DataStore:
         return dir
 
     def account_devices_dir(self, account: str) -> str:
+        """Returns the directory holding an account's devices.
+
+        Unlike the top-level (generic) devices directory, this is for devices
+        associated with an account.
+        """
         return path.join(self.data_dir, account, DEVICES_DIR)
 
     def account_device_dir(
         self, account: str, device: str, create: bool = False
     ) -> str:
+        """Returns the directory holding an account's files for a given device."""
         dir = path.join(self.account_devices_dir(account), device)
         if not path.exists(dir) and not create:
             raise HTTPException(
@@ -79,7 +85,7 @@ class DataStore:
         return dir
 
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
-        """Get the device info"""
+        """Gets definition of a Device associated with an Account"""
 
         stored_tree = ET.parse(
             path.join(self.account_device_dir(account, device), DEVICE_INFO_FILE)
@@ -115,6 +121,7 @@ class DataStore:
         return info_elem
 
     def save_presets(self, account: str, device: str, presets_list: list[Preset]):
+        """Saves Presets for a Device associated with an Account"""
         save_file = path.join(self.account_dir(account), PRESETS_FILE)
         presets_elem = ET.Element("presets")
         presets_list.sort(key=lambda preset: int(preset.id))
@@ -141,12 +148,14 @@ class DataStore:
 
     # TODO: add error handling if you can't write the file
     def save_presets_xml(self, account: str, presets_xml: str):
+        """Write Presets.xml for an Account"""
         with open(
             path.join(self.account_dir(account), PRESETS_FILE), "w"
         ) as presets_file:
             presets_file.write(presets_xml)
 
     def get_presets(self, account: str, device: str) -> list[Preset]:
+        """Gets Presets for a Device associated with an Account"""
         storedTree = ET.parse(path.join(self.account_dir(account), PRESETS_FILE))
         root = storedTree.getroot()
 
@@ -190,6 +199,7 @@ class DataStore:
         return presets
 
     def get_recents(self, account: str, device: str) -> list[Recent]:
+        """Gets Recents for a Device associated with an Account"""
         stored_tree = ET.parse(path.join(self.account_dir(account), RECENTS_FILE))
         root = stored_tree.getroot()
 
@@ -258,6 +268,7 @@ class DataStore:
 
     # TODO: add error handling if you can't write the file
     def save_recents_xml(self, account: str, recents_xml: str):
+        """Write Recents.xml for an Account"""
         with open(
             path.join(self.account_dir(account), RECENTS_FILE), "w"
         ) as recents_file:
@@ -266,6 +277,7 @@ class DataStore:
     def get_configured_sources(
         self, account: str, device: str
     ) -> list[ConfiguredSource]:
+        """Get known Sources for a Device associated with an Account"""
         sources_tree = ET.parse(path.join(self.account_dir(account), SOURCES_FILE))
         root = sources_tree.getroot()
         sources_list = []
@@ -301,6 +313,7 @@ class DataStore:
 
     # TODO: add error handling if you can't write the file
     def save_configured_sources_xml(self, account: str, sources_xml: str):
+        """Write Sources.xml for an Account"""
         with open(
             path.join(self.account_dir(account), SOURCES_FILE), "w"
         ) as sources_file:
@@ -329,12 +342,18 @@ class DataStore:
         return None, None
 
     def get_poweron_device_info(self, device: str) -> DeviceInfo:
+        """Return info about a Device that's been powered on at least once."""
         poweron_elem = ET.parse(
             path.join(self.poweron_device_dir(device), POWERON_FILE)
         ).getroot()
         return self.device_info_from_poweron_xml(poweron_elem)
 
     def save_poweron(self, device_id: str, poweron_xml: str):
+        """Writes Device information for a newly discovered device
+
+        Records Device infomation for a Device that's been powered on, if it
+        doesn't already exist in the directory.
+        """
         device_dir = self.poweron_device_dir(device_id)
         if not path.exists(device_dir):
             mkdir(device_dir)
@@ -346,6 +365,14 @@ class DataStore:
             poweron_file.write(poweron_xml)
 
     def device_info_from_poweron_xml(self, poweron_elem: ET.Element) -> DeviceInfo:
+        """Creates a DeviceInfo object
+
+        Args:
+        - poweron_elem (ET.Element): deserialized XML element from the poweron device XML
+
+        Returns:
+        - DeviceInfo:  DeviceInfo built from the poweron XML
+        """
         device_elem = poweron_elem.find("device")
         if device_elem != None:
             device_id = device_elem.attrib.get("id", "")
@@ -426,9 +453,12 @@ class DataStore:
                 f"There are missing required fields in the device: {device_id}"
             )
 
-    #### ETags
+    #########
+    # ETags #
+    #########
 
     def etag_for_presets(self, account: str) -> int:
+        """Returns an etag for the Presets.xml file for a given account"""
         presets_file = path.join(self.account_dir(account), PRESETS_FILE)
         if path.exists(presets_file):
             return int(path.getmtime(presets_file) * 1000)
@@ -436,6 +466,7 @@ class DataStore:
             return 0
 
     def etag_for_sources(self, account: str) -> int:
+        """Returns an etag for the Sources.xml file for a given account"""
         sources_file = path.join(self.account_dir(account), SOURCES_FILE)
         if path.exists(sources_file):
             return int(path.getmtime(sources_file) * 1000)
@@ -443,6 +474,7 @@ class DataStore:
             return 0
 
     def etag_for_recents(self, account: str) -> int:
+        """Returns an etag for the Recents.xml file for a given account"""
         recents_file = path.join(self.account_dir(account), RECENTS_FILE)
         if path.exists(recents_file):
             return int(path.getmtime(recents_file) * 1000)
@@ -450,15 +482,22 @@ class DataStore:
             return 0
 
     def etag_for_account(self, account: str) -> int:
+        """Returns an etag for a given account"""
         return max(
             self.etag_for_presets(account),
             self.etag_for_sources(account),
             self.etag_for_recents(account),
         )
 
-    ######## create account
+    ##################
+    # create account #
+    ##################
 
     def list_accounts(self) -> list[Optional[str]]:
+        """Returns a list of accounts that have been created in the datastore.
+
+        If no accounts have been created, returns an empty list.
+        """
         accounts: list[str | None] = []
         for account_id in next(walk(self.data_dir))[1]:
             # Check if the ID is digits to distinguish between accounts and power_on devices.
@@ -468,6 +507,10 @@ class DataStore:
         return accounts
 
     def list_devices(self, account_id) -> list[Optional[str]]:
+        """Returns a list of devices associated with an account.
+
+        If the account has no devices, returns an empty list.
+        """
         devices: list[str | None] = []
         for device_id in next(walk(self.account_devices_dir(account_id)))[1]:
             devices.append(device_id)
@@ -487,12 +530,20 @@ class DataStore:
         return devices
 
     def account_exists(self, account: str) -> bool:
+        """Returns true if account exists in the datastore."""
         return account in self.list_accounts()
 
     def device_exists(self, account: str, device_id: str) -> bool:
+        """Returns true if device exists for a given account in the datastore."""
         return device_id in self.list_devices(account)
 
     def create_account(self, account: str) -> bool:
+        """Creates an account folder in the datastore.
+
+        Returns:
+        - True if account was successfully created
+        - False if account already exists
+        """
         logger.info(f"creating account {account}")
         if self.account_exists(account):
             return False
@@ -504,6 +555,12 @@ class DataStore:
         return True
 
     def add_device(self, account: str, device_id: str, device: DeviceInfo) -> bool:
+        """Adds a device to a given account in the datastore.
+
+        Returns:
+        - True if device was successfully added
+        - False if device already exists for the account
+        """
         if self.device_exists(account, device_id):
             return False
 
@@ -515,6 +572,12 @@ class DataStore:
         return True
 
     def remove_device(self, account: str, device_id: str) -> bool:
+        """Removes a device from a given account in the datastore.
+
+        Returns:
+        - True if device was successfully removed
+        - False if device does not exist for the account
+        """
         logger.debug(f"removing device {device_id} from account {account}")
         if not self.device_exists(account, device_id):
             return False
@@ -524,10 +587,14 @@ class DataStore:
         rmdir(path.join(self.account_devices_dir(account), device_id))
         return True
 
-    ######## groups #################
+    ############################################################################
+    # groups                                                                   #
+    #                                                                          #
+    # A Group is two devices that have been paired together to play in stereo. #
+    ############################################################################
 
-    # -- Helper function to create a unique group_id
     def _generate_group_id(self, account: str) -> str:
+        """Helper function to create a unique group_id"""
         while True:
             group_id = f"{random.randint(0, 9999999):07d}"
             filepath = path.join(
@@ -536,8 +603,8 @@ class DataStore:
             if not path.exists(filepath):
                 return group_id
 
-    # -- list all existing groups
     def list_groups(self, account: str) -> list[Group]:
+        """list all existing groups"""
         devices_dir = self.account_devices_dir(account)
         groups = []
         for fn in listdir(devices_dir):
@@ -547,8 +614,8 @@ class DataStore:
                     groups.append(group)
         return groups
 
-    # -- check if a group with given id exist
     def group_exists(self, account: str, group_id: str) -> bool:
+        """check if a group with given id exist"""
         return path.exists(
             path.join(self.account_devices_dir(account), f"Group_{group_id}.xml")
         )
@@ -556,41 +623,11 @@ class DataStore:
     def device_is_groupable(self, device_info: DeviceInfo) -> bool:
         return device_info.product_code == "SoundTouch 10"
 
-    # -- validate group xml
-    def validate_group_xml(self, xml_content: str) -> ET.Element:
-        try:
-            root = ET.fromstring(xml_content)
-        except ET.ParseError as e:
-            raise ValueError(f"Invalid XML: {e}")
-
-        # -- <name>
-        name = root.find("name")
-        if name is None or not name.text or not name.text.strip():
-            raise ValueError("Missing or empty <name> element")
-
-        # -- <masterDeviceId>
-        master = root.find("masterDeviceId")
-        if master is None or not master.text:
-            raise ValueError("Missing <masterDeviceId> element")
-
-        # <roles>/<groupRole>/<deviceId>
-        device_ids = [
-            d.text for d in root.findall("./roles/groupRole/deviceId") if d.text
-        ]
-        if not device_ids:
-            raise ValueError("No <groupRole>/<deviceId> entries found")
-
-        if master.text not in device_ids:
-            raise ValueError("masterDeviceId must appear in group roles")
-
-        return root
-
-    # -- add a group, if a.) both devices are ungrouped and
-    #                   b.) of type ST10 and
     def add_group(self, account: str, group: Group) -> ET.Element:
-        """
-        adds a group if it a.) both devices exist, b.) both are ST10
-        return value:
+        """adds a group
+
+        Adds group if a.) both devices exist, b.) both are ST10
+        Returns:
         - XML string of created group on success
         - raises exception on failure
         """
@@ -607,12 +644,12 @@ class DataStore:
                     f"Device {dev_id} is already part of group {existing_group.id}",
                 )
 
-        # -- are these ST10 devices?
+        # Only ST10 devices can be grouped
         for dev_id in device_ids:
             device_info = self.get_device_info(account, dev_id)
             if not device_info:
                 raise HTTPException(
-                    HTTPStatus.BAD_REQUEST, f"Device {dev_id} does not exists"
+                    HTTPStatus.BAD_REQUEST, f"Device {dev_id} does not exist"
                 )
             if not self.device_is_groupable(device_info):
                 raise HTTPException(
@@ -620,10 +657,13 @@ class DataStore:
                     f"Device {dev_id} is not of type 'SoundTouch 10'",
                 )
 
-        # -- done with tests
         return self.save_group(account, group_id, group)
 
     def save_group(self, account: str, group_id: str, group: Group) -> ET.Element:
+        """Saves a group to the account in the datastore
+
+        Overwrite if it already exists.
+        """
 
         filename = f"Group_{group_id}.xml"
         filepath = path.join(self.account_devices_dir(account), filename)
@@ -636,6 +676,7 @@ class DataStore:
         return group_xml
 
     def get_group(self, account: str, group_id: str) -> Group | None:
+        """Gets a group from the account files in the datastore"""
         filename = f"Group_{group_id}.xml"
         filepath = path.join(self.account_devices_dir(account), filename)
         if path.exists(filepath):
@@ -645,13 +686,13 @@ class DataStore:
         else:
             return None
 
-    # -- delete a group if it exists
     def delete_group(self, account: str, group_id: str) -> str:
         """
         deletes a group if it exists.
-        return value:
-        ""    → in case of success
-        raises exception in case of error
+
+        Returns:
+        - Empty string on success
+        - raises exception if group doesn't exist or if there's an error deleting the file
         """
         filename = f"Group_{group_id}.xml"
         filepath = path.join(self.account_devices_dir(account), filename)
@@ -672,14 +713,14 @@ class DataStore:
 
         return ""
 
-    # -- check group status of a device
     def group_for_device(self, account: str, device_id: str) -> Group | None:
         """
         check group status of a device
-        return value::
+
+        Returns:
         - XML <group/> if ungrouped
         - XML file of group if grouped
-        - error if device does not exist or is no ST10
+        - error if device does not exist or is not ST10
         """
         device_info = self.get_device_info(account, device_id)
         if not device_info:
@@ -695,6 +736,7 @@ class DataStore:
         return None
 
     def group_to_xml(self, group: Group) -> ET.Element:
+        """Converts a Group object to an XML element for storage."""
         group_elem = ET.Element("group")
         ET.SubElement(group_elem, "name").text = group.name
         ET.SubElement(group_elem, "masterDeviceId").text = group.master_id
@@ -712,6 +754,7 @@ class DataStore:
         return group_elem
 
     def group_from_xml(self, group_id: str, group_elem: ET.Element) -> Group:
+        """Converts an XML element into a Group object."""
         name = strip_element_text(group_elem.find("name"))
         master_id = strip_element_text(group_elem.find("masterDeviceId"))
         roles_elem = group_elem.find("roles")
