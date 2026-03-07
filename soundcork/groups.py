@@ -1,4 +1,3 @@
-import asyncio
 import xml.etree.ElementTree as ET
 from http import HTTPStatus
 from typing import Annotated
@@ -9,10 +8,8 @@ from soundcork.constants import ACCOUNT_RE, DEVICE_RE, GROUP_RE
 from soundcork.marge import add_group, get_device_group_xml, modify_group
 from soundcork.model import BoseXMLResponse
 
-# -- Router
 router = APIRouter(tags=["marge"])
 
-# -- Bose box endpoints
 BOSE_PORT = 8090
 BOSE_ADDGROUP = "/addGroup"  # POST + XML
 BOSE_UPDATEGROUP = "/updateGroup"  # POST + XML
@@ -27,7 +24,6 @@ def get_groups_router(datastore):
 
     from soundcork.main import bose_xml_str
 
-    # ----------------- marge group endpoint to query group per device -----------------
     @marge.get(
         "/marge/streaming/account/{account}/device/{device}/group",
         response_class=BoseXMLResponse,
@@ -37,12 +33,12 @@ def get_groups_router(datastore):
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
         device: Annotated[str, Path(pattern=DEVICE_RE)],
     ):
+        """marge group endpoint to query group per device"""
 
         result = get_device_group_xml(datastore, account, device)
 
         return bose_xml_str(result)
 
-    # ----------------- marge group endpoint to add group  -----------------
     @marge.post(
         "/marge/streaming/account/{account}/group",
         response_class=BoseXMLResponse,
@@ -60,7 +56,6 @@ def get_groups_router(datastore):
 
         return bose_xml_str(result)
 
-    # ----------------- marge group endpoint to modify group  -----------------
     @marge.post(
         "/marge/streaming/account/{account}/group/{group}",
         response_class=BoseXMLResponse,
@@ -72,6 +67,7 @@ def get_groups_router(datastore):
         request: Request,
         response: Response,
     ):
+        """marge group endpoint to add group"""
         try:
             body = await request.body()
             xml_str = body.decode("utf-8")
@@ -86,7 +82,6 @@ def get_groups_router(datastore):
             response.status_code = HTTPStatus.BAD_REQUEST
             return "<error>Invalid UTF-8 in request body</error>"
 
-    # ----------------- marge group endpoint to delete group  -----------------
     @marge.delete(
         "/marge/streaming/account/{account}/group/{group}",
         response_class=BoseXMLResponse,
@@ -96,6 +91,7 @@ def get_groups_router(datastore):
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
         group: Annotated[str, Path(pattern=GROUP_RE)],
     ):
+        """marge group endpoint to delete group"""
         if not datastore.account_exists(account):
             return BoseXMLResponse(
                 content=f"<error>Account {account} not found</error>",
