@@ -74,6 +74,17 @@ class BmxResponse(BaseModel):
     bmx_services: list[Service]
 
 
+class BmxOauthToken(BaseModel):
+    links: Optional[Links] = Field(
+        default=None,
+        alias="_links",
+        serialization_alias="_links",
+        validation_alias=AliasChoices("links", "_links"),
+    )
+    access_token: str
+    refresh_token: str
+
+
 class Stream(BaseModel):
     links: Optional[Links] = Field(
         default=None, alias="_links", serialization_alias="_links"
@@ -135,11 +146,13 @@ class BmxPodcastInfoResponse(BaseModel):
 
 
 class BmxNowPlaying(BaseModel):
-    links: dict = Field(default=None, serialization_alias="_links")
+    links: dict | None = Field(default=None, serialization_alias="_links")
     album: Optional[str] = None
     artist: Optional[str] = None
-    ask_again_after: Optional[int] = None
-    image_url: Optional[str] = None
+    ask_again_after: Optional[int] = Field(
+        default=None, serialization_alias="askAgainAfter"
+    )
+    image_url: Optional[str] = Field(default=None, serialization_alias="imageUrl")
     track: str
 
 

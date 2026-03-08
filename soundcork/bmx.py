@@ -1,23 +1,30 @@
 import base64
 import json
+import logging
 import urllib.parse
 import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime
+from http import HTTPStatus
+
+from fastapi import HTTPException
 
 from soundcork.config import Settings
 from soundcork.model import (
     Audio,
     BmxNowPlaying,
+    BmxOauthToken,
     BmxPlaybackResponse,
     BmxPodcastInfoResponse,
     BmxReporting,
     Stream,
     Track,
 )
-from soundcork.siriusxm_fastapi import SiriusXM
+from soundcork.sxm import SiriusXM
 from soundcork.utils import strip_element_text
+
+logger = logging.getLogger(__name__)
 
 # TODO: move into constants file eventually.
 TUNEIN_DESCRIBE = "https://opml.radiotime.com/describe.ashx?id=%s"
@@ -240,13 +247,80 @@ def play_custom_stream(data: str) -> BmxPlaybackResponse:
     return resp
 
 
+def siriusxm_access_token(refresh_payload: str) -> BmxOauthToken:
+    #  refresh_payloard in {"grant_type":"refresh_token","refresh_token": "{token}"
+    try:
+        grant_request = json.loads(refresh_payload)
+        if grant_request.get("grant_type", "") == "refresh_token":
+            logger.info("grant request")
+            links = {"self": {"href": "/token"}}
+            refresh_token = grant_request.get("refresh_token", "")
+            refresh_token_obj = json.loads(base64.b64decode(refresh_token))
+            rt_payload = refresh_token_obj.get("payload", "")
+            payload_obj = json.loads(base64.b64decode(rt_payload))
+            player_id = payload_obj.get("playerId", "")
+            at_payload_obj = {
+                "playerId": player_id,
+                "routingUrl": "https://streamingapi2-east.mountain.siriusxm.com",
+                "template": "HLSP",
+                "lineupId": "400",
+            }
+            at_payload = base64.b64encode(
+                bytes(json.dumps(at_payload_obj), "utf-8")
+            ).decode()
+            access_token_obj = {"payload": at_payload, "code": "12345"}
+            access_token = base64.b64encode(
+                bytes(json.dumps(access_token_obj), "utf-8")
+            ).decode()
+            # test to make sure generated value is correct
+            if siriusxm_player_from_token(access_token):
+                return BmxOauthToken(
+                    links=links, access_token=access_token, refresh_token=refresh_token
+                )
+    except Exception as e:
+        logger.info(f"exception handing refresh token {e}")
+        pass
+
+    raise HTTPException(HTTPStatus.UNAUTHORIZED, "Invalid refresh request")
+
+
+def siriusxm_player_from_token(access_token: str) -> str:
+    logger.info(f"getting player from access_token {access_token}")
+    # access_token should be a BmxOauthToken where the payload has an embedded playerId
+    try:
+        payload = json.loads(base64.b64decode(access_token)).get("payload", "")
+        logger.info(f"payload={payload}")
+        player_id = json.loads(base64.b64decode(payload)).get("playerId", "")
+        logger.info(f"player_id={player_id}")
+        if player_id:
+            return player_id
+    except Exception as e:
+        logger.info(f"exception {e}")
+        pass
+
+    raise HTTPException(HTTPStatus.UNAUTHORIZED, "Invalid token")
+
+
 def play_siriusxm_station(
-    sxm: SiriusXM, station: int, settings: Settings
+    sxm: SiriusXM, station: str, player_id: str
 ) -> BmxPlaybackResponse:
+    logger.info(f"playing sxm {station}")
+    guid, channel_id = sxm.get_channel(station)
+    logger.info(f"playlist={sxm.get_playlist_url(guid, channel_id)}")
     # channel_by_number = sxm.get_channel_info_by_number(station)
     # tuner = sxm.get_tuner(channel_by_number["id"])
     # stream_url = f"{tuner['base_url']}{tuner['sources']}"
-    stream_url = f"{settings.base_url}/listen/33.m3u8"
+    stream_url = sxm.get_bmx_playback(guid, channel_id, player_id, station)
+    channel_info = sxm.get_channel_info(station)
+    # logger.info(f"channelinfo={channel_info}")
+    image_url = ""
+    for image in channel_info.get("images", {}).get("images", {}):
+        if image.get("name", "") == "list view channel logo":
+            image_url = image.get("url", "")
+            break
+
+    # image_url = "http://pri.art.prod.streaming.siriusxm.com/images/chan/84/79e99c-eff4-c36e-b1a5-dde0aa457787.png"
+    name = channel_info.get("name", "")
 
     listen_id = str(3432432423)
 
@@ -278,44 +352,39 @@ def play_siriusxm_station(
             "bmx_reporting": {"href": f"/reporting/live/{station}"},
         },
         audio=audio,
-        imageUrl="http://pri.art.prod.streaming.siriusxm.com/images/chan/84/79e99c-eff4-c36e-b1a5-dde0aa457787.png",
+        imageUrl=image_url,
         isFavorite=False,
-        name="First Wave",
+        name=name,
         restrictions={"inactivityTimeout": 28800},
         streamType="liveRadio",
     )
     return resp
 
 
-def now_playing_siriusxm(sxm: SiriusXM, station_name: str) -> BmxNowPlaying:
-    channels = sxm.get_channels()
-    # print(f"channels = {channels}")
-    # channel_info = sxm.get_channel_info(station)
-    # print(f"channel_info = {channel_info}")
-    # channel = sxm.get_channel(station)
-    # print(f"channel = {channel}")
-    station = 33
+def now_playing_siriusxm(sxm: SiriusXM, station_name: str, date: str) -> BmxNowPlaying:
 
-    channel_by_number = sxm.get_channel_info_by_number(station)
-    if not channel_by_number:
-        channel_by_number = channels[0]
-    # print(f"channel by number {station} = {channel_by_number}")
-    if channel_by_number:
-        print(f"now playing by number, info={channel_by_number['id']}")
-        now_playing = sxm.get_now_playing(channel_by_number["id"])
-        # print(f"now_playing = {now_playing}")
+    channel = sxm.get_channel_info(station_name)
+
+    if channel:
+        # now_playing = sxm.get_now_playing(channel["id"])
+        now_playing = sxm.get_now_playing(station_name, date)
+        if not now_playing:
+            now_playing = {"artist": "test artist", "songTitle": "song title"}
+
     else:
         now_playing = {"artist": "test artist", "songTitle": "song title"}
 
     resp = BmxNowPlaying(
         links={
             "self": {
-                "href": f"/now-playing/{station}?a={{absolutePlayPoint}}",
+                "href": f"/now-playing/{station_name}?a={{absolutePlayPoint}}",
                 "templated": True,
             },
         },
         artist=now_playing.get("artist", ""),
-        track=now_playing.get("songTitle"),
+        album=now_playing.get("album", ""),
+        image_url=now_playing.get("image_url", ""),
+        track=now_playing.get("track"),
         ask_again_after=10,
     )
     return resp
@@ -343,5 +412,5 @@ def reporting_siriusxm(payload: str, station: str) -> BmxReporting:
                 "href": f"/reporting/live/{station}?lastReport={last_report_encoded}"
             }
         },
-        next_report_in=50,
+        next_report_in=0,
     )
