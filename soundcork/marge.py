@@ -12,6 +12,7 @@ from soundcork.devices import get_device_by_id, read_device_info
 from soundcork.model import (
     ConfiguredSource,
     ContentItem,
+    Group,
     Preset,
     Recent,
     SourceProvider,
@@ -491,3 +492,46 @@ def update_device_poweron(datastore: "DataStore", poweron_xml: bytes):
             current_device.ip_address = device.ip_address
             datastore.save_device_info(current_device, account_id)
     datastore.save_poweron(device.device_id, poweron_xml.decode())
+
+
+def get_device_group_xml(
+    datastore: "DataStore", account: str, device_id: str
+) -> ET.Element:
+    """
+    check group status of a device
+    return value::
+    - XML <group/> if ungrouped
+    - XML file of group if grouped
+    - error if device does not exist or is no ST10
+    """
+    group = datastore.group_for_device(account, device_id)
+    if group:
+        return datastore.group_to_xml(group)
+    else:
+        return ET.Element("groups")
+
+
+def add_group(datastore: "DataStore", account: str, group_info_xml: str) -> ET.Element:
+    group_elem = ET.fromstring(group_info_xml)
+    group = datastore.group_from_xml("", group_elem)
+    return datastore.add_group(account, group)
+
+
+def modify_group(
+    datastore: "DataStore", account: str, group_id: str, group_info_xml: str
+) -> ET.Element:
+    group_elem = ET.fromstring(group_info_xml)
+    name = strip_element_text(group_elem.find("name"))
+    master_id = strip_element_text(group_elem.find("masterDeviceId"))
+    group = datastore.get_group(account, group_id)
+    if group:
+        if group.master_id == master_id:
+            group.name = name
+            return datastore.save_group(account, group_id, group)
+        else:
+            raise HTTPException(
+                HTTPStatus.BAD_REQUEST,
+                f"masterDeviceId {master_id} does not match group master",
+            )
+    else:
+        raise HTTPException(HTTPStatus.BAD_REQUEST, f"No such group {group_id}")

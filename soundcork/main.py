@@ -25,6 +25,8 @@ from soundcork.devices import (
     read_device_info,
     read_recents,
 )
+from soundcork.groups import get_groups_router
+from soundcork.groups_service import get_groups_service_router
 from soundcork.marge import (
     account_full_xml,
     add_device_to_account,
@@ -52,7 +54,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 datastore = DataStore()
 settings = Settings()
 
@@ -77,6 +78,10 @@ tags_metadata = [
         "description": "Communicates with the speaker.",
     },
     {
+        "name": "service",
+        "description": "Communicates with user applications.",
+    },
+    {
         "name": "bmx",
         "description": "Communicates with streaming radio services (eg. TuneIn).",
     },
@@ -89,7 +94,6 @@ app = FastAPI(
     openapi_tags=tags_metadata,
     lifespan=lifespan,
 )
-
 
 # @lru_cache
 # def get_settings():
@@ -446,7 +450,7 @@ def bose_xml_str(xml: ET.Element) -> str:
     return return_xml
 
 
-################## configuration ############3
+################## configuration ############
 
 
 @app.get("/scan_recents", tags=["setup"])
@@ -483,3 +487,9 @@ def add_device_to_datastore(device_id: str):
         if info_elem.attrib.get("deviceID", "") == device_id:
             success = add_device(device)
             return {device_id: success}
+
+
+#####################################################################################
+# -- include all routines for groups
+app.include_router(get_groups_router(datastore))
+app.include_router(get_groups_service_router(datastore))
