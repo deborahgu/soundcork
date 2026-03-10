@@ -482,16 +482,19 @@ def remove_device_from_account(datastore: "DataStore", account: str, device: str
     return {"ok": removed}
 
 
-def update_device_poweron(datastore: "DataStore", poweron_xml: bytes):
+# updates the poweron data for the device represented by the
+# poweron_xml xml. if the device is part of an account, also checks
+# to see if the ip address needs to be updated, and if so, updates it.
+def update_device_poweron(datastore: "DataStore", poweron_xml: bytes) -> str | None:
     poweron_elem = ET.fromstring(poweron_xml)
     device = datastore.device_info_from_poweron_xml(poweron_elem)
-    logger.info(f"device={device}")
     current_device, account_id = datastore.find_device(device.device_id)
     if current_device and account_id:
         if current_device.ip_address != device.ip_address:
             current_device.ip_address = device.ip_address
             datastore.save_device_info(current_device, account_id)
     datastore.save_poweron(device.device_id, poweron_xml.decode())
+    return account_id
 
 
 def get_device_group_xml(

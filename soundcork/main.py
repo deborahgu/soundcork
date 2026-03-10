@@ -111,12 +111,22 @@ def read_root():
 @app.post(
     "/marge/streaming/support/power_on",
     tags=["marge"],
-    status_code=HTTPStatus.OK,
 )
-async def power_on(request: Request):
+async def power_on(request: Request, response: Response) -> Response:
     xml = await request.body()
-    update_device_poweron(datastore, xml)
-    return
+    account = update_device_poweron(datastore, xml)
+    if account:
+        response.status_code = HTTPStatus.OK
+        return response
+    else:
+        response = BoseXMLResponse()
+        element = ET.Element("status")
+        ET.SubElement(element, "message").text = "Device does not exist"
+        ET.SubElement(element, "status-code").text = "4012"
+        response.body = bose_xml_str(element).encode()
+        response.headers["Content-Length"] = str(len(response.body))
+        response.status_code = HTTPStatus.BAD_REQUEST
+        return response
 
 
 @app.get("/marge/streaming/sourceproviders", tags=["marge"])
