@@ -36,6 +36,7 @@ from soundcork.marge import (
     provider_settings_xml,
     recents_xml,
     remove_device_from_account,
+    rename_device,
     software_update_xml,
     source_providers,
     update_device_poweron,
@@ -337,6 +338,34 @@ async def post_account_device(
 ):
     xml = await request.body()
     device_id, xml_resp = add_device_to_account(datastore, account, xml.decode())
+
+    return bose_xml_str(xml_resp)
+
+
+@app.put(
+    "/marge/streaming/account/{account}/device/{device_id}",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+    status_code=HTTPStatus.CREATED,
+    dependencies=[
+        Depends(
+            Etag(
+                etag_gen=etag_for_account,
+                weak=False,
+                extra_headers={
+                    "method_name": "putDevice",
+                },
+            )
+        )
+    ],
+)
+async def put_account_device(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device_id: Annotated[str, Path(pattern=DEVICE_RE)],
+    request: Request,
+):
+    xml = await request.body()
+    xml_resp = rename_device(datastore, account, device_id, xml.decode())
 
     return bose_xml_str(xml_resp)
 

@@ -1,9 +1,8 @@
 import logging
 import random
-import re
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from http import HTTPStatus
-from io import BytesIO
 from os import listdir, mkdir, path, remove, rmdir, walk
 from typing import Optional
 
@@ -11,6 +10,7 @@ from fastapi import HTTPException
 
 from soundcork.config import Settings
 from soundcork.constants import (
+    DEFAULT_DATESTR,
     DEVICE_INFO_FILE,
     DEVICES_DIR,
     POWERON_FILE,
@@ -87,8 +87,14 @@ class DataStore:
         info_elem = stored_tree.getroot()
         return self.device_info_from_device_info_xml(info_elem)
 
-    def save_device_info(self, device: DeviceInfo, account: str) -> ET.Element:
+    def save_device_info(self, device: DeviceInfo, account: str) -> DeviceInfo:
         """Saves definition of a Device associated with an Account"""
+        device.updated_on = datetime.fromtimestamp(
+            int(datetime.now().timestamp()), timezone.utc
+        ).isoformat(timespec="milliseconds")
+        if not device.created_on:
+            device.created_on = device.updated_on
+
         save_file = path.join(
             self.account_device_dir(account, device.device_id), DEVICE_INFO_FILE
         )
@@ -108,11 +114,14 @@ class DataStore:
         network_elem.attrib["type"] = "SCM"
         ET.SubElement(network_elem, "macAddress").text = device.device_id
         ET.SubElement(network_elem, "ipAddress").text = device.ip_address
+        ET.SubElement(info_elem, "createdOn").text = device.created_on
+        ET.SubElement(info_elem, "updatedOn").text = device.updated_on
 
         info_tree = ET.ElementTree(info_elem)
         ET.indent(info_tree, space="    ", level=0)
         info_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
-        return info_elem
+
+        return self.get_device_info(account, device.device_id)
 
     def save_presets(self, account: str, device: str, presets_list: list[Preset]):
         """Saves Presets for a Device associated with an Account"""
@@ -398,6 +407,8 @@ class DataStore:
             firmware_version=str(firmware_version),
             ip_address=str(ip_address),
             name="",
+            created_on="",
+            updated_on="",
         )
 
     def device_info_from_device_info_xml(self, info_elem: ET.Element) -> DeviceInfo:
@@ -437,6 +448,13 @@ class DataStore:
             # TODO narrow exception class
             ip_address = ""
 
+        created_on = strip_element_text(info_elem.find("createdOn"))
+        if not created_on:
+            created_on = DEFAULT_DATESTR
+        updated_on = strip_element_text(info_elem.find("updatedOn"))
+        if not updated_on:
+            updated_on = created_on
+
         try:
             return DeviceInfo(
                 device_id=device_id,
@@ -446,6 +464,8 @@ class DataStore:
                 firmware_version=str(firmware_version),
                 ip_address=str(ip_address),
                 name=str(name),
+                created_on=created_on,
+                updated_on=updated_on,
             )
         except NameError:
             raise RuntimeError(
@@ -553,7 +573,9 @@ class DataStore:
         # create devices subdirectory
         return True
 
-    def add_device(self, account: str, device_id: str, device: DeviceInfo) -> bool:
+    def add_device(
+        self, account: str, device_id: str, device: DeviceInfo
+    ) -> DeviceInfo | None:
         """Adds a device to a given account in the datastore.
 
         Returns:
@@ -561,14 +583,12 @@ class DataStore:
         - False if device already exists for the account
         """
         if self.device_exists(account, device_id):
-            return False
+            return None
 
         # TODO: add error handling if you can't make the directory
         mkdir(path.join(self.account_devices_dir(account), device_id))
 
-        self.save_device_info(device, account)
-
-        return True
+        return self.save_device_info(device, account)
 
     def remove_device(self, account: str, device_id: str) -> bool:
         """Removes a device from a given account in the datastore.

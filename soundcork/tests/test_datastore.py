@@ -9,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 
 from soundcork.constants import (
+    DEFAULT_DATESTR,
     DEVICE_INFO_FILE,
     DEVICES_DIR,
     POWERON_FILE,
@@ -34,6 +35,8 @@ def sample_device() -> DeviceInfo:
         firmware_version="1.2.3.4",
         ip_address="192.168.1.1",
         name="Cloister Room",
+        created_on=DEFAULT_DATESTR,
+        updated_on=DEFAULT_DATESTR,
     )
 
 
@@ -122,7 +125,7 @@ def test_get_device_info(
     assert result.name == sample_device.name
 
 
-def test_save_device_info_builds_xml_and_writes_file(
+def test_save_device_info_returns_object_and_writes_file(
     datastore: DataStore,
     sample_device: DeviceInfo,
     monkeypatch,
@@ -135,16 +138,13 @@ def test_save_device_info_builds_xml_and_writes_file(
         lambda *_: f"/virtual/data/12345/{DEVICES_DIR}/{sample_device.device_id}",
     )
 
-    info_elem = datastore.save_device_info(sample_device, "12345")
-    name_elem = info_elem.find("name")
-    ip_elem = info_elem.find("networkInfo/ipAddress")
+    updated_device = datastore.save_device_info(sample_device, "12345")
+    updated_name = updated_device.name
+    updated_ip = updated_device.ip_address
 
-    assert info_elem.tag == "info"
-    assert info_elem.attrib["deviceID"] == sample_device.device_id
-    assert name_elem is not None
-    assert name_elem.text == sample_device.name
-    assert ip_elem is not None
-    assert ip_elem.text == sample_device.ip_address
+    assert updated_device.device_id == sample_device.device_id
+    assert updated_name == sample_device.name
+    assert updated_ip == sample_device.ip_address
     write_mock.assert_called_once_with(
         f"/virtual/data/12345/{DEVICES_DIR}/{sample_device.device_id}/{DEVICE_INFO_FILE}",
         xml_declaration=True,
@@ -534,6 +534,8 @@ def test_find_device_prefers_account_then_falls_back_poweron(
         firmware_version="6",
         ip_address="10.0.0.2",
         name="",
+        created_on="",
+        updated_on="",
     )
 
     monkeypatch.setattr(datastore, "list_accounts", lambda: ["12345"])
