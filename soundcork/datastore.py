@@ -2,9 +2,11 @@ import logging
 import random
 import re
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from http import HTTPStatus
 from io import BytesIO
 from os import listdir, mkdir, path, remove, rmdir, walk
+from random import randint
 from typing import Optional
 
 from fastapi import HTTPException
@@ -269,7 +271,7 @@ class DataStore:
             recents_file.write(recents_xml)
 
     def get_configured_sources(
-        self, account: str, device: str
+        self, account: str, device: str = ""
     ) -> list[ConfiguredSource]:
         """Get known Sources for a Device associated with an Account"""
         sources_tree = ET.parse(path.join(self.account_dir(account), SOURCES_FILE))
@@ -309,6 +311,63 @@ class DataStore:
             )
 
         return sources_list
+
+    def add_source(
+        self, account: str, new_source: ConfiguredSource
+    ) -> ConfiguredSource:
+        """Adds a source to the source list.
+
+        Returns:
+        - the newly created ConfiguredSource, including fields like id and updated
+        """
+        now = datetime.fromtimestamp(
+            datetime.now().timestamp(), timezone.utc
+        ).isoformat(timespec="milliseconds")
+        all_sources = self.get_configured_sources(account)
+        max_source = max(all_sources, key=lambda x: int(x.id))
+        new_source.id = str(int(max_source.id) + randint(1, 100))
+        new_source.updated_on = now
+        new_source.created_on = now
+
+        all_sources.append(new_source)
+        self.save_configured_sources(account, all_sources)
+
+        return new_source
+
+    def save_configured_sources(
+        self, account: str, sources_list: list[ConfiguredSource]
+    ) -> ET.Element:
+        save_file = path.join(self.account_dir(account), SOURCES_FILE)
+        sources_root = ET.Element("sources")
+        for source in sources_list:
+            source_elem = ET.SubElement(sources_root, "source")
+            source_elem.attrib["id"] = source.id
+            source_elem.attrib["displayName"] = source.display_name
+            source_elem.attrib["secret"] = source.secret
+            source_elem.attrib["secretType"] = source.secret_type
+            key_elem = ET.SubElement(source_elem, "sourceKey")
+            key_elem.attrib["type"] = source.source_key_type
+            key_elem.attrib["account"] = source.source_key_account
+            ET.SubElement(source_elem, "createdOn").text = source.created_on
+            ET.SubElement(source_elem, "updatedOn").text = source.updated_on
+        sources_tree = ET.ElementTree(sources_root)
+        ET.indent(sources_tree, space="    ", level=0)
+        sources_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
+        return sources_root
+
+    def remove_source(self, account: str, source_id: str) -> bool:
+        all_sources = self.get_configured_sources(account)
+        match = None
+        for source in all_sources:
+            if source.id == source_id:
+                logger.info("found source")
+                match = source
+                break
+        if match:
+            all_sources.remove(match)
+            self.save_configured_sources(account, all_sources)
+            return True
+        return False
 
     # TODO: add error handling if you can't write the file
     def save_configured_sources_xml(self, account: str, sources_xml: str):

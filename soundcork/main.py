@@ -31,11 +31,13 @@ from soundcork.marge import (
     account_full_xml,
     add_device_to_account,
     add_recent,
+    add_source_to_account,
     delete_preset,
     presets_xml,
     provider_settings_xml,
     recents_xml,
     remove_device_from_account,
+    remove_source_from_account,
     software_update_xml,
     source_providers,
     update_device_poweron,
@@ -364,6 +366,49 @@ def streaming_token(device_id: str, response: Response):
     response.headers["ETag"] = str(etag)
 
     return
+
+
+@app.post(
+    "/marge/streaming/account/{account}/source",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+    status_code=HTTPStatus.CREATED,
+    dependencies=[
+        Depends(
+            Etag(
+                etag_gen=etag_for_account,
+                weak=False,
+                extra_headers={
+                    "method_name": "addSource",
+                },
+            )
+        )
+    ],
+)
+async def post_account_source(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    request: Request,
+):
+    xml = await request.body()
+    xml_resp = add_source_to_account(datastore, account, xml.decode())
+
+    return bose_xml_str(xml_resp)
+
+
+@app.delete("/marge/streaming/account/{account}/source/{source_id}", tags=["marge"])
+async def delete_account_source(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    source_id: str,
+    response: Response,
+):
+    remove_source_from_account(datastore, account, source_id)
+    response.headers["method_name"] = "removeSource"
+    response.headers["location"] = (
+        f"{settings.base_url}/marge/account/{account}/source/{source_id}"
+    )
+    response.body = b""
+    response.status_code = HTTPStatus.OK
+    return response
 
 
 @app.get("/bmx/registry/v1/services", response_model_exclude_none=True, tags=["bmx"])
