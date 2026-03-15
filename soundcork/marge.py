@@ -12,7 +12,6 @@ from soundcork.devices import get_device_by_id, read_device_info
 from soundcork.model import (
     ConfiguredSource,
     ContentItem,
-    Group,
     Preset,
     Recent,
     SourceProvider,
@@ -535,3 +534,32 @@ def modify_group(
             )
     else:
         raise HTTPException(HTTPStatus.BAD_REQUEST, f"No such group {group_id}")
+
+
+def add_source_to_account(datastore: "DataStore", account: str, xml: str) -> ET.Element:
+    source_elem = ET.fromstring(xml)
+    credential = strip_element_text(source_elem.find("credential"))
+    username = strip_element_text(source_elem.find("username"))
+    source_provider_id = strip_element_text(source_elem.find("sourceproviderid"))
+    source_key_type = PROVIDERS[int(source_provider_id) - 1]
+    source_name = strip_element_text(source_elem.find("sourcename"))
+    # if we see something that uses a secret type other than 'token' then we'll learn
+    # how that's set
+    secret_type = "token"
+
+    new_source = ConfiguredSource(
+        id="",
+        display_name=source_name,
+        secret=credential,
+        secret_type=secret_type,
+        source_key_account=username,
+        source_key_type=source_key_type,
+        created_on="",
+        updated_on="",
+    )
+    updated_source = datastore.add_source(account, new_source)
+    return configured_source_xml(updated_source)
+
+
+def remove_source_from_account(datastore: "DataStore", account: str, source_id: str):
+    return datastore.remove_source(account, source_id)
