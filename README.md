@@ -7,6 +7,10 @@ This project is pre-alpha. We welcome contributions! See [CONTRIBUTING.md](CONTR
 
 Read [SECURITY.md](SECURITY.md) carefully. This should only be run inside your home network, behind a firewall. (If you have a router at home, it probably has a firewall on it.) Don't put it on an open network.
 
+### Service status
+
+We'll maintain a forum post with the [Current Status of Bose Cloud Services](https://github.com/deborahgu/soundcork/discussions/181). Check there for updates. We will update whenever we learn new information.
+
 ## Background
 [Bose has announced that they are shutting down the servers for the SoundTouch system in February, 2026. ](https://www.bose.com/soundtouch-end-of-life) When those servers go away, certain network-based functionality currently available to SoundTouch devices will stop working.
 
@@ -33,6 +37,10 @@ Assumingly all four servers listed there will be shut down. From testing, the `m
 
 ## Running, testing, and installing soundcork
 
+### Development
+
+See the [wiki](https://github.com/deborahgu/soundcork/wiki/) for developer guidelines.
+
 ### Installing
 
 This has been written and tested with Python 3.12. Eventually it will be bundled as an installable app but for now you'll want a virtual environment.
@@ -43,7 +51,7 @@ manage virtual environments. These docs assume `venv`.
 	- Unix, Windows, and MacOS [installation and use guide for venv](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/).
 	- Your operating system might have some prerequisites here. On ubuntu, you may need:
 		```sh
-		sudo apt-install python3-pip python3.12-venv
+		sudo apt install python3-pip python3.12-venv
 		```
 1. Set up the virtual environment and run it. Run these commands in the
 directory where you've cloned the repository. (Adapt as needed for your shell
@@ -79,8 +87,6 @@ When you're done with the virtual environment, you can type `deactivate` to leav
 		python -m build && \
 		pip install dist/*.whl
 		``` 
-    -NOTE: In the current development stage of the project, we may exhibit code changes without change of the version number. In case you update your local code, this build process has to be repeated, but with the last command modified to ```pip install dist/*.whl --force-reinstall```
-    - In the file ```soundcork/gunicorn_conf.py```, replace the binding address 127.0.0.1 by the IP address of your server
     - If using systemd, make a copy of `soundcork.service.example`, named `soundcork.service`
 	- modify the placeholder strings appropriately
 	- then mv to systemd and enable.
@@ -90,6 +96,14 @@ When you're done with the virtual environment, you can type `deactivate` to leav
 		sudo systemctl enable soundcork && \
 		sudo systemctl start soundcork
 		```
+    - To update the server, rebuild the project and restart. NOTE: In the current development stage of the project, we code changes may happen without a change of the version number. In these cases, or if you update your local code yourself, this build process has to be repeated, but with the last command modified to ```pip install dist/*.whl --force-reinstall```:
+      ```
+      git pull
+      pip install build && \
+      python -m build && \
+      pip install dist/*.whl --force-reinstall
+      sudo systemctl restart soundcork
+      ```
 
 You can verify the server by checking the `/docs` endpoint at your URL.
 

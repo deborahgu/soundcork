@@ -26,16 +26,20 @@ from soundcork.devices import (
     read_device_info,
     read_recents,
 )
+from soundcork.groups import get_groups_router
+from soundcork.groups_service import get_groups_service_router
 from soundcork.marge import (
     account_full_xml,
     add_device_to_account,
     add_recent,
+    delete_preset,
     presets_xml,
     provider_settings_xml,
     recents_xml,
     remove_device_from_account,
     software_update_xml,
     source_providers,
+    update_device_poweron,
     update_preset,
 )
 from soundcork.model import (
@@ -50,7 +54,6 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
-
 
 datastore = DataStore()
 settings = Settings()
@@ -74,6 +77,10 @@ tags_metadata = [
     {
         "name": "marge",
         "description": "Communicates with the speaker.",
+    },
+    {
+        "name": "service",
+        "description": "Communicates with user applications.",
     },
     {
         "name": "bmx",
@@ -120,11 +127,9 @@ def read_root():
     tags=["marge"],
     status_code=HTTPStatus.OK,
 )
-def power_on():
-    # see https://github.com/fastapi/fastapi/discussions/8091 for the TODO here
-    # I wonder if the endpoint will work if I return HTTPStatus.IM_A_TEAPOT
-    # instead? I'd like to try it.
-
+async def power_on(request: Request):
+    xml = await request.body()
+    update_device_poweron(datastore, xml)
     return
 
 
@@ -161,15 +166,15 @@ def streamingsourceproviders():
 
 
 def etag_for_presets(request: Request) -> str:
-    return str(datastore.etag_for_presets(request.path_params.get("account")))
+    return str(datastore.etag_for_presets(str(request.path_params.get("account"))))
 
 
 def etag_for_recents(request: Request) -> str:
-    return str(datastore.etag_for_recents(request.path_params.get("account")))
+    return str(datastore.etag_for_recents(str(request.path_params.get("account"))))
 
 
 def etag_for_account(request: Request) -> str:
-    return str(datastore.etag_for_account(request.path_params.get("account")))
+    return str(datastore.etag_for_account(str(request.path_params.get("account"))))
 
 
 def etag_for_swupdate(request: Request) -> str:
@@ -220,6 +225,20 @@ async def put_account_preset(
     xml = await request.body()
     xml_resp = update_preset(datastore, account, device, preset_number, xml)
     return bose_xml_str(xml_resp)
+
+
+@app.delete(
+    "/marge/streaming/account/{account}/device/{device}/preset/{preset_number}",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+)
+def delete_account_preset(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device: Annotated[str, Path(pattern=DEVICE_RE)],
+    preset_number: int,
+):
+    delete_preset(datastore, account, device, preset_number)
+    return None
 
 
 @app.get(
@@ -312,30 +331,53 @@ async def post_account_recent(
     "/marge/streaming/account/{account}/device/",
     response_class=BoseXMLResponse,
     tags=["marge"],
+    status_code=HTTPStatus.CREATED,
     dependencies=[
         Depends(
             Etag(
                 etag_gen=etag_for_account,
                 weak=False,
+                extra_headers={
+                    "method_name": "addDevice",
+                    "access-control-expose-headers": "Credentials",
+                },
             )
         )
     ],
 )
 async def post_account_device(
-    account: Annotated[str, Path(pattern=ACCOUNT_RE)], request: Request
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    request: Request,
 ):
     xml = await request.body()
-    xml_resp = add_device_to_account(datastore, account, xml)
+    device_id, xml_resp = add_device_to_account(datastore, account, xml.decode())
+
     return bose_xml_str(xml_resp)
 
 
-@app.delete("/marge/streaming/account/{account}/device/{device}/", tags=["marge"])
+@app.delete("/marge/streaming/account/{account}/device/{device}", tags=["marge"])
 async def delete_account_device(
     account: Annotated[str, Path(pattern=ACCOUNT_RE)],
     device: Annotated[str, Path(pattern=DEVICE_RE)],
+    response: Response,
 ):
     xml_resp = remove_device_from_account(datastore, account, device)
-    return {"ok": True}
+    response.headers["method_name"] = "removeDevice"
+    response.headers["location"] = (
+        f"{settings.base_url}/marge/account/{account}/device/{device}"
+    )
+    response.body = b""
+    response.status_code = HTTPStatus.OK
+    return response
+
+
+@app.get("/marge/streaming/device/{device_id}/streaming_token", tags=["marge"])
+def streaming_token(device_id: str, response: Response):
+    response.headers["Authorization"] = "c3dvcmRmaXNoCg=="
+    etag = int(datetime.now().timestamp() * 1000)
+    response.headers["ETag"] = str(etag)
+
+    return
 
 
 @app.post("/marge/streaming/account/login", tags=["marge"])
@@ -430,6 +472,15 @@ def sw_update() -> Response:
         return response
 
 
+@app.post("/v1/scmudc/{deviceid}", tags=["stats"], status_code=HTTPStatus.OK)
+def stats_scmudc(deviceid: str):
+    """Returns 200 for the analytics endpoint.
+
+    This isn't an endpoint we use, but it's noisy when it fails. Return 200.
+    """
+    return
+
+
 def bose_xml_str(xml: ET.Element) -> str:
     # ET.tostring won't allow you to set standalone="yes"
     return_xml = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>{ET.tostring(xml, encoding="unicode")}'
@@ -437,7 +488,7 @@ def bose_xml_str(xml: ET.Element) -> str:
     return return_xml
 
 
-################## configuration ############3
+################## configuration ############
 
 
 @app.get("/scan_recents", tags=["setup"])
@@ -451,16 +502,17 @@ def test_scan_recents():
 
 @app.get("/scan", tags=["setup"])
 def scan_devices():
+    """Unlikely to be used in production, but has been useful during development."""
     devices = get_bose_devices()
     device_infos = {}
     for device in devices:
         info_elem = ET.fromstring(read_device_info(device))
         device_infos[device.udn] = {
             "device_id": info_elem.attrib.get("deviceID", ""),
-            "name": info_elem.find("name").text,
-            "type": info_elem.find("type").text,
-            "marge URL": info_elem.find("margeURL").text,
-            "account": info_elem.find("margeAccountUUID").text,
+            "name": info_elem.find("name").text,  # type: ignore
+            "type": info_elem.find("type").text,  # type: ignore
+            "marge URL": info_elem.find("margeURL").text,  # type: ignore
+            "account": info_elem.find("margeAccountUUID").text,  # type: ignore
         }
     return device_infos
 
@@ -473,3 +525,9 @@ def add_device_to_datastore(device_id: str):
         if info_elem.attrib.get("deviceID", "") == device_id:
             success = add_device(device)
             return {device_id: success}
+
+
+#####################################################################################
+# -- include all routines for groups
+app.include_router(get_groups_router(datastore))
+app.include_router(get_groups_service_router(datastore))

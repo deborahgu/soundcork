@@ -9,10 +9,11 @@ import logging
 import urllib.request
 import xml.etree.ElementTree as ET
 from subprocess import run
+from typing import Optional
 from urllib.parse import urlparse
 
-import upnpclient
-from telnetlib3 import Telnet
+import upnpclient  # type: ignore
+from telnetlib3 import Telnet  # type: ignore
 
 from soundcork.config import Settings
 from soundcork.constants import (
@@ -89,7 +90,7 @@ def write_file_to_speaker(filename: str, host: str, remote_path: str) -> None:
     )
     if result.returncode:
         raise RuntimeError(
-            f"something went wrong copying {filename} to {host}: {result.stderr}"
+            f"something went wrong copying {filename} to {host}: {str(result.stderr)}"
         )
 
 
@@ -110,7 +111,7 @@ def read_file_from_speaker_ssh(
     )
     if result.returncode:
         raise RuntimeError(
-            f"something went wrong copying {filename} from {host}: {result.stderr}"
+            f"something went wrong copying {filename} from {host}: {str(result.stderr)}"
         )
 
 
@@ -134,6 +135,18 @@ def get_bose_devices() -> list[upnpclient.upnp.Device]:
         f'Discovered Bose devices:\n- {"\n- ".join([b.friendly_name for b in bose_devices])}'
     )
     return bose_devices
+
+
+def get_device_by_id(device_id: str) -> Optional[upnpclient.upnp.Device]:
+    devices = get_bose_devices()
+    for device in devices:
+        try:
+            info_elem = ET.fromstring(read_device_info(device))
+            if info_elem.attrib.get("deviceID", "") == device_id:
+                return device
+        except:
+            pass
+    return None
 
 
 def show_upnp_devices() -> None:

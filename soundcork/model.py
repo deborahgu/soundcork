@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import List, Optional
 
 from fastapi import Response
@@ -11,7 +10,7 @@ class BoseXMLResponse(Response):
 
 class Link(BaseModel):
     href: str
-    use_internal_client: Optional[str] = Field(
+    use_internal_client: str | None = Field(
         default=None,
         alias="useInternalClient",
         serialization_alias="useInternalClient",
@@ -26,7 +25,6 @@ class Links(BaseModel):
     bmx_token: Optional[Link] = None
     self: Optional[Link] = None
     bmx_availability: Optional[Link] = None
-    bmx_logout: Optional[Link] = None
     bmx_reporting: Optional[Link] = None
     bmx_favorite: Optional[Link] = None
     bmx_nowplaying: Optional[Link] = None
@@ -84,6 +82,7 @@ class Stream(BaseModel):
     hasPlaylist: bool
     isRealtime: bool
     streamUrl: str
+    maxTimeout: Optional[int] = None
 
 
 class Audio(BaseModel):
@@ -108,6 +107,8 @@ class BmxPlaybackResponse(BaseModel):
     name: str
     streamType: str
     duration: Optional[int] = None
+    shuffle_disabled: Optional[bool] = None
+    repeat_disabled: Optional[bool] = None
 
 
 class Track(BaseModel):
@@ -150,12 +151,12 @@ class ContentItem(BaseModel):
     source_account: Optional[str] = None
     source_id: Optional[str] = None
     is_presetable: Optional[str] = None
+    created_on: Optional[str] = None
+    updated_on: Optional[str] = None
 
 
 class Preset(ContentItem):
     container_art: str
-    created_on: str
-    updated_on: str
 
 
 class Recent(ContentItem):
@@ -171,6 +172,8 @@ class ConfiguredSource(BaseModel):
     secret_type: str
     source_key_type: str
     source_key_account: str
+    created_on: str
+    updated_on: str
 
 
 class DeviceInfo(BaseModel):
@@ -181,3 +184,13 @@ class DeviceInfo(BaseModel):
     firmware_version: str
     ip_address: str
     name: str
+
+
+class Group(BaseModel):
+    id: str
+    name: str
+    master_id: str
+    left_id: str
+    left_ip: str
+    right_id: str
+    right_ip: str
