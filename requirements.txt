@@ -5,7 +5,7 @@ gunicorn==23.0.0
 isort==8.0.0  # dev only
 mypy==1.19.1  # dev only
 pydantic-settings==2.13.1
-pytest==9.0.1  # dev only
+pytest==9.0.2  # dev only
 pytest-cov==7.0.0  # dev only
 telnetlib3==4.0.1
 upnpclient==1.0.3
