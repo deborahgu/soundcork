@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -53,6 +54,7 @@ from soundcork.model import (
     BmxResponse,
     BoseXMLResponse,
 )
+from soundcork.utils import strip_element_text
 
 logging.basicConfig(
     level=logging.INFO,
@@ -428,9 +430,22 @@ def streaming_token(device_id: str, response: Response):
 async def post_account_login(
     request: Request,
 ):
-    # xml = await request.body()
+    xml = await request.body()
+    account_id = "1234567"
+    # for now if they send in an account id as the username
+    # then log in that account
+    try:
+        login_xml = ET.fromstring(xml)
+        if login_xml:
+            username = strip_element_text(login_xml.find("username"))
+            account_pattern = re.compile(ACCOUNT_RE)
+            if account_pattern.match(username):
+                account_id = username
+    except Exception:
+        pass
+
     account_elem = ET.Element("account")
-    account_elem.attrib["id"] = "1234567"  # map login to account?
+    account_elem.attrib["id"] = account_id
     ET.SubElement(account_elem, "accountStatus").text = "OK"
     ET.SubElement(account_elem, "mode").text = "global"
     ET.SubElement(account_elem, "preferredLanguage").text = "en"
@@ -445,6 +460,7 @@ async def post_account_login(
     response.headers["etag"] = str(etag)
     # just making this up
     response.headers["Credentials"] = "3432143243243432143fdafd"
+    return response
 
 
 @app.post(
