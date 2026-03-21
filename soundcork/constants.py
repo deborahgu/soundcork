@@ -69,6 +69,10 @@ SPEAKER_PRESETS_PATH = "/presets"
 SPEAKER_SOURCES_FILE_LOCATION = "/mnt/nv/BoseApp-Persistence/1/Sources.xml"
 
 # validation
-ACCOUNT_RE = "^\d{1,20}$"
+ACCOUNT_RE = "^\\d{1,20}$"
 DEVICE_RE = "^[0-9a-fA-F]{12}$"
-GROUP_RE = "^\d{7}$"
+GROUP_RE = "^\\d{7}$"
+
+
+# used for when a timestamp is missing
+DEFAULT_DATESTR = "2012-09-19T12:43:00.000+00:00"

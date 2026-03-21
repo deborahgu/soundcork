@@ -9,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 
 from soundcork.constants import (
+    DEFAULT_DATESTR,
     DEVICE_INFO_FILE,
     DEVICES_DIR,
     POWERON_FILE,
@@ -34,6 +35,8 @@ def sample_device() -> DeviceInfo:
         firmware_version="1.2.3.4",
         ip_address="192.168.1.1",
         name="Cloister Room",
+        created_on=DEFAULT_DATESTR,
+        updated_on=DEFAULT_DATESTR,
     )
 
 
@@ -89,8 +92,7 @@ def test_get_device_info(
     sample_device: DeviceInfo,
     monkeypatch,
 ):
-    xml = ET.fromstring(
-        f"""
+    xml = ET.fromstring(f"""
             <info deviceID="{sample_device.device_id}">
             <name>{sample_device.name}</name>
             <type>SoundTouch and Relative Dimensions in Space</type>
@@ -111,8 +113,7 @@ def test_get_device_info(
                 <ipAddress>{sample_device.ip_address}</ipAddress>
             </networkInfo>
             </info>
-        """
-    )
+        """)
 
     monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
@@ -122,7 +123,7 @@ def test_get_device_info(
     assert result.name == sample_device.name
 
 
-def test_save_device_info_builds_xml_and_writes_file(
+def test_save_device_info_returns_object_and_writes_file(
     datastore: DataStore,
     sample_device: DeviceInfo,
     monkeypatch,
@@ -134,17 +135,38 @@ def test_save_device_info_builds_xml_and_writes_file(
         "account_device_dir",
         lambda *_: f"/virtual/data/12345/{DEVICES_DIR}/{sample_device.device_id}",
     )
+    xml = ET.fromstring(f"""
+    <info deviceID="{sample_device.device_id}">
+    <name>{sample_device.name}</name>
+    <type>{sample_device.product_code}</type>
+    <components>
+        <component>
+            <componentCategory>SCM</componentCategory>
+            <softwareVersion>{sample_device.firmware_version}</softwareVersion>
+            <serialNumber>{sample_device.device_serial_number}</serialNumber>
+        </component>
+        <component>
+            <componentCategory>PackagedProduct</componentCategory>
+            <serialNumber>{sample_device.product_serial_number}</serialNumber>
+        </component>
+    </components>
+    <networkInfo type="SCM">
+        <macAddress>{sample_device.device_id}</macAddress>
+        <ipAddress>{sample_device.ip_address}</ipAddress>
+    </networkInfo>
+    <createdOn>{sample_device.created_on}</createdOn>
+    <updatedOn>{sample_device.updated_on}</updatedOn>
+    </info>
+    """)
+    monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
 
-    info_elem = datastore.save_device_info(sample_device, "12345")
-    name_elem = info_elem.find("name")
-    ip_elem = info_elem.find("networkInfo/ipAddress")
+    updated_device = datastore.save_device_info(sample_device, "12345")
+    updated_name = updated_device.name
+    updated_ip = updated_device.ip_address
 
-    assert info_elem.tag == "info"
-    assert info_elem.attrib["deviceID"] == sample_device.device_id
-    assert name_elem is not None
-    assert name_elem.text == sample_device.name
-    assert ip_elem is not None
-    assert ip_elem.text == sample_device.ip_address
+    assert updated_device.device_id == sample_device.device_id
+    assert updated_name == sample_device.name
+    assert updated_ip == sample_device.ip_address
     write_mock.assert_called_once_with(
         f"/virtual/data/12345/{DEVICES_DIR}/{sample_device.device_id}/{DEVICE_INFO_FILE}",
         xml_declaration=True,
@@ -192,7 +214,7 @@ def test_create_account_returns_false_if_account_dir_present(
     mkdir_mock.assert_not_called()
 
 
-def test_add_device_returns_false_if_account_device_dir_missing(
+def test_add_device_returns_none_if_account_device_dir_missing(
     datastore: DataStore,
     sample_device: DeviceInfo,
     monkeypatch,
@@ -201,7 +223,7 @@ def test_add_device_returns_false_if_account_device_dir_missing(
 
     added = datastore.add_device("12345", sample_device.device_id, sample_device)
 
-    assert added is False
+    assert added is None
 
 
 def test_add_device_calls_mkdir_and_save_info_if_account_device_dir_present(
@@ -217,7 +239,7 @@ def test_add_device_calls_mkdir_and_save_info_if_account_device_dir_present(
 
     added = datastore.add_device("12345", sample_device.device_id, sample_device)
 
-    assert added is True
+    assert added is not None
     mkdir_mock.assert_called_once_with(
         f"/virtual/data/12345/{DEVICES_DIR}/{sample_device.device_id}"
     )
@@ -362,8 +384,7 @@ def test_get_presets_parses_xml_from_mocked_parse(
     sample_device: DeviceInfo,
     monkeypatch,
 ):
-    xml = ET.fromstring(
-        """
+    xml = ET.fromstring("""
         <presets>
           <preset id="1" createdOn="" updatedOn="">
             <ContentItem source="INTERNET_RADIO" type="uri" location="http://a" sourceAccount="acct" isPresetable="true">
@@ -378,8 +399,7 @@ def test_get_presets_parses_xml_from_mocked_parse(
             </ContentItem>
           </preset>
         </presets>
-        """
-    )
+        """)
     monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
 
@@ -397,8 +417,7 @@ def test_get_recents_parses_xml_from_mocked_parse(
     sample_device: DeviceInfo,
     monkeypatch,
 ):
-    xml = ET.fromstring(
-        f"""
+    xml = ET.fromstring(f"""
         <recents>
           <recent id="1" deviceID="{sample_device.device_id}" utcTime="2026-03-05T00:00:00Z">
             <contentItem source="INTERNET_RADIO" type="uri" location="http://a" sourceAccount="acct" isPresetable="true">
@@ -413,8 +432,7 @@ def test_get_recents_parses_xml_from_mocked_parse(
             </contentItem>
           </recent>
         </recents>
-        """
-    )
+        """)
     monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
 
@@ -432,8 +450,7 @@ def test_get_configured_sources_parses_and_generates_missing_id(
     sample_device: DeviceInfo,
     monkeypatch,
 ):
-    xml = ET.fromstring(
-        """
+    xml = ET.fromstring("""
         <sources>
           <source displayName="One" secret="s1" secretType="token" id="500">
             <createdOn>1</createdOn>
@@ -446,8 +463,7 @@ def test_get_configured_sources_parses_and_generates_missing_id(
             <sourceKey account="b" type="u" />
           </source>
         </sources>
-        """
-    )
+        """)
     monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
 
@@ -534,6 +550,8 @@ def test_find_device_prefers_account_then_falls_back_poweron(
         firmware_version="6",
         ip_address="10.0.0.2",
         name="",
+        created_on="",
+        updated_on="",
     )
 
     monkeypatch.setattr(datastore, "list_accounts", lambda: ["12345"])

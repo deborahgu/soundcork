@@ -1,0 +1,39 @@
+/* grid container */
+.left-sidebar-grid {
+    display:grid;
+    grid-template-areas:
+        'header'
+        'main-content'
+        'left-sidebar'
+        'footer';
+}
+
+/* general column padding */
+.left-sidebar-grid > * {
+    padding:1rem;
+}
+
+/* assign columns to grid areas */
+.left-sidebar-grid > .header {
+    grid-area:header;
+}
+.left-sidebar-grid > .main-content {
+    grid-area:main-content;
+}
+.left-sidebar-grid > .left-sidebar {
+    grid-area:left-sidebar;
+}
+.left-sidebar-grid > .footer {
+    grid-area:footer;
+}
+
+/* tablet breakpoint */
+@media (min-width:768px) {
+    .left-sidebar-grid {
+        grid-template-columns:repeat(3, 1fr);
+        grid-template-areas:
+            'header header header'
+            'left-sidebar main-content main-content'
+            'footer footer footer';
+    }
+}

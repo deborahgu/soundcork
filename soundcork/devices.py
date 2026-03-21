@@ -6,13 +6,17 @@ software on a BusyBox system.
 """
 
 import logging
+import tempfile
 import urllib.request
 import xml.etree.ElementTree as ET
+from os import unlink
 from subprocess import run
 from typing import Optional
 from urllib.parse import urlparse
 
+import paramiko
 import upnpclient  # type: ignore
+from scp import SCPClient  # type: ignore
 from telnetlib3 import Telnet  # type: ignore
 
 from soundcork.config import Settings
@@ -75,6 +79,20 @@ def read_presets(device: upnpclient.upnp.Device) -> str:
     )
 
 
+def read_sources(device: upnpclient.upnp.Device) -> str:
+    hostname = hostname_for_device(device)
+    sources_tmp_file = tempfile.NamedTemporaryFile(delete=False)
+    read_file_from_speaker_ssh(
+        host=hostname,
+        remote_path=SPEAKER_SOURCES_FILE_LOCATION,
+        local_path=sources_tmp_file.name,
+    )
+    sources = sources_tmp_file.read()
+    sources_tmp_file.close()
+    unlink(sources_tmp_file.name)
+    return sources.decode()
+
+
 def write_file_to_speaker(filename: str, host: str, remote_path: str) -> None:
     """Place a file on the remote speaker.
 
@@ -94,25 +112,17 @@ def write_file_to_speaker(filename: str, host: str, remote_path: str) -> None:
         )
 
 
-def read_file_from_speaker_ssh(
-    filename: str, host: str, remote_path: str, local_path: str
-) -> None:
-    """Read a file from the remote speaker, using ssh.
+def read_file_from_speaker_ssh(host: str, remote_path: str, local_path: str) -> None:
+    """Read a file from the remote speaker, using ssh."""
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        ssh.connect(hostname=host, port=22, username="root", password="")
 
-    Unfortunately, the speakers' shell (BusyBox) supports scp but not sftp, while
-    all the Paramiko-based ssh libraries for Python (such as Fabric) only emulate scp over
-    sftp. As a result, we need to subprocess call out to scp, which hopefully is present
-    on the host system and hopefully uses a version with these arguments.
-    """
-    # TODO add timeout handling
-    logger.debug(f"copying {filename} from {host}")
-    result = run(
-        SSH_ARGS + [f"root@{host}:{remote_path}", local_path], capture_output=True
-    )
-    if result.returncode:
-        raise RuntimeError(
-            f"something went wrong copying {filename} from {host}: {str(result.stderr)}"
-        )
+        with SCPClient(ssh.get_transport()) as scp:
+            scp.get(remote_path, local_path)
+    except Exception as e:
+        logger.info(f"Error: {e}")
 
 
 def read_file_from_speaker_http(host: str, path: str) -> str:
@@ -123,7 +133,7 @@ def read_file_from_speaker_http(host: str, path: str) -> str:
         return str(urllib.request.urlopen(url).read(), "utf-8")
     except Exception:
         logger.info(f"no result for {url}")
-        return "none"
+        return ""
 
 
 def get_bose_devices() -> list[upnpclient.upnp.Device]:
@@ -141,9 +151,11 @@ def get_device_by_id(device_id: str) -> Optional[upnpclient.upnp.Device]:
     devices = get_bose_devices()
     for device in devices:
         try:
-            info_elem = ET.fromstring(read_device_info(device))
-            if info_elem.attrib.get("deviceID", "") == device_id:
-                return device
+            info_str = read_device_info(device)
+            if info_str:
+                info_elem = ET.fromstring(info_str)
+                if info_elem.attrib.get("deviceID", "") == device_id:
+                    return device
         except:
             pass
     return None
@@ -180,16 +192,22 @@ def add_device(device: upnpclient.upnp.Device) -> bool:
     device_id = info_elem.attrib.get("deviceID", "")
     # If margeAccountUUID is not present, the .text will correctly raise an error here
     account_id = info_elem.find("margeAccountUUID").text  # type: ignore
-    if not datastore.account_exists(account_id):  # type: ignore
-        recents = read_recents(device)
-        presets = read_presets(device)
-        # TBD
-        # sources = read_sources(device)
-        sources = ""
-        add_account(account_id, recents, presets, sources)  # type: ignore
+    if account_id:
+        if not datastore.account_exists(account_id):  # type: ignore
+            recents = read_recents(device)
+            presets = read_presets(device)
+            sources = read_sources(device)
+            add_account(account_id, recents, presets, sources)  # type: ignore
 
-    datastore.add_device(account_id, device_id, read_device_info(device))  # type: ignore
-    return True
+        datastore.add_device(
+            account_id,
+            device_id,
+            datastore.device_info_from_device_info_xml(
+                ET.fromstring(read_device_info(device))
+            ),
+        )  # type: ignore
+        return True
+    return False
 
 
 def add_account(account_id: str, recents: str, presets: str, sources: str) -> bool:

@@ -1,0 +1,61 @@
+<html>
+    <head>
+        <title>Soundcork Admin</title>
+        <link id="favicon" rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+        <link rel="stylesheet" href="/static/css/admin.css">
+        <meta charset="UTF-8">
+        <meta name="viewport"
+          content="width=device-width,
+                   initial-scale=1.0">
+    </head>
+    <body>
+        <div class="left-sidebar-grid">
+            <header class="header">
+                Soundcork:  Can't Brick Us
+            </header>
+    <main class="main-content">
+<table>
+            <thead>
+                <th>Account</th>
+                <th>Devices</th>
+            </thead>
+            <tbody>
+            {% for account in accounts %}
+                <tr>
+                    <td>{{account.account_id}}</td>
+                    <td>
+                        <ul>
+                        {% for device in account.devices %}
+                        <li>{{device.name}}</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <table>
+            <thead>
+                <th>Device</th>
+                <th>IP Address</th>
+                <th>Status</th>
+            </thead>
+            <tbody>
+            {% for device in devices %}
+                <tr>
+                    <td>{{device.name}}</td>
+                    <td>{{device.ip_addr}}</td>
+                    <td>{{device.status}}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </main>
+    <section class="left-sidebar">
+        <img src="/static/images/soundcork.png" alt="Soundcork logo">
+    </section>
+    <footer class="footer"></footer>
+</div>
+
+    </body>
+</html>

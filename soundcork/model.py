@@ -184,6 +184,8 @@ class DeviceInfo(BaseModel):
     firmware_version: str
     ip_address: str
     name: str
+    created_on: str
+    updated_on: str
 
 
 class Group(BaseModel):

@@ -9,8 +9,10 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, Path, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi_etag import Etag
 
+from soundcork.admin import get_admin_router
 from soundcork.bmx import (
     play_custom_stream,
     tunein_playback,
@@ -32,11 +34,14 @@ from soundcork.marge import (
     account_full_xml,
     add_device_to_account,
     add_recent,
+    add_source_to_account,
     delete_preset,
     presets_xml,
     provider_settings_xml,
     recents_xml,
     remove_device_from_account,
+    remove_source_from_account,
+    rename_device,
     software_update_xml,
     source_providers,
     update_device_poweron,
@@ -108,6 +113,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # @lru_cache
 # def get_settings():
@@ -125,12 +131,22 @@ def read_root():
 @app.post(
     "/marge/streaming/support/power_on",
     tags=["marge"],
-    status_code=HTTPStatus.OK,
 )
-async def power_on(request: Request):
+async def power_on(request: Request, response: Response) -> Response:
     xml = await request.body()
-    update_device_poweron(datastore, xml)
-    return
+    account = update_device_poweron(datastore, xml)
+    if account:
+        response.status_code = HTTPStatus.OK
+        return response
+    else:
+        response = BoseXMLResponse()
+        element = ET.Element("status")
+        ET.SubElement(element, "message").text = "Device does not exist"
+        ET.SubElement(element, "status-code").text = "4012"
+        response.body = bose_xml_str(element).encode()
+        response.headers["Content-Length"] = str(len(response.body))
+        response.status_code = HTTPStatus.BAD_REQUEST
+        return response
 
 
 @app.get("/marge/streaming/sourceproviders", tags=["marge"])
@@ -355,6 +371,34 @@ async def post_account_device(
     return bose_xml_str(xml_resp)
 
 
+@app.put(
+    "/marge/streaming/account/{account}/device/{device_id}",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+    status_code=HTTPStatus.CREATED,
+    dependencies=[
+        Depends(
+            Etag(
+                etag_gen=etag_for_account,
+                weak=False,
+                extra_headers={
+                    "method_name": "putDevice",
+                },
+            )
+        )
+    ],
+)
+async def put_account_device(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    device_id: Annotated[str, Path(pattern=DEVICE_RE)],
+    request: Request,
+):
+    xml = await request.body()
+    xml_resp = rename_device(datastore, account, device_id, xml.decode())
+
+    return bose_xml_str(xml_resp)
+
+
 @app.delete("/marge/streaming/account/{account}/device/{device}", tags=["marge"])
 async def delete_account_device(
     account: Annotated[str, Path(pattern=ACCOUNT_RE)],
@@ -401,6 +445,48 @@ async def post_account_login(
     response.headers["etag"] = str(etag)
     # just making this up
     response.headers["Credentials"] = "3432143243243432143fdafd"
+
+
+@app.post(
+    "/marge/streaming/account/{account}/source",
+    response_class=BoseXMLResponse,
+    tags=["marge"],
+    status_code=HTTPStatus.CREATED,
+    dependencies=[
+        Depends(
+            Etag(
+                etag_gen=etag_for_account,
+                weak=False,
+                extra_headers={
+                    "method_name": "addSource",
+                },
+            )
+        )
+    ],
+)
+async def post_account_source(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    request: Request,
+):
+    xml = await request.body()
+    xml_resp = add_source_to_account(datastore, account, xml.decode())
+
+    return bose_xml_str(xml_resp)
+
+
+@app.delete("/marge/streaming/account/{account}/source/{source_id}", tags=["marge"])
+async def delete_account_source(
+    account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    source_id: str,
+    response: Response,
+):
+    remove_source_from_account(datastore, account, source_id)
+    response.headers["method_name"] = "removeSource"
+    response.headers["location"] = (
+        f"{settings.base_url}/marge/account/{account}/source/{source_id}"
+    )
+    response.body = b""
+    response.status_code = HTTPStatus.OK
     return response
 
 
@@ -531,3 +617,7 @@ def add_device_to_datastore(device_id: str):
 # -- include all routines for groups
 app.include_router(get_groups_router(datastore))
 app.include_router(get_groups_service_router(datastore))
+
+
+# -- include admin router
+app.include_router(get_admin_router(datastore, settings))
