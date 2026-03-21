@@ -431,7 +431,6 @@ async def post_account_login(
     request: Request,
 ):
     xml = await request.body()
-    account_id = "1234567"
     # for now if they send in an account id as the username
     # then log in that account
     try:
@@ -441,8 +440,16 @@ async def post_account_login(
             account_pattern = re.compile(ACCOUNT_RE)
             if account_pattern.match(username):
                 account_id = username
+            else:
+                raise Exception
     except Exception:
-        pass
+        exception_xml = """<status>
+        <message>Account Login failure.</message>
+        <status-code>4024</status-code>
+        </status>"""
+        response = Response(content=exception_xml, media_type="application/xml")
+        response.status_code = HTTPStatus.BAD_REQUEST
+        return response
 
     account_elem = ET.Element("account")
     account_elem.attrib["id"] = account_id
