@@ -215,7 +215,9 @@ def add_device(device: upnpclient.upnp.Device) -> bool:
             recents = read_recents(device)
             presets = read_presets(device)
             sources = read_sources(device)
-            add_account(account_id, recents, presets, sources)  # type: ignore
+            # FIXME get the account email address for this
+            account_name = None
+            add_account(account_id, recents, presets, sources, account_name)
 
         datastore.add_device(
             account_id,
@@ -228,8 +230,14 @@ def add_device(device: upnpclient.upnp.Device) -> bool:
     return False
 
 
-def add_account(account_id: str, recents: str, presets: str, sources: str) -> bool:
-    if not datastore.create_account(account_id):
+def add_account(
+    account_id: str,
+    recents: str,
+    presets: str,
+    sources: str,
+    account_name: str | None = None,
+) -> bool:
+    if not datastore.create_account(account_id, label=account_name):
         return False
     datastore.save_presets_xml(account_id, presets)
     datastore.save_recents_xml(account_id, recents)
