@@ -49,6 +49,7 @@ from soundcork.marge import (
     update_device_poweron,
     update_preset,
 )
+from soundcork.miniapp import get_miniapp_router
 from soundcork.model import (
     BmxPlaybackResponse,
     BmxPodcastInfoResponse,
@@ -662,10 +663,13 @@ def add_device_to_datastore(device_id: str):
 
 
 #####################################################################################
-# -- include all routines for groups
+# include all routines for groups
 app.include_router(get_groups_router(datastore))
 app.include_router(get_groups_service_router(datastore))
 
 
-# -- include admin router
+#  include admin router
 app.include_router(get_admin_router(datastore, speakers))
+
+#  include miniapp router
+app.include_router(get_miniapp_router(datastore, settings))

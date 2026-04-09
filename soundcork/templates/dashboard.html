@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soundcork Dashboard</title>
+    <link rel="stylesheet" href="/static/css/miniapp.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+    
+    <header>
+        <div class="header-content">
+            <h1>Soundcork</h1>
+            <div class="account-info">
+                {{ account_label }}
+                <form action="/miniapp/logout" method="post" style="display:inline;">
+                    <button type="submit" class="button-secondary" style="margin-left:1rem;">Logout</button>
+                </form>
+            </div>
+        </div>
+    </header>
+    
+    <main id="main" class="container">
+        {% if error %}
+        <div class="error-message" role="alert" aria-live="polite">
+            <p>{{ error }}</p>
+        </div>
+        {% endif %}
+        
+        <section class="dashboard-section" aria-labelledby="presets-heading">
+            <h2 id="presets-heading">Presets</h2>
+            {% if presets %}
+            <ol class="presets-grid">
+                {% for preset in presets %}
+                <li class="preset-card">
+                    {% if preset.container_art %}
+                    <img src="{{ preset.container_art }}" alt="">
+                    {% endif %}
+                    <span class="preset-number" aria-label="Preset">{{ preset.id }}</span>
+                    <span class="preset-name">{{ preset.name }}</span>
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <div class="empty-state">
+                <p>No presets configured yet.</p>
+            </div>
+            {% endif %}
+        </section>
+        
+        <section class="dashboard-section" aria-labelledby="devices-heading">
+            <h2 id="devices-heading">Devices</h2>
+            {% if devices %}
+            <ul class="devices-grid">
+                {% for device in devices %}
+                <li class="device-card">
+                    <img 
+                        src="/static/images/devices/{{ device.image_file }}" 
+                        alt="" 
+                        class="device-image">
+                    <div class="device-info">
+                        <div class="device-name">{{ device.name }}</div>
+                        <div class="device-type">{{ device.product_code }}</div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-state">
+                <p>No devices found for this account.</p>
+            </div>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>

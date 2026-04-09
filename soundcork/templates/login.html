@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soundcork Login</title>
+    <link rel="stylesheet" href="/static/css/miniapp.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+    
+    <main id="main" class="login-container">
+        <div class="login-card">
+            <h1>Soundcork</h1>
+            <p>Select your account to continue</p>
+            
+            {% if error %}
+            <div class="error-message" role="alert" aria-live="polite">
+                <p>{{ error }}</p>
+            </div>
+            {% endif %}
+            
+            {% if accounts %}
+            <form action="/miniapp/login" method="post">
+                <fieldset style="border:none; padding:0;">
+                    <legend class="sr-only">Select account</legend>
+                    <ul class="account-list">
+                        {% for account_id, account_data in accounts.items() %}
+                        <li>
+                            <button 
+                                type="submit" 
+                                name="account_id" 
+                                value="{{ account_id }}"
+                                class="account-button"
+                                aria-label="Login as {{ account_data.label }}">
+                                <span class="account-label">{{ account_data.label }}</span>
+                                <span class="account-id">{{ account_id }}</span>
+                                {% if account_data.device_count %}
+                                <span class="account-devices">{{ account_data.device_count }} device{% if account_data.device_count != 1 %}s{% endif %}</span>
+                                {% endif %}
+                            </button>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </fieldset>
+            </form>
+            {% else %}
+            <div class="empty-state">
+                <p>No accounts found.</p>
+                <p>Please add a device to Soundcork first.</p>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</body>
+</html>

@@ -16,7 +16,7 @@ class CombinedDevice(BaseModel):
     A Device that's at least one of:
     - A physical SoundTouch speaker detected on the network
     - A configured DeviceInfo block stored in the datastore.
-        
+
     Property:
     - id: Bose-issued unique speaker ID from DeviceInfo
     - ip: The speaker's IP address
@@ -28,6 +28,7 @@ class CombinedDevice(BaseModel):
     - reachable:  Has been configured (ie. with a USB key) to have shell-access available.
     - st_device: SoundTouchDevice instance as discovered by BoseSoundTouchApi
     """
+
     id: str
     ip: str
     name: str

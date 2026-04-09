@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 import xml.etree.ElementTree as ET
@@ -11,6 +12,8 @@ from fastapi import HTTPException
 
 from soundcork.config import Settings
 from soundcork.constants import (
+    ACCOUNTS_FILE,
+    DEFAULT_ACCOUNT_LABEL,
     DEFAULT_DATESTR,
     DEVICE_INFO_FILE,
     DEVICES_DIR,
@@ -78,6 +81,49 @@ class DataStore:
                 f"Device {device} does not belong to account {account}",
             )
         return dir
+
+    def initialize_accounts_file(self) -> None:
+        """Initializes the accounts file"""
+        if not path.exists(path.join(self.data_dir, ACCOUNTS_FILE)):
+            accounts = self.list_accounts()
+            accounts_labels = {
+                account: {"label": f"{DEFAULT_ACCOUNT_LABEL} {account}"}
+                for account in accounts
+            }
+            with open(path.join(self.data_dir, ACCOUNTS_FILE), "w") as f:
+                json.dump(accounts_labels, f)
+
+    def get_account_info(self, account: str) -> str:
+        """Returns the label for the given account
+
+        Likely to be the login email address used when Bose APIs were real"""
+        try:
+            with open(path.join(self.data_dir, ACCOUNTS_FILE), "r") as f:
+                accounts = json.load(f)
+        except FileNotFoundError:
+            # Initialize the file if it doesn't exist
+            self.initialize_accounts_file()
+        if account not in accounts:
+            self.save_account_info(account, f"{DEFAULT_ACCOUNT_LABEL} {account}")
+            return f"{DEFAULT_ACCOUNT_LABEL} {account}"
+
+        return accounts[account]["label"]
+
+    def save_account_info(self, account: str, label: str) -> None:
+        """Saves the label for the given account"""
+        with open(path.join(self.data_dir, ACCOUNTS_FILE), "r") as f:
+            accounts = json.load(f)
+        if account_label := accounts.get(label):
+            if account_label == label:
+                return
+            logger.warning(
+                (
+                    f"Account {account} already has label {account_label}, overwriting with {label}"
+                )
+            )
+        accounts[account] = {"label": label}
+        with open(path.join(self.data_dir, ACCOUNTS_FILE), "w") as f:
+            json.dump(accounts, f, indent=4)
 
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Gets definition of a Device associated with an Account"""
@@ -614,7 +660,7 @@ class DataStore:
         """Returns true if device exists for a given account in the datastore."""
         return device_id in self.list_devices(account)
 
-    def create_account(self, account: str) -> bool:
+    def create_account(self, account: str, label: Optional[str]) -> bool:
         """Creates an account folder in the datastore.
 
         Returns:
@@ -625,6 +671,8 @@ class DataStore:
         if self.account_exists(account):
             return False
 
+        if not label:
+            label = f"{DEFAULT_ACCOUNT_LABEL} {account}"
         # TODO: add error handling if you can't make the directory
         mkdir(self.account_dir(account, True))
         mkdir(self.account_devices_dir(account))

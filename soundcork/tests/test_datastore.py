@@ -192,7 +192,7 @@ def test_create_account_calls_mkdir_if_account_dir_missing(
     monkeypatch.setattr(datastore, "account_exists", lambda _: False)
     monkeypatch.setattr("soundcork.datastore.mkdir", mkdir_mock)
 
-    created = datastore.create_account("12345")
+    created = datastore.create_account("12345", label="")
 
     assert created is True
     assert mkdir_mock.call_args_list == [
@@ -208,7 +208,7 @@ def test_create_account_returns_false_if_account_dir_present(
     monkeypatch.setattr(datastore, "account_exists", lambda _: True)
     monkeypatch.setattr("soundcork.datastore.mkdir", mkdir_mock)
 
-    created = datastore.create_account("12345")
+    created = datastore.create_account("12345", label="")
 
     assert created is False
     mkdir_mock.assert_not_called()
