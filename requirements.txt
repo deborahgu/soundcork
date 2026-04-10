@@ -8,7 +8,7 @@ mypy==1.19.1  # dev only
 paramiko==4.0.0
 pydantic-settings==2.13.1
 pytest==9.0.2  # dev only
-pytest-cov==7.0.0  # dev only
+pytest-cov==7.1.0  # dev only
 scp==0.15.0
-types-paramiko==4.0.0.20250822
+types-paramiko==4.0.0.20260322
 upnpclient==1.0.3

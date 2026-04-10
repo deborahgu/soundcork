@@ -51,26 +51,19 @@ def hostname_for_device(device: upnpclient.upnp.Device) -> str:
     return urlparse(device.location).hostname  # type: ignore
 
 
-def read_recents(device: upnpclient.upnp.Device) -> str:
-    return read_file_from_speaker_http(
-        hostname_for_device(device), SPEAKER_RECENTS_PATH
-    )
+def read_recents(hostname: str) -> str:
+    return read_file_from_speaker_http(hostname, SPEAKER_RECENTS_PATH)
 
 
-def read_device_info(device: upnpclient.upnp.Device) -> str:
-    return read_file_from_speaker_http(
-        hostname_for_device(device), SPEAKER_DEVICE_INFO_PATH
-    )
+def read_device_info(hostname: str) -> str:
+    return read_file_from_speaker_http(hostname, SPEAKER_DEVICE_INFO_PATH)
 
 
-def read_presets(device: upnpclient.upnp.Device) -> str:
-    return read_file_from_speaker_http(
-        hostname_for_device(device), SPEAKER_PRESETS_PATH
-    )
+def read_presets(hostname: str) -> str:
+    return read_file_from_speaker_http(hostname, SPEAKER_PRESETS_PATH)
 
 
-def read_sources(device: upnpclient.upnp.Device) -> str:
-    hostname = hostname_for_device(device)
+def read_sources(hostname: str) -> str:
     sources_tmp_file = tempfile.NamedTemporaryFile(delete=False)
     read_file_from_speaker_ssh(
         host=hostname,
@@ -164,7 +157,7 @@ def get_device_by_id(device_id: str) -> Optional[upnpclient.upnp.Device]:
     devices = get_bose_devices()
     for device in devices:
         try:
-            info_str = read_device_info(device)
+            info_str = read_device_info(hostname_for_device(device))
             if info_str:
                 info_elem = ET.fromstring(info_str)
                 if info_elem.attrib.get("deviceID", "") == device_id:
@@ -206,15 +199,20 @@ def addr_is_reachable(device_address: str) -> bool:
 
 
 def add_device(device: upnpclient.upnp.Device) -> bool:
-    info_elem = ET.fromstring(read_device_info(device))
+    hostname = hostname_for_device(device)
+    return add_device_by_ip(hostname)
+
+
+def add_device_by_ip(hostname: str) -> bool:
+    info_elem = ET.fromstring(read_device_info(hostname))
     device_id = info_elem.attrib.get("deviceID", "")
     # If margeAccountUUID is not present, the .text will correctly raise an error here
     account_id = info_elem.find("margeAccountUUID").text  # type: ignore
     if account_id:
         if not datastore.account_exists(account_id):  # type: ignore
-            recents = read_recents(device)
-            presets = read_presets(device)
-            sources = read_sources(device)
+            recents = read_recents(hostname)
+            presets = read_presets(hostname)
+            sources = read_sources(hostname)
             # FIXME get the account email address for this
             account_name = None
             add_account(account_id, recents, presets, sources, account_name)
@@ -223,7 +221,7 @@ def add_device(device: upnpclient.upnp.Device) -> bool:
             account_id,
             device_id,
             datastore.device_info_from_device_info_xml(
-                ET.fromstring(read_device_info(device))
+                ET.fromstring(read_device_info(hostname))
             ),
         )  # type: ignore
         return True

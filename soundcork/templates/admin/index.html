@@ -16,7 +16,11 @@
     <main class="main-content">
 
         {% for id, account in accounts.items() %}
-        <h2>Account {{account.id}}</h2>
+        <h2>Account {{account.id}}
+            {% if not account.in_soundcork %}
+            <em>Not in soundcork</em>
+            {% endif %}
+        </h2>
         <table>
             <thead>
                 <th>Device</th>
@@ -40,7 +44,15 @@
                     <td>{{device.reachable}}</td>
                     <td>
                         {% if not device.in_soundcork %}
-                        (add)
+                          {% if not account.in_soundcork and device.reachable %}
+                            <form action="/admin/addDevice/{{device.id}}" method="POST">
+                              <input type="submit" value="Configure Account">
+                            </form>
+                          {% elif account.in_soundcork %}
+                            <form action="/admin/addDevice/{{device.id}}" method="POST">
+                              <input type="submit" value="Add to Soundcork">
+                            </form>
+                          {% endif %}
                         {% elif device.reachable and device.marge_server != "Soundcork"%}
                         <form action="/admin/switchToSoundcork/{{device.id}}" method="POST">
                             <input type="submit" value="Switch to Soundcork">

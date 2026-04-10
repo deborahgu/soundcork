@@ -204,7 +204,7 @@ class DataStore:
         ) as presets_file:
             presets_file.write(presets_xml)
 
-    def get_presets(self, account: str, device: str) -> list[Preset]:
+    def get_presets(self, account: str, device: str = "") -> list[Preset]:
         """Gets Presets for a Device associated with an Account"""
         storedTree = ET.parse(path.join(self.account_dir(account), PRESETS_FILE))
         root = storedTree.getroot()

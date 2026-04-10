@@ -18,7 +18,12 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from soundcork.datastore import DataStore
-from soundcork.devices import addr_is_reachable, override_speaker_config, reboot_speaker
+from soundcork.devices import (
+    add_device_by_ip,
+    addr_is_reachable,
+    override_speaker_config,
+    reboot_speaker,
+)
 from soundcork.ui.speakers import CombinedDevice, Speakers
 
 router = APIRouter(tags=["admin"])
@@ -64,9 +69,9 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
                 found_account = accounts.get(account_id, None)
                 if not found_account:
                     found_account = CombinedAccount(
-                        id=account_id, devices={}, in_soundcork=False
+                        id=account_id, devices=[], in_soundcork=False
                     )
-                    accounts[account_id] = account
+                    accounts[account_id] = found_account
 
                 found_account.devices.append(dev)
             else:
@@ -117,5 +122,18 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
             name="admin/wait.html",
             context={"elapsed": elapsed, "device_id": device_id},
         )
+
+    @router.post("/admin/addDevice/{device_id}")
+    async def add_device_to_soundcork(device_id: str):
+        logger.info(f"add device {device_id} to soundcork")
+        combined_device = speakers.all_devices().get(device_id)
+        if combined_device:
+            st_device = combined_device.st_device
+            if st_device:
+                hostname = st_device.Host
+                success = add_device_by_ip(hostname)
+                logger.info(f"added account from {hostname} success = {success}")
+
+        return RedirectResponse(url=f"/admin/", status_code=HTTPStatus.FOUND)
 
     return router

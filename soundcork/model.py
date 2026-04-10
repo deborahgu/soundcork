@@ -9,7 +9,12 @@ class BoseXMLResponse(Response):
 
 
 class Link(BaseModel):
+    container_art: str | None = Field(default=None, serialization_alias="containerArt")
     href: str
+    filters: list | None = None
+    name: str | None = None
+    templated: bool | None = None
+    type: str | None = None
     use_internal_client: str | None = Field(
         default=None,
         alias="useInternalClient",
@@ -22,6 +27,7 @@ class Links(BaseModel):
     bmx_logout: Optional[Link] = None
     bmx_navigate: Optional[Link] = None
     bmx_services_availability: Optional[Link] = None
+    bmx_search: Link | None = None
     bmx_token: Optional[Link] = None
     self: Optional[Link] = None
     bmx_availability: Optional[Link] = None
@@ -29,6 +35,8 @@ class Links(BaseModel):
     bmx_favorite: Optional[Link] = None
     bmx_nowplaying: Optional[Link] = None
     bmx_track: Optional[Link] = None
+    bmx_playback: Link | None = None
+    bmx_preset: Link | None = None
 
 
 class IconSet(BaseModel):
@@ -71,6 +79,41 @@ class BmxResponse(BaseModel):
     )
     askAgainAfter: int
     bmx_services: list[Service]
+
+
+class BmxNavItem(BaseModel):
+    links: Optional[Links] = Field(
+        default=None,
+        alias="_links",
+        serialization_alias="_links",
+        validation_alias=AliasChoices("links", "_links"),
+    )
+    image_url: str | None = Field(default=None, serialization_alias="imageUrl")
+    name: str
+    subtitle: str
+
+
+class BmxNavSection(BaseModel):
+    links: Optional[Links] = Field(
+        default=None,
+        alias="_links",
+        serialization_alias="_links",
+        validation_alias=AliasChoices("links", "_links"),
+    )
+    items: list[BmxNavItem]
+    layout: str
+    name: str
+
+
+class BmxNavResponse(BaseModel):
+    links: Optional[Links] = Field(
+        default=None,
+        alias="_links",
+        serialization_alias="_links",
+        validation_alias=AliasChoices("links", "_links"),
+    )
+    bmx_sections: list[BmxNavSection]
+    layout: str
 
 
 class Stream(BaseModel):
