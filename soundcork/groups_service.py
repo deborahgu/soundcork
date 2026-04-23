@@ -15,9 +15,9 @@ from http import HTTPStatus
 from typing import Annotated, Optional
 
 import httpx
-from fastapi import APIRouter, Path, Query, Request, Response
+from fastapi import APIRouter, Path, Query, Response
 
-from soundcork.constants import ACCOUNT_RE, DEVICE_RE, GROUP_RE
+from soundcork.constants import ACCOUNT_RE
 from soundcork.datastore import DataStore
 from soundcork.marge import add_group, modify_group
 
@@ -235,12 +235,8 @@ def get_groups_service_router(datastore: DataStore):
             #    parts.append(
             #        f'      <device id="{_x(dev_id)}" ip="{_x(dev_ip)}" role="{_x(dev_role)}">{_x(dev_name)}</device>'
             #    )
-            parts.append(
-                f'      <device id="{group.left_id}" ip="{group.left_ip}" role="LEFT"></device>'
-            )
-            parts.append(
-                f'      <device id="{group.right_id}" ip="{group.right_ip}" role="RIGHT"></device>'
-            )
+            parts.append(f'      <device id="{group.left_id}" ip="{group.left_ip}" role="LEFT"></device>')
+            parts.append(f'      <device id="{group.right_id}" ip="{group.right_ip}" role="RIGHT"></device>')
             parts.append("    </devices>")
             parts.append("  </group>")
         parts.append("</groups>")
@@ -290,9 +286,7 @@ def get_groups_service_router(datastore: DataStore):
         from soundcork.main import bose_xml_str
 
         # -- create in datastore
-        xml_with_id = bose_xml_str(
-            add_group(datastore, account=account, group_info_xml=xml_no_id)
-        )  # reuse
+        xml_with_id = bose_xml_str(add_group(datastore, account=account, group_info_xml=xml_no_id))  # reuse
         # xml_with_id = _extract_resp_text(resp).strip()
         if "<error" in xml_with_id and "<group" not in xml_with_id:
             return Response(xml_with_id, media_type="application/xml", status_code=409)
@@ -338,9 +332,7 @@ def get_groups_service_router(datastore: DataStore):
                 status_code=HTTPStatus.BAD_REQUEST,
             )
         # -- exactly one must be set
-        if (groupid is None and name is None) or (
-            groupid is not None and name is not None
-        ):
+        if (groupid is None and name is None) or (groupid is not None and name is not None):
             return Response(
                 "<error>Use exactly one of groupid=... or name=...</error>",
                 media_type="application/xml",
@@ -430,9 +422,7 @@ def get_groups_service_router(datastore: DataStore):
         name = (name or "").strip() or None
 
         # exactly one must be set
-        if (groupid is None and name is None) or (
-            groupid is not None and name is not None
-        ):
+        if (groupid is None and name is None) or (groupid is not None and name is not None):
             return Response(
                 "<error>Use exactly one of groupid=... or name=...</error>",
                 media_type="application/xml",

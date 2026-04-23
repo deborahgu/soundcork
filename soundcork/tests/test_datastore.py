@@ -40,9 +40,7 @@ def sample_device() -> DeviceInfo:
     )
 
 
-def test_poweron_devices_dir_calls_mkdir_when_missing_datastore_dir(
-    datastore: DataStore, monkeypatch
-):
+def test_poweron_devices_dir_calls_mkdir_when_missing_datastore_dir(datastore: DataStore, monkeypatch):
     mkdir_mock = MagicMock()
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: False)
     monkeypatch.setattr("soundcork.datastore.mkdir", mkdir_mock)
@@ -53,9 +51,7 @@ def test_poweron_devices_dir_calls_mkdir_when_missing_datastore_dir(
     mkdir_mock.assert_called_once_with(f"/virtual/data/{DEVICES_DIR}")
 
 
-def test_poweron_devices_dir_skips_mkdir_when_present(
-    datastore: DataStore, monkeypatch
-):
+def test_poweron_devices_dir_skips_mkdir_when_present(datastore: DataStore, monkeypatch):
     mkdir_mock = MagicMock()
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
     monkeypatch.setattr("soundcork.datastore.mkdir", mkdir_mock)
@@ -66,9 +62,7 @@ def test_poweron_devices_dir_skips_mkdir_when_present(
     mkdir_mock.assert_not_called()
 
 
-def test_account_dir_raises_not_found_when_missing_datastore_dir(
-    datastore: DataStore, monkeypatch
-):
+def test_account_dir_raises_not_found_when_missing_datastore_dir(datastore: DataStore, monkeypatch):
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: False)
 
     with pytest.raises(HTTPException):
@@ -185,9 +179,7 @@ def test_device_info_path_raises_when_missing_device_dir(
         datastore.account_device_dir("12345", sample_device.device_id)
 
 
-def test_create_account_calls_mkdir_if_account_dir_missing(
-    datastore: DataStore, monkeypatch
-):
+def test_create_account_calls_mkdir_if_account_dir_missing(datastore: DataStore, monkeypatch):
     mkdir_mock = MagicMock()
     monkeypatch.setattr(datastore, "account_exists", lambda _: False)
     monkeypatch.setattr("soundcork.datastore.mkdir", mkdir_mock)
@@ -201,9 +193,7 @@ def test_create_account_calls_mkdir_if_account_dir_missing(
     ]
 
 
-def test_create_account_returns_false_if_account_dir_present(
-    datastore: DataStore, monkeypatch
-):
+def test_create_account_returns_false_if_account_dir_present(datastore: DataStore, monkeypatch):
     mkdir_mock = MagicMock()
     monkeypatch.setattr(datastore, "account_exists", lambda _: True)
     monkeypatch.setattr("soundcork.datastore.mkdir", mkdir_mock)
@@ -240,9 +230,7 @@ def test_add_device_calls_mkdir_and_save_info_if_account_device_dir_present(
     added = datastore.add_device("12345", sample_device.device_id, sample_device)
 
     assert added is not None
-    mkdir_mock.assert_called_once_with(
-        f"/virtual/data/12345/{DEVICES_DIR}/{sample_device.device_id}"
-    )
+    mkdir_mock.assert_called_once_with(f"/virtual/data/12345/{DEVICES_DIR}/{sample_device.device_id}")
     save_mock.assert_called_once_with(sample_device, "12345")
 
 
@@ -277,12 +265,8 @@ def test_remove_device_calls_remove_and_rmdir_if_account_device_dir_present(
     removed = datastore.remove_device("12345", sample_device.device_id)
 
     assert removed is True
-    remove_mock.assert_called_once_with(
-        f"/virtual/data/12345/devices/{sample_device.device_id}/DeviceInfo.xml"
-    )
-    rmdir_mock.assert_called_once_with(
-        f"/virtual/data/12345/devices/{sample_device.device_id}"
-    )
+    remove_mock.assert_called_once_with(f"/virtual/data/12345/devices/{sample_device.device_id}/DeviceInfo.xml")
+    rmdir_mock.assert_called_once_with(f"/virtual/data/12345/devices/{sample_device.device_id}")
 
 
 def test_save_presets_constructs_xml(
@@ -358,9 +342,7 @@ def test_save_recents_constructs_xml(
     recent_elem = root.find("recent")
     content_item = recent_elem.find("contentItem") if recent_elem is not None else None
     item_name = content_item.find("itemName") if content_item is not None else None
-    container_art = (
-        content_item.find("containerArt") if content_item is not None else None
-    )
+    container_art = content_item.find("containerArt") if content_item is not None else None
 
     assert root.tag == "recents"
     assert recent_elem is not None
@@ -489,9 +471,7 @@ def test_save_poweron_writes_xml_when_dir_exists(
     datastore.save_poweron(sample_device.device_id, "<updates />")
 
     mkdir_mock.assert_not_called()
-    open_mock.assert_called_once_with(
-        f"/virtual/data/devices/{sample_device.device_id}/{POWERON_FILE}", "w"
-    )
+    open_mock.assert_called_once_with(f"/virtual/data/devices/{sample_device.device_id}/{POWERON_FILE}", "w")
 
 
 def test_save_poweron_creates_dir_when_missing_and_writes_xml(
@@ -507,9 +487,7 @@ def test_save_poweron_creates_dir_when_missing_and_writes_xml(
 
     datastore.save_poweron(sample_device.device_id, "<updates />")
 
-    open_mock.assert_called_once_with(
-        f"/virtual/data/devices/{sample_device.device_id}/{POWERON_FILE}", "w"
-    )
+    open_mock.assert_called_once_with(f"/virtual/data/devices/{sample_device.device_id}/{POWERON_FILE}", "w")
 
 
 def test_save_xml_helpers_open_files_to_write(datastore: DataStore, monkeypatch):
@@ -528,9 +506,7 @@ def test_etag_for_account_correctly_finds_max(datastore: DataStore, monkeypatch)
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
     monkeypatch.setattr(
         "soundcork.datastore.path.getmtime",
-        lambda f: {"Presets.xml": 1.0, "Recents.xml": 2.0, "Sources.xml": 3.0}[
-            f.split("/")[-1]
-        ],
+        lambda f: {"Presets.xml": 1.0, "Recents.xml": 2.0, "Sources.xml": 3.0}[f.split("/")[-1]],
     )
 
     assert datastore.etag_for_account("12345") == 3000
@@ -569,9 +545,7 @@ def test_find_device_prefers_account_then_falls_back_poweron(
     assert poweron_account is None
 
 
-def find_device_returns_none_when_no_account_or_poweron(
-    datastore: DataStore, monkeypatch
-):
+def find_device_returns_none_when_no_account_or_poweron(datastore: DataStore, monkeypatch):
     monkeypatch.setattr(datastore, "list_accounts", lambda: ["12345"])
     monkeypatch.setattr(datastore, "list_devices", lambda _: [])
     monkeypatch.setattr(datastore, "list_poweron_devices", lambda: [])

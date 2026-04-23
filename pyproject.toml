@@ -33,6 +33,7 @@ select = ["E", "F", "W", "I"]
 
 [tool.ruff.lint.per-file-ignores]
 "soundcork/main.py" = ["E402"]
+"soundcork/tests/*" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["soundcork"]

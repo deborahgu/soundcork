@@ -1,7 +1,9 @@
 """
 Endpoints for an admin UI.
 
-This is a DRAFT version of the admin ui. The display code is not functioning correctly yet, because the device discovery code isn't working correctly. Before it's considered working even for display-only, it will need to have:
+This is a DRAFT version of the admin ui. The display code is not functioning
+correctly yet, because the device discovery code isn't working correctly.
+Before it's considered working even for display-only, it will need to have:
 
 - timeouts for device interaction
 - error handling, with errors reported on the web page
@@ -11,8 +13,6 @@ This is a DRAFT version of the admin ui. The display code is not functioning cor
 import logging
 from http import HTTPStatus
 
-from bosesoundtouchapi.soundtouchclient import SoundTouchDevice  # type: ignore
-from bosesoundtouchapi.soundtouchdiscovery import SoundTouchDiscovery  # type: ignore
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -68,9 +68,7 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
             if account_id:
                 found_account = accounts.get(account_id, None)
                 if not found_account:
-                    found_account = CombinedAccount(
-                        id=account_id, devices=[], in_soundcork=False
-                    )
+                    found_account = CombinedAccount(id=account_id, devices=[], in_soundcork=False)
                     accounts[account_id] = found_account
 
                 found_account.devices.append(dev)
@@ -94,28 +92,24 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
             if st_device:
                 hostname = st_device.Host
                 success = override_speaker_config(hostname)
-                logger.info(
-                    f"override speaker config on {hostname} success = {success}"
-                )
+                logger.info(f"override speaker config on {hostname} success = {success}")
                 reboot = reboot_speaker(hostname)
                 logger.info(f"reboot {hostname} result {reboot}")
                 speakers.clear_device(device_id)
-        return RedirectResponse(
-            url=f"/admin/wait/{device_id}/0", status_code=HTTPStatus.FOUND
-        )
+        return RedirectResponse(url=f"/admin/wait/{device_id}/0", status_code=HTTPStatus.FOUND)
 
     @router.get("/admin/wait/{device_id}/{elapsed}")
     async def wait_switch_device(request: Request, device_id: str, elapsed: int):
-        logger.debug(f"checking for restart for {{device_id}}")
+        logger.debug("checking for restart for {device_id}")
         # only wait up to 120 seconds
         if elapsed >= 120:
-            return RedirectResponse(url=f"/admin/", status_code=HTTPStatus.FOUND)
+            return RedirectResponse(url="/admin/", status_code=HTTPStatus.FOUND)
 
         combined_device = speakers.all_devices().get(device_id)
         if combined_device:
             st_device = combined_device.st_device
             if st_device:
-                return RedirectResponse(url=f"/admin/", status_code=HTTPStatus.FOUND)
+                return RedirectResponse(url="/admin/", status_code=HTTPStatus.FOUND)
 
         return templates.TemplateResponse(
             request=request,
@@ -134,6 +128,6 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
                 success = add_device_by_ip(hostname)
                 logger.info(f"added account from {hostname} success = {success}")
 
-        return RedirectResponse(url=f"/admin/", status_code=HTTPStatus.FOUND)
+        return RedirectResponse(url="/admin/", status_code=HTTPStatus.FOUND)
 
     return router

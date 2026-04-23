@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from http import HTTPStatus
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query, Request, Response
+from fastapi import APIRouter, Path, Request, Response
 
 from soundcork.constants import ACCOUNT_RE, DEVICE_RE, GROUP_RE
 from soundcork.marge import add_group, get_device_group_xml, modify_group
@@ -113,12 +113,8 @@ def get_groups_router(datastore):
                     content=f"<error>{error}</error>",
                     status_code=HTTPStatus.BAD_REQUEST,
                 )
-            return BoseXMLResponse(
-                content=f"<status>Group {group} deleted successfully</status>"
-            )
+            return BoseXMLResponse(content=f"<status>Group {group} deleted successfully</status>")
         except Exception as e:
-            return BoseXMLResponse(
-                content=f"<error>Unexpected error: {e}</error>", status_code=500
-            )
+            return BoseXMLResponse(content=f"<error>Unexpected error: {e}</error>", status_code=500)
 
     return marge

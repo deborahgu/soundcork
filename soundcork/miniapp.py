@@ -4,7 +4,7 @@ Endpoints for a miniapp UI.
 
 import logging
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def get_device_image(product_code: str) -> str:
     """Map product code to device image file."""
     logger.info(f"Mapping product code '{product_code.lower()}' to device image")
-    logger.info(f"{DEVICE_IMAGE_MAP.get(product_code.lower(), "foo")}")
+    logger.info(f"{DEVICE_IMAGE_MAP.get(product_code.lower(), 'foo')}")
     return DEVICE_IMAGE_MAP.get(product_code.lower(), DEFAULT_DEVICE_IMAGE)
 
 
@@ -52,9 +52,7 @@ def get_miniapp_router(datastore: DataStore, settings):
                             "device_count": device_count,
                         }
                     except Exception as e:
-                        logger.error(
-                            f"Error getting info for account {account_id}: {e}"
-                        )
+                        logger.error(f"Error getting info for account {account_id}: {e}")
                         continue
 
             logger.info(f"Rendering login with {len(accounts_data)} accounts")
@@ -79,17 +77,13 @@ def get_miniapp_router(datastore: DataStore, settings):
             account_id_raw = form_data.get("account_id")
 
             if not account_id_raw or not isinstance(account_id_raw, str):
-                return RedirectResponse(
-                    url="/miniapp/login?error=No account selected", status_code=303
-                )
+                return RedirectResponse(url="/miniapp/login?error=No account selected", status_code=303)
 
             account_id: str = account_id_raw
 
             # Verify account exists
             if not datastore.account_exists(account_id):
-                return RedirectResponse(
-                    url="/miniapp/login?error=Invalid account", status_code=303
-                )
+                return RedirectResponse(url="/miniapp/login?error=Invalid account", status_code=303)
 
             # Get account label
             account_label = datastore.get_account_info(account_id)
@@ -118,9 +112,7 @@ def get_miniapp_router(datastore: DataStore, settings):
 
         except Exception as e:
             logger.error(f"Error during login: {e}")
-            return RedirectResponse(
-                url="/miniapp/login?error=Login failed", status_code=303
-            )
+            return RedirectResponse(url="/miniapp/login?error=Login failed", status_code=303)
 
     @router.get("/miniapp/dashboard", response_class=HTMLResponse)
     async def dashboard_page(request: Request):
@@ -128,9 +120,7 @@ def get_miniapp_router(datastore: DataStore, settings):
         try:
             # Get account from cookie
             account_id = request.cookies.get("soundcork_account_id")
-            account_label = request.cookies.get(
-                "soundcork_account_label", "Unknown Account"
-            )
+            account_label = request.cookies.get("soundcork_account_label", "Unknown Account")
 
             if not account_id:
                 return RedirectResponse(url="/miniapp/login", status_code=303)
@@ -157,18 +147,14 @@ def get_miniapp_router(datastore: DataStore, settings):
                                 "name": device_info.name,
                                 "product_code": device_info.product_code,
                                 "device_id": device_info.device_id,
-                                "image_file": get_device_image(
-                                    device_info.product_code
-                                ),
+                                "image_file": get_device_image(device_info.product_code),
                             }
                         )
 
                         # Get presets for first device only
                         if not presets:
                             try:
-                                device_presets = datastore.get_presets(
-                                    account_id, device_id
-                                )
+                                device_presets = datastore.get_presets(account_id, device_id)
                                 presets = [
                                     {
                                         "id": p.id,
@@ -178,9 +164,7 @@ def get_miniapp_router(datastore: DataStore, settings):
                                     for p in device_presets
                                 ]
                             except Exception as e:
-                                logger.warning(
-                                    f"Error getting presets for device {device_id}: {e}"
-                                )
+                                logger.warning(f"Error getting presets for device {device_id}: {e}")
 
                     except Exception as e:
                         logger.error(f"Error getting device info for {device_id}: {e}")
