@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SoundCork — Login</title>
+  <link rel="stylesheet" href="/webui/static/style.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: var(--bg-secondary);
+    }
+    .login-card {
+      background: var(--bg-card);
+      border-radius: 12px;
+      box-shadow: var(--shadow-md);
+      padding: 2rem;
+      width: 100%;
+      max-width: 360px;
+    }
+    .login-card h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.5rem;
+      color: var(--text-primary);
+    }
+    .login-card p {
+      margin: 0 0 1.5rem;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    .login-card label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    .login-card input {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    .login-card input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-light);
+    }
+    .login-card button {
+      width: 100%;
+      padding: 0.7rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .login-card button:hover { background: var(--accent-hover); }
+    .login-card button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .login-error {
+      color: var(--danger);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .login-divider {
+      display: flex;
+      align-items: center;
+      margin: 1.25rem 0;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+    }
+    .login-divider::before,
+    .login-divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .login-divider span {
+      padding: 0 0.75rem;
+    }
+    .sso-btn {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+    .sso-btn:hover {
+      background: var(--bg-secondary);
+    }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h1>SoundCork</h1>
+    <p>Sign in to manage your speakers</p>
+    <div class="login-error" id="error"></div>
+
+    <!-- SSO button (shown when OIDC is enabled) -->
+    <div id="sso-section" class="hidden">
+      <a href="/auth/login">
+        <button type="button" class="sso-btn" id="sso-btn">Sign in with SSO</button>
+      </a>
+    </div>
+
+    <!-- Password form (shown when OIDC is disabled, or as fallback) -->
+    <div id="password-section">
+      <form id="login-form">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
+        <button type="submit">Sign in</button>
+      </form>
+    </div>
+  </div>
+  <script>
+    // Check if OIDC is enabled and show the appropriate login method
+    (async function() {
+      try {
+        const resp = await fetch('/auth/config');
+        if (resp.ok) {
+          const config = await resp.json();
+          if (config.oidcEnabled) {
+            document.getElementById('sso-section').classList.remove('hidden');
+            document.getElementById('password-section').classList.add('hidden');
+          }
+        }
+      } catch (e) {
+        // If /auth/config fails, just show the password form (safe default)
+      }
+    })();
+
+    const form = document.getElementById('login-form');
+    const errorEl = document.getElementById('error');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.style.display = 'none';
+      const btn = form.querySelector('button');
+      btn.disabled = true;
+      try {
+        const resp = await fetch('/webui/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: form.username.value,
+            password: form.password.value,
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          sessionStorage.setItem('csrf_token', data.csrf_token);
+          window.location.href = '/webui/';
+        } else {
+          errorEl.textContent = 'Invalid username or password';
+          errorEl.style.display = 'block';
+        }
+      } catch (err) {
+        errorEl.textContent = 'Connection error. Please try again.';
+        errorEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

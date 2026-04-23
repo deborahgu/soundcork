@@ -1,224 +1,132 @@
-# soundcork
-Intercept API for Bose SoundTouch after they turn off the servers
+# SoundCork
 
-## Status
+Keep your Bose SoundTouch speaker fully functional after Bose shuts down the SoundTouch cloud servers on May 6, 2026.
 
-This project is pre-alpha. We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for more information, and the project [milestones](https://github.com/deborahgu/soundcork/milestones?sort=title&direction=asc) for our goals.
+SoundCork is a self-hosted replacement for the four Bose cloud servers that SoundTouch speakers depend on. It serves all responses locally — no traffic to Bose, no risk of unwanted firmware updates, no data leaving your network.
 
-Read [SECURITY.md](SECURITY.md) carefully. This should only be run inside your home network, behind a firewall. (If you have a router at home, it probably has a firewall on it.) Don't put it on an open network.
+Fork of [deborahgu/soundcork](https://github.com/deborahgu/soundcork) with added Docker support, smart proxy mode, and deployment guides.
 
 ### Service status
 
 We'll maintain a forum post with the [Current Status of Bose Cloud Services](https://github.com/deborahgu/soundcork/discussions/181). Check there for updates. We will update whenever we learn new information.
 
-## Background
-[Bose has announced that they are shutting down the servers for the SoundTouch system in February, 2026. ](https://www.bose.com/soundtouch-end-of-life) When those servers go away, certain network-based functionality currently available to SoundTouch devices will stop working.
+## What Works
 
-This is an attempt to reverse-engineer those servers so that users can continue to use the full set of SoundTouch functionality after Bose shuts the official servers down.
+| Feature | Status | Notes |
+|---------|--------|-------|
+| TuneIn radio presets | Working | Presets 1-6, station playback |
+| Spotify Connect | Working | Cast from the Spotify app — independent of Bose servers |
+| Spotify presets | Working | Requires a [one-time kick-start](docs/spotify.md#fixing-spotify-presets) via Spotify Connect |
+| Web UI | Working | Browser-based speaker control at `/webui/` |
+| SSO/OIDC authentication | Working | Optional — works with any OIDC provider (Authentik, Keycloak, Auth0, etc.) |
+| AUX input | Working | Not affected by shutdown |
+| Bluetooth | Working | Not affected by shutdown |
+| Firmware updates | Blocked | SoundCork returns "no updates available" |
+| SoundTouch app presets | Working | Configure TuneIn presets via the Web UI or [Bose CLI](https://github.com/timvw/bose) |
 
-### Context
+## Screenshots
 
-[As described here](https://flarn2006.blogspot.com/2014/09/hacking-bose-soundtouch-and-its-linux.html), it is possible to access the underlying server by creating a USB stick with an empty file called ```remote_services``` and then booting the SoundTouch with the USB stick plugged in to the USB port in the back. From there we can then telnet (or ssh, but the ssh server running is fairly old) over and log in as root (no password).
+| Login (SSO) | Dashboard |
+|:-----------:|:---------:|
+| ![Login](docs/screenshots/login-sso.png) | ![Dashboard](docs/screenshots/dashboard.png) |
 
-Once logged into the speaker, you can go to `/opt/Bose/etc` and look at the file `SoundTouchSdkPrivateCfg.xml`:
+| Speaker Controls & Presets | Manage Presets |
+|:--------------------------:|:--------------:|
+| ![Speaker](docs/screenshots/speaker-controls.png) | ![Presets](docs/screenshots/manage-presets.png) |
 
-	<?xml version="1.0" encoding="utf-8"?>
-	<SoundTouchSdkPrivateCfg>
-	  <margeServerUrl>https://streaming.bose.com</margeServerUrl>
-	  <statsServerUrl>https://events.api.bosecm.com</statsServerUrl>
-	  <swUpdateUrl>https://worldwide.bose.com/updates/soundtouch</swUpdateUrl>
-	  <usePandoraProductionServer>true</usePandoraProductionServer>
-	  <isZeroconfEnabled>true</isZeroconfEnabled>
-	  <saveMargeCustomerReport>false</saveMargeCustomerReport>
-	  <bmxRegistryUrl>https://content.api.bose.io/bmx/registry/v1/services</bmxRegistryUrl>
-	</SoundTouchSdkPrivateCfg>
+| Preset Detail | Set Spotify Preset |
+|:-------------:|:------------------:|
+| ![Preset Detail](docs/screenshots/preset-detail.png) | ![Spotify Preset](docs/screenshots/edit-spotify-preset.png) |
 
-Assumingly all four servers listed there will be shut down. From testing, the `marge` server is necessary for basic network functionality, and the `bmx` server seems to be required for TuneIn radio at least. The stats and swUpdate addresses don't seem to be necessary for the speaker to function.
+| Search TuneIn Stations | Station Detail & Save |
+|:----------------------:|:---------------------:|
+| ![TuneIn Search](docs/screenshots/edit-tunein-search.png) | ![TuneIn Detail](docs/screenshots/edit-tunein-detail.png) |
 
-## Running, testing, and installing soundcork
+| Internet Radio Preset | Spotify Accounts |
+|:---------------------:|:----------------:|
+| ![Radio Preset](docs/screenshots/edit-radio-preset.png) | ![Spotify](docs/screenshots/spotify.png) |
 
-### Development
+## Quick Start
 
-See the [wiki](https://github.com/deborahgu/soundcork/wiki/) for developer guidelines.
+```bash
+docker run -d --name soundcork \
+  -p 8000:8000 \
+  -v ./data:/soundcork/data \
+  -e base_url=http://your-server:8000 \
+  -e data_dir=/soundcork/data \
+  ghcr.io/timvw/soundcork:main
+```
 
-### Installing
+Verify it's running:
+```bash
+curl http://your-server:8000/
+# {"Bose":"Can't Brick Us"}
+```
 
-This has been written and tested with Python 3.12. Eventually it will be bundled as an installable app but for now you'll want a virtual environment.
+Then open `http://your-server:8000/webui/` to access the Web UI.
 
+The container image supports `linux/amd64` and `linux/arm64` (Raspberry Pi).
 
-1. You can use `venv`, `virtualenvwrapper`, or any other tool that lets you
-manage virtual environments. These docs assume `venv`.
-	- Unix, Windows, and MacOS [installation and use guide for venv](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/).
-	- Your operating system might have some prerequisites here. On ubuntu, you may need:
-		```sh
-		sudo apt install python3-pip python3.12-venv
-		```
-1. Set up the virtual environment and run it. Run these commands in the
-directory where you've cloned the repository. (Adapt as needed for your shell
-or OS.)
+See [Deployment Guide](docs/deployment.md) for Docker Compose, Kubernetes, and bare metal options.
 
-	```sh
-	mkdir .venv
-	python3.12 -m venv .venv
-	source .venv/bin/activate
-	```
-1. Install the pre-requisites
-	```bash
-	pip install -r requirements.txt
-	```
+## Setup
 
-When you're done with the virtual environment, you can type `deactivate` to leave that shell.
+1. **Get SSH access** to your speaker — [Speaker Setup Guide](docs/speaker-setup.md#step-1-enable-ssh-access)
+2. **Extract your speaker data** (presets, sources, device info) — [Speaker Setup Guide](docs/speaker-setup.md#step-2-extract-speaker-data)
+3. **Deploy SoundCork** on your network — [Deployment Guide](docs/deployment.md)
+4. **Redirect your speaker** to SoundCork — [Speaker Setup Guide](docs/speaker-setup.md#step-3-redirect-speaker-to-soundcork)
 
-### Running
+## Authentication
 
-- To run in test
-	```sh
-	fastapi dev main.py
-	# server is on http://127.0.0.1:8000
-	```
-- To run a prod server
-	```sh
-	fastapi run main.py
-	```
-- To run as a daemon
-    - install the package in your virtualenv
-		```sh
-		pip install build && \
-		python -m build && \
-		pip install dist/*.whl
-		``` 
-    - If using systemd, make a copy of `soundcork.service.example`, named `soundcork.service`
-	- modify the placeholder strings appropriately
-	- then mv to systemd and enable.
-		```sh
-		sudo mv soundcork.service /etc/systemd/system && \
-		sudo systemctl daemon-reload && \
-		sudo systemctl enable soundcork && \
-		sudo systemctl start soundcork
-		```
-    - To update the server, rebuild the project and restart. NOTE: In the current development stage of the project, we code changes may happen without a change of the version number. In these cases, or if you update your local code yourself, this build process has to be repeated, but with the last command modified to ```pip install dist/*.whl --force-reinstall```:
-      ```
-      git pull
-      pip install build && \
-      python -m build && \
-      pip install dist/*.whl --force-reinstall
-      sudo systemctl restart soundcork
-      ```
+The Web UI is protected by session-based authentication. By default it uses a username/password login (configured via `MGMT_USERNAME`/`MGMT_PASSWORD`).
 
-You can verify the server by checking the `/docs` endpoint at your URL.
+Optionally, you can enable **SSO via any OpenID Connect provider** (Authentik, Keycloak, Auth0, Google, Okta, etc.):
 
-### Setting your SoundTouch device to use the soundcork server
+```bash
+docker run -d --name soundcork \
+  -p 8000:8000 \
+  -v ./data:/soundcork/data \
+  -e base_url=http://your-server:8000 \
+  -e data_dir=/soundcork/data \
+  -e OIDC_ISSUER_URL=https://your-provider/application/o/soundcork/ \
+  -e OIDC_CLIENT_ID=soundcork \
+  -e OIDC_CLIENT_SECRET=your-secret \
+  ghcr.io/timvw/soundcork:main
+```
 
-For purposes of this example, let's say that you've set up a soundcork server on your local server available via hostname ```soundcork.local.example.com``` and running on port 8000.  Let's also say that you want a data dir at ```/home/soundcork/db```.
+When OIDC is configured, the login page shows a "Sign in with SSO" button. When it's not configured, the password form is shown. See [Deployment Guide](docs/deployment.md#authentication) for details.
 
-To configure the server, go to the ```soundcork``` subdirectory of the repository. Copy the ```env.shared``` file to ```env.private```, and then edit it to show your configuration:
+## How It Works
 
-	cd soundcork
-	cp .env.shared .env.private
-	vim .env.private
-	
-new contents of ```.env.private```:
+SoundTouch speakers communicate with four Bose cloud servers. SoundCork replaces all of them by editing the speaker's configuration to point to your server instead.
 
-	base_url = "http://soundcork.local.example.com:8000"
-	data_dir = "/home/soundcork/db"
+See [Architecture](docs/architecture.md) for details on the Bose servers, operating modes, and data flows.
 
-and then start the server
+## Bose CLI
 
-	fastapi run main.py
+The [Bose CLI](https://github.com/timvw/bose) talks directly to the speaker's local API (port 8090) and works independently of any cloud server:
 
-Once a soundcork server is running, the next step is to configure your SoundTouch device to run using soundcork instead of the Bose servers.  The first step is to get access to the Bose system. As mentioned in the Context section above, the way to do that is to get a USB drive, create a file called ```remote_services```, plug it into the USB port of the SoundTouch speaker and then reboot the speaker (unplugging and plugging back in being the most direct way).  
+```bash
+brew install timvw/tap/bose
+bose preset    # view presets
+bose status    # speaker status
+bose volume 30 # set volume
+```
 
-Once the speaker has rebooted, you can connect to it via telnet. So if your SoundTouch device is on 192.168.1.158, you can do
+## Documentation
 
-	telnet 192.168.1.158
-	
-You'll get a login screen.  Log in as user ```root```; there is no password. 
+- [Speaker Setup Guide](docs/speaker-setup.md) — SSH access, data extraction, speaker redirect
+- [Deployment Guide](docs/deployment.md) — Docker, Docker Compose, Kubernetes, bare metal
+- [Architecture](docs/architecture.md) — Bose servers, proxy modes, circuit breaker, data flows
+- [Spotify Guide](docs/spotify.md) — Spotify Connect vs SoundTouch Spotify, preset fix
+- [API Specification](docs/API_Spec.md) — Reverse-engineered Bose server API
+- [Shutdown Emulation](docs/Shutdown_Emulation.md) — Test results without Bose servers
 
-Once you're logged into the shell on the SoundTouch speaker, there are two things that need to be done. First, the speaker has a lot of information about its current configuration; this information will need to be sent to the soundcork server so that we can send it back to the speaker.  Second, the speaker will need to be configured to point to the soundcork server itself.
+## Credits
 
-#### Configuring the soundcork server from the Bose speaker
+- [deborahgu](https://github.com/deborahgu) for creating the original [soundcork](https://github.com/deborahgu/soundcork) project
+- Bose for publishing the [SoundTouch Web API documentation](https://assets.bosecreative.com/m/496577402d128874/original/SoundTouch-Web-API.pdf) to support community developers
 
-*NOTE in the future we plan to have a web UI that will automatically transfer over these values, but for now the only way to do it is by hand.* 
+## License
 
-The general layout of the soundcork db (using /home/soundcork/db as the db location) is
-
-	/home/soundcork/db/{account}/Presets.xml
-	/home/soundcork/db/{account}/Recents.xml
-	/home/soundcork/db/{account}/Sources.xml
-	/home/soundcork/db/{account}/devices/{deviceid}/DeviceInfo.xml
-		
-The first two things that we'll need to do is to get the speaker's device ID and account ID. Both of these are available via the webserver running on port 8090 of the SoundTouch device:
-
-	http://192.168.1.158:8090/info
-
-This should return something like
-
-	<info deviceID="A0B1C2D3E4F5">
-	<name>Your SoundTouch Name</name>
-	<type>SoundTouch 20</type>
-	<margeAccountUUID>1234567</margeAccountUUID>
-	
-So now your have your account number of ```1234567``` and device ID of ```A0B1C2D3E4F5```. Now, back on your soundcork system, create directories for the account and device in your ```data_dir```:
-
-	mkdir -p /home/soundcork/db/1234567/devices/A0B1C2D3E4F5
-
-`Presets.xml`, `Recents.xml`, and `DeviceInfo.xml` can all be gotten via the web UI at `http://{SoundTouchIp}:8090/presets`, `http://{SoundTouchIp}:8090/recents`, and `http://{SoundTouchIp}:8090/info`, respectively. Fetch those URLs and save the returned XML as the apprpriate files. (If you have multiple SoundTouch devices, create a directory and `DeviceInfo.xml` file for each one. If you have multiple accounts that you keep separate, repeat this procedure for each account.)
-
-For Sources, there is some information that is stored on the devices themselves that isn't exposed via the web UI, so you have to go onto the device itself to get that file. `telnet` or `ssh` into the device and then transfer the `Sources.xml` file over to your soundcork db:
-
-	cd /mnt/nv/BoseApp-Persistence/1/
-	scp Sources.xml username@soundcork.local.example.com:/home/soundcork/db/1234567
-	
-(If you're not running an ssh server on your machine you can also copy over the files to your USB stick and transfer them that way; the stick is mounted at ```/media/sda1```.)
-
-*Note on `Sources.xml`*: The marge server has `id`s associated with the configured sources but these values don't seem to be stored anywhere on the devices. These values should all be unique but I believe that they are arbitrary--that is, it's necessary for soundcork to have `id`s for each source, but not that the `id`s match the original marge `id`s. soundcork will assign `id`s to sources if they are not present, but it might be better at this time to go ahead and assign `id`s in the `Sources.xml` file. To do so, just add an `id` field to each `source` element like so:
-
-	<source displayName="AUX IN" id="123456" secret="">
-
-
-
-#### Configuring the Bose speaker to use the soundcork server
-
-Now that the soundcork server has all of the information that it needs, we're ready to tell the speaker to use the soundcork server instead of the Bose servers.  For this, we go to 
-
-	cd /opt/Bose/etc/
-
-set the filesystem to be read-write (this is a shortcut that the Bose engineers were nice enough to put in by default)
-
-	rw
-	
-and edit the file ```SoundTouchSdkPrivateCfg.xml```
-
-	vi SoundTouchSdkPrivateCfg.xml
-	
-The original values are
-
-	<?xml version="1.0" encoding="utf-8"?>
-	<SoundTouchSdkPrivateCfg>
-  	<margeServerUrl>https://streaming.bose.com</margeServerUrl>
-  	<statsServerUrl>https://events.api.bosecm.com</statsServerUrl>
-  	<swUpdateUrl>https://worldwide.bose.com/updates/soundtouch</swUpdateUrl>
-  	<usePandoraProductionServer>true</usePandoraProductionServer>
-  	<isZeroconfEnabled>true</isZeroconfEnabled>
-  	<saveMargeCustomerReport>false</saveMargeCustomerReport>
-  	<bmxRegistryUrl>https://content.api.bose.io/bmx/registry/v1/services</bmxRegistryUrl>
-	</SoundTouchSdkPrivateCfg>>
-	
-set these all to point to the soundcork server
-
-	<?xml version="1.0" encoding="utf-8"?>
-	<SoundTouchSdkPrivateCfg>
-  	<margeServerUrl>http://soundcork.local.example.com:8000/marge</margeServerUrl>
-  	<statsServerUrl>http://soundcork.local.example.com:8000</statsServerUrl>
-  	<swUpdateUrl>http://soundcork.local.example.com:8000/updates/soundtouch</swUpdateUrl>
-  	<usePandoraProductionServer>true</usePandoraProductionServer>
-  	<isZeroconfEnabled>true</isZeroconfEnabled>
-  	<saveMargeCustomerReport>false</saveMargeCustomerReport>
-  	<bmxRegistryUrl>http://soundcork.local.example.com:8000/bmx/registry/v1/services</bmxRegistryUrl>
-	</SoundTouchSdkPrivateCfg>>
-
-And finally, the moment of truth: reboot the speaker.  You can do it the way we did earlier by unplugging it, or, now that we have access to the command prompt, just run
-
-	reboot
-	
-
+MIT — see [LICENSE](LICENSE)

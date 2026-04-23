@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SoundCork</title>
+  <link rel="stylesheet" href="/webui/static/style.css">
+</head>
+<body>
+  <div id="app">
+    <nav id="nav">
+      <a href="#/speakers" class="nav-item active" data-tab="speakers">
+        <span class="nav-icon">&#x1F50A;</span>
+        <span class="nav-label">Speakers</span>
+      </a>
+      <a href="#/spotify" class="nav-item" data-tab="spotify">
+        <span class="nav-icon">&#x1F3B5;</span>
+        <span class="nav-label">Spotify</span>
+      </a>
+      <a href="#/config" class="nav-item" data-tab="config">
+        <span class="nav-icon">&#x2699;</span>
+        <span class="nav-label">Config</span>
+      </a>
+      <a href="#" class="nav-item nav-logout" id="logout-btn" title="Sign out">
+        <span class="nav-icon">&#x23FB;</span>
+        <span class="nav-label">Logout</span>
+      </a>
+    </nav>
+    <main id="main"></main>
+  </div>
+  <script type="module" src="/webui/static/app.js"></script>
+</body>
+</html>

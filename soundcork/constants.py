@@ -72,9 +72,9 @@ SPEAKER_SOURCES_FILE_LOCATION = "/mnt/nv/BoseApp-Persistence/1/Sources.xml"
 SPEAKER_OVERRIDE_SDK_LOCATION = "/mnt/nv/OverrideSdkPrivateCfg.xml"
 
 # validation
-ACCOUNT_RE = "^\\d{1,20}$"
-DEVICE_RE = "^[0-9a-fA-F]{12}$"
-GROUP_RE = "^\\d{7}$"
+ACCOUNT_RE = r"^\d{1,20}$"
+DEVICE_RE = r"^[0-9a-fA-F]{12}$"
+GROUP_RE = r"^\d{7}$"
 
 
 # used for when a timestamp is missing
@@ -101,7 +101,6 @@ DEVICE_IMAGE_MAP = {
     "soundtouch sa-4": "d4.png",
     "luke": "d5.png",
     "soundtouch stereo jc": "d5.png",
-    "soundtouch wireless link adapter": "d5.png",
     "soundtouch sa-5 amplifier": "d5.png",
     "otto": "d6.png",
     "marconi": "d6.png",

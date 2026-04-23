@@ -12,7 +12,6 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from io import BytesIO
 from os import unlink
-from subprocess import run
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -113,7 +112,7 @@ def reboot_speaker(host: str) -> bool:
         ssh.close()
         logger.debug(f"sent reboot to {host}")
         return True
-    except:
+    except Exception:
         logger.info(f"error rebooting {host}")
         return False
 
@@ -147,9 +146,7 @@ def get_bose_devices() -> list[upnpclient.upnp.Device]:
     devices = upnpclient.discover()
     bose_devices = [d for d in devices if "Bose SoundTouch" in d.model_description]
     logger.info("Discovering upnp devices on the network")
-    logger.info(
-        f'Discovered Bose devices:\n- {"\n- ".join([b.friendly_name for b in bose_devices])}'
-    )
+    logger.info(f"Discovered Bose devices:\n- {'\n- '.join([b.friendly_name for b in bose_devices])}")
     return bose_devices
 
 
@@ -162,7 +159,7 @@ def get_device_by_id(device_id: str) -> Optional[upnpclient.upnp.Device]:
                 info_elem = ET.fromstring(info_str)
                 if info_elem.attrib.get("deviceID", "") == device_id:
                     return device
-        except:
+        except Exception:
             pass
     return None
 
@@ -194,7 +191,7 @@ def addr_is_reachable(device_address: str) -> bool:
     try:
         s.connect((device_address, 22))  # Port ,Here 22 is port
         return True
-    except:
+    except Exception:
         return False
 
 
@@ -220,9 +217,7 @@ def add_device_by_ip(hostname: str) -> bool:
         datastore.add_device(
             account_id,
             device_id,
-            datastore.device_info_from_device_info_xml(
-                ET.fromstring(read_device_info(hostname))
-            ),
+            datastore.device_info_from_device_info_xml(ET.fromstring(read_device_info(hostname))),
         )  # type: ignore
         return True
     return False

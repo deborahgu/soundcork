@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<info deviceID="YOUR_DEVICE_ID">
+    <name>Your-Speaker-Name</name>
+    <type>SoundTouch 20</type>
+    <margeAccountUUID>YOUR_ACCOUNT_ID</margeAccountUUID>
+    <components>
+        <component>
+            <componentCategory>SCM</componentCategory>
+            <softwareVersion>27.0.6.46330.5043500 epdbuild.trunk.hepdswbld04.2022-08-04T11:20:29</softwareVersion>
+            <serialNumber>XXXXXXXXXXX</serialNumber>
+        </component>
+        <component>
+            <componentCategory>PackagedProduct</componentCategory>
+            <serialNumber>XXXXXXXXXXX</serialNumber>
+        </component>
+        <component>
+            <componentCategory>Lightswitch</componentCategory>
+            <serialNumber></serialNumber>
+        </component>
+        <component>
+            <componentCategory>SMSC</componentCategory>
+            <softwareVersion>I2014102015199423; B201306111041 081008C 2014102015199423</softwareVersion>
+            <serialNumber>XXXXXXXXXXX</serialNumber>
+        </component>
+    </components>
+    <margeURL>https://your-soundcork-server/marge</margeURL>
+    <networkInfo type="SCM">
+        <macAddress>000000000000</macAddress>
+        <ipAddress>192.168.1.x</ipAddress>
+    </networkInfo>
+    <networkInfo type="SMSC">
+        <macAddress>000000000000</macAddress>
+        <ipAddress>192.168.1.x</ipAddress>
+    </networkInfo>
+    <moduleType>scm</moduleType>
+    <variant>spotty</variant>
+    <variantMode>normal</variantMode>
+    <countryCode>EU</countryCode>
+    <regionCode></regionCode>
+</info>

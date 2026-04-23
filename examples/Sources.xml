@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<sources>
+    <source displayName="AUX IN" secret="" secretType="">
+        <sourceKey type="AUX" account="AUX" />
+    </source>
+    <source secret="" secretType="token">
+        <sourceKey type="INTERNET_RADIO" account="" />
+    </source>
+    <source secret="REDACTED_BASE64_TOKEN" secretType="token">
+        <sourceKey type="LOCAL_INTERNET_RADIO" account="" />
+    </source>
+    <source displayName="your@email.com" secret="REDACTED_SPOTIFY_OAUTH_TOKEN" secretType="token_version_3">
+        <sourceKey type="SPOTIFY" account="YOUR_SPOTIFY_ACCOUNT_ID" />
+    </source>
+    <source secret="REDACTED_BASE64_TOKEN" secretType="token">
+        <sourceKey type="TUNEIN" account="" />
+    </source>
+</sources>

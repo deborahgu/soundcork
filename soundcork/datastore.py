@@ -86,10 +86,7 @@ class DataStore:
         """Initializes the accounts file"""
         if not path.exists(path.join(self.data_dir, ACCOUNTS_FILE)):
             accounts = self.list_accounts()
-            accounts_labels = {
-                account: {"label": f"{DEFAULT_ACCOUNT_LABEL} {account}"}
-                for account in accounts
-            }
+            accounts_labels = {account: {"label": f"{DEFAULT_ACCOUNT_LABEL} {account}"} for account in accounts}
             with open(path.join(self.data_dir, ACCOUNTS_FILE), "w") as f:
                 json.dump(accounts_labels, f)
 
@@ -116,11 +113,7 @@ class DataStore:
         if account_label := accounts.get(label):
             if account_label == label:
                 return
-            logger.warning(
-                (
-                    f"Account {account} already has label {account_label}, overwriting with {label}"
-                )
-            )
+            logger.warning((f"Account {account} already has label {account_label}, overwriting with {label}"))
         accounts[account] = {"label": label}
         with open(path.join(self.data_dir, ACCOUNTS_FILE), "w") as f:
             json.dump(accounts, f, indent=4)
@@ -128,23 +121,19 @@ class DataStore:
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Gets definition of a Device associated with an Account"""
 
-        stored_tree = ET.parse(
-            path.join(self.account_device_dir(account, device), DEVICE_INFO_FILE)
-        )
+        stored_tree = ET.parse(path.join(self.account_device_dir(account, device), DEVICE_INFO_FILE))
         info_elem = stored_tree.getroot()
         return self.device_info_from_device_info_xml(info_elem)
 
     def save_device_info(self, device: DeviceInfo, account: str) -> DeviceInfo:
         """Saves definition of a Device associated with an Account"""
-        device.updated_on = datetime.fromtimestamp(
-            int(datetime.now().timestamp()), timezone.utc
-        ).isoformat(timespec="milliseconds")
+        device.updated_on = datetime.fromtimestamp(int(datetime.now().timestamp()), timezone.utc).isoformat(
+            timespec="milliseconds"
+        )
         if not device.created_on:
             device.created_on = device.updated_on
 
-        save_file = path.join(
-            self.account_device_dir(account, device.device_id), DEVICE_INFO_FILE
-        )
+        save_file = path.join(self.account_device_dir(account, device.device_id), DEVICE_INFO_FILE)
         info_elem = ET.Element("info")
         info_elem.attrib["deviceID"] = device.device_id
         ET.SubElement(info_elem, "name").text = device.name
@@ -199,9 +188,7 @@ class DataStore:
     # TODO: add error handling if you can't write the file
     def save_presets_xml(self, account: str, presets_xml: str):
         """Write Presets.xml for an Account"""
-        with open(
-            path.join(self.account_dir(account), PRESETS_FILE), "w"
-        ) as presets_file:
+        with open(path.join(self.account_dir(account), PRESETS_FILE), "w") as presets_file:
             presets_file.write(presets_xml)
 
     def get_presets(self, account: str, device: str = "") -> list[Preset]:
@@ -290,9 +277,7 @@ class DataStore:
 
         return recents
 
-    def save_recents(
-        self, account: str, device: str, recents_list: list[Recent]
-    ) -> ET.Element:
+    def save_recents(self, account: str, device: str, recents_list: list[Recent]) -> ET.Element:
         save_file = path.join(self.account_dir(account), RECENTS_FILE)
         recents_elem = ET.Element("recents")
         for recent in recents_list:
@@ -319,14 +304,10 @@ class DataStore:
     # TODO: add error handling if you can't write the file
     def save_recents_xml(self, account: str, recents_xml: str):
         """Write Recents.xml for an Account"""
-        with open(
-            path.join(self.account_dir(account), RECENTS_FILE), "w"
-        ) as recents_file:
+        with open(path.join(self.account_dir(account), RECENTS_FILE), "w") as recents_file:
             recents_file.write(recents_xml)
 
-    def get_configured_sources(
-        self, account: str, device: str = ""
-    ) -> list[ConfiguredSource]:
+    def get_configured_sources(self, account: str, device: str = "") -> list[ConfiguredSource]:
         """Get known Sources for a Device associated with an Account"""
         sources_tree = ET.parse(path.join(self.account_dir(account), SOURCES_FILE))
         root = sources_tree.getroot()
@@ -366,17 +347,13 @@ class DataStore:
 
         return sources_list
 
-    def add_source(
-        self, account: str, new_source: ConfiguredSource
-    ) -> ConfiguredSource:
+    def add_source(self, account: str, new_source: ConfiguredSource) -> ConfiguredSource:
         """Adds a source to the source list.
 
         Returns:
         - the newly created ConfiguredSource, including fields like id and updated
         """
-        now = datetime.fromtimestamp(
-            datetime.now().timestamp(), timezone.utc
-        ).isoformat(timespec="milliseconds")
+        now = datetime.fromtimestamp(datetime.now().timestamp(), timezone.utc).isoformat(timespec="milliseconds")
         all_sources = self.get_configured_sources(account)
         max_source = max(all_sources, key=lambda x: int(x.id))
         new_source.id = str(int(max_source.id) + randint(1, 100))
@@ -388,9 +365,7 @@ class DataStore:
 
         return new_source
 
-    def save_configured_sources(
-        self, account: str, sources_list: list[ConfiguredSource]
-    ) -> ET.Element:
+    def save_configured_sources(self, account: str, sources_list: list[ConfiguredSource]) -> ET.Element:
         save_file = path.join(self.account_dir(account), SOURCES_FILE)
         sources_root = ET.Element("sources")
         for source in sources_list:
@@ -426,9 +401,7 @@ class DataStore:
     # TODO: add error handling if you can't write the file
     def save_configured_sources_xml(self, account: str, sources_xml: str):
         """Write Sources.xml for an Account"""
-        with open(
-            path.join(self.account_dir(account), SOURCES_FILE), "w"
-        ) as sources_file:
+        with open(path.join(self.account_dir(account), SOURCES_FILE), "w") as sources_file:
             sources_file.write(sources_xml)
 
     def find_device(self, device_id: str) -> tuple[DeviceInfo | None, str | None]:
@@ -455,9 +428,7 @@ class DataStore:
 
     def get_poweron_device_info(self, device: str) -> DeviceInfo:
         """Return info about a Device that's been powered on at least once."""
-        poweron_elem = ET.parse(
-            path.join(self.poweron_device_dir(device), POWERON_FILE)
-        ).getroot()
+        poweron_elem = ET.parse(path.join(self.poweron_device_dir(device), POWERON_FILE)).getroot()
         return self.device_info_from_poweron_xml(poweron_elem)
 
     def save_poweron(self, device_id: str, poweron_xml: str):
@@ -486,21 +457,18 @@ class DataStore:
         - DeviceInfo:  DeviceInfo built from the poweron XML
         """
         device_elem = poweron_elem.find("device")
-        if device_elem != None:
+        if device_elem is not None:
             device_id = device_elem.attrib.get("id", "")
             device_serial_number = strip_element_text(device_elem.find("serialnumber"))
             firmware_version = strip_element_text(device_elem.find("firmware-version"))
             product_elem = device_elem.find("product")
-            if product_elem != None:
+            if product_elem is not None:
                 product_code = product_elem.attrib.get("product_code", "")
-                product_type = product_elem.attrib.get("type", "")
-                product_serial_number = strip_element_text(
-                    product_elem.find("serialnumber")
-                )
+                product_serial_number = strip_element_text(product_elem.find("serialnumber"))
         diagnostic_elem = poweron_elem.find("diagnostic-data")
-        if diagnostic_elem != None:
+        if diagnostic_elem is not None:
             landscape_elem = diagnostic_elem.find("device-landscape")
-            if landscape_elem != None:
+            if landscape_elem is not None:
                 ip_address = strip_element_text(landscape_elem.find("ip-address"))
 
         return DeviceInfo(
@@ -536,13 +504,9 @@ class DataStore:
             component_category = strip_element_text(component.find("componentCategory"))
             if component_category == "SCM":
                 firmware_version = strip_element_text(component.find("softwareVersion"))
-                device_serial_number = strip_element_text(
-                    component.find("serialNumber")
-                )
+                device_serial_number = strip_element_text(component.find("serialNumber"))
             elif component_category == "PackagedProduct":
-                product_serial_number = strip_element_text(
-                    component.find("serialNumber")
-                )
+                product_serial_number = strip_element_text(component.find("serialNumber"))
 
         try:
             for network_info in info_elem.findall("networkInfo"):
@@ -572,9 +536,7 @@ class DataStore:
                 updated_on=updated_on,
             )
         except NameError:
-            raise RuntimeError(
-                f"There are missing required fields in the device: {device_id}"
-            )
+            raise RuntimeError(f"There are missing required fields in the device: {device_id}")
 
     #########
     # ETags #
@@ -679,9 +641,7 @@ class DataStore:
         # create devices subdirectory
         return True
 
-    def add_device(
-        self, account: str, device_id: str, device: DeviceInfo
-    ) -> DeviceInfo | None:
+    def add_device(self, account: str, device_id: str, device: DeviceInfo) -> DeviceInfo | None:
         """Adds a device to a given account in the datastore.
 
         Returns:
@@ -722,9 +682,7 @@ class DataStore:
         """Helper function to create a unique group_id"""
         while True:
             group_id = f"{random.randint(0, 9999999):07d}"
-            filepath = path.join(
-                self.account_devices_dir(account), f"Group_{group_id}.xml"
-            )
+            filepath = path.join(self.account_devices_dir(account), f"Group_{group_id}.xml")
             if not path.exists(filepath):
                 return group_id
 
@@ -741,9 +699,7 @@ class DataStore:
 
     def group_exists(self, account: str, group_id: str) -> bool:
         """check if a group with given id exist"""
-        return path.exists(
-            path.join(self.account_devices_dir(account), f"Group_{group_id}.xml")
-        )
+        return path.exists(path.join(self.account_devices_dir(account), f"Group_{group_id}.xml"))
 
     def device_is_groupable(self, device_info: DeviceInfo) -> bool:
         return device_info.product_code == "SoundTouch 10"
@@ -773,9 +729,7 @@ class DataStore:
         for dev_id in device_ids:
             device_info = self.get_device_info(account, dev_id)
             if not device_info:
-                raise HTTPException(
-                    HTTPStatus.BAD_REQUEST, f"Device {dev_id} does not exist"
-                )
+                raise HTTPException(HTTPStatus.BAD_REQUEST, f"Device {dev_id} does not exist")
             if not self.device_is_groupable(device_info):
                 raise HTTPException(
                     HTTPStatus.BAD_REQUEST,
@@ -795,9 +749,7 @@ class DataStore:
         group_xml = self.group_to_xml(group)
 
         ET.indent(group_xml, space="    ", level=0)
-        ET.ElementTree(group_xml).write(
-            filepath, xml_declaration=True, encoding="UTF-8"
-        )
+        ET.ElementTree(group_xml).write(filepath, xml_declaration=True, encoding="UTF-8")
         return group_xml
 
     def get_group(self, account: str, group_id: str) -> Group | None:
@@ -883,7 +835,7 @@ class DataStore:
         name = strip_element_text(group_elem.find("name"))
         master_id = strip_element_text(group_elem.find("masterDeviceId"))
         roles_elem = group_elem.find("roles")
-        if not roles_elem == None:
+        if roles_elem is not None:
             for role_elem in roles_elem.findall("groupRole"):
                 role = strip_element_text(role_elem.find("role"))
                 if role == "LEFT":

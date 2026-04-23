@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<recents>
+    <recent deviceID="YOUR_DEVICE_ID" utcTime="1771287920" id="2454152503">
+        <contentItem source="SPOTIFY" type="tracklisturl" location="/playback/container/YOUR_BASE64_ENCODED_URI" sourceAccount="YOUR_SPOTIFY_ACCOUNT_ID" isPresetable="true">
+            <itemName>Artist Name</itemName>
+        </contentItem>
+    </recent>
+    <recent deviceID="YOUR_DEVICE_ID" utcTime="1771286998" id="2307122547">
+        <contentItem source="TUNEIN" type="stationurl" location="/v1/playback/station/s69243" sourceAccount="" isPresetable="true">
+            <itemName>QMusic Belgium</itemName>
+        </contentItem>
+    </recent>
+</recents>

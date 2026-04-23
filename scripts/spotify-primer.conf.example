@@ -1,0 +1,8 @@
+# /mnt/nv/BoseApp-Persistence/1/spotify-primer.conf
+# Soundcork connection for the on-speaker Spotify boot primer.
+# The speaker fetches a fresh Spotify token from soundcork at boot.
+# No Spotify credentials needed on the device.
+
+SOUNDCORK_URL=https://soundcork.example.com
+SOUNDCORK_USER=admin
+SOUNDCORK_PASS=secret

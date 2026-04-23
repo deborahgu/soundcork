@@ -1,8 +1,10 @@
+authlib==1.6.0
 black==26.3.1  # dev only
 bosesoundtouchapi==1.0.86
 fastapi[standard]==0.135.3
 fastapi-etag==0.4.0
 gunicorn==25.3.0
+httpx==0.28.1
 isort==8.0.1  # dev only
 mypy==1.19.1  # dev only
 paramiko==4.0.0
@@ -12,3 +14,4 @@ pytest-cov==7.1.0  # dev only
 scp==0.15.0
 types-paramiko==4.0.0.20260322
 upnpclient==1.0.3
+websockets==14.2

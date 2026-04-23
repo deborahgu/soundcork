@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<presets>
+    <preset id="1" createdOn="1695000000" updatedOn="1695000000">
+        <ContentItem source="TUNEIN" type="stationurl" location="/v1/playback/station/s102123" sourceAccount="" isPresetable="true">
+            <itemName>Joe</itemName>
+            <containerArt>http://cdn-profiles.tunein.com/s25741/images/logoq.png</containerArt>
+        </ContentItem>
+    </preset>
+    <preset id="2" createdOn="1695000000" updatedOn="1695000000">
+        <ContentItem source="TUNEIN" type="stationurl" location="/v1/playback/station/s69243" sourceAccount="" isPresetable="true">
+            <itemName>QMusic Belgium</itemName>
+        </ContentItem>
+    </preset>
+    <preset id="3" createdOn="1695000000" updatedOn="1695000000">
+        <ContentItem source="TUNEIN" type="stationurl" location="/v1/playback/station/s214611" sourceAccount="" isPresetable="true">
+            <itemName>RGR Dance</itemName>
+            <containerArt>http://cdn-profiles.tunein.com/s214611/images/logog.jpg?t=638199227250000000</containerArt>
+        </ContentItem>
+    </preset>
+    <preset id="4" createdOn="1695000000" updatedOn="1695000000">
+        <ContentItem source="TUNEIN" type="stationurl" location="/v1/playback/station/s10861" sourceAccount="" isPresetable="true">
+            <itemName>VRT MNM</itemName>
+            <containerArt>http://cdn-profiles.tunein.com/s10861/images/logoq.png</containerArt>
+        </ContentItem>
+    </preset>
+    <preset id="5" createdOn="1695000000" updatedOn="1695000000">
+        <ContentItem source="TUNEIN" type="stationurl" location="/v1/playback/station/s2611" sourceAccount="" isPresetable="true">
+            <itemName>VRT Studio Brussel</itemName>
+        </ContentItem>
+    </preset>
+    <preset id="6" createdOn="1695000000" updatedOn="1695000000">
+        <ContentItem source="SPOTIFY" type="tracklisturl" location="YOUR_BASE64_ENCODED_SPOTIFY_URI" sourceAccount="YOUR_SPOTIFY_ACCOUNT_ID" isPresetable="true">
+            <itemName>Your Artist Name</itemName>
+            <containerArt>https://i.scdn.co/image/YOUR_ALBUM_ART_HASH</containerArt>
+        </ContentItem>
+    </preset>
+</presets>
