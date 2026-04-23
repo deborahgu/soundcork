@@ -133,11 +133,16 @@ class TestBoseProtocolIPRestriction:
         )
         assert resp.status_code != 403
 
-    def test_xff_all_unknown_public_ips_blocked(self, client):
-        """All XFF entries are unknown public IPs — request must be blocked."""
+    def test_xff_spoofing_uses_last_value(self, client):
+        """Attacker-supplied XFF entries should be ignored.
+
+        The reverse proxy (Traefik) appends the real client IP as the last
+        entry.  An attacker can prepend a private IP, but the middleware
+        must use the rightmost (proxy-appended) value.
+        """
         resp = client.get(
             "/marge/streaming/sourceproviders",
-            headers={"X-Forwarded-For": "203.0.113.1, 203.0.113.99"},
+            headers={"X-Forwarded-For": "192.168.1.143, 203.0.113.99"},
         )
         assert resp.status_code == 403
 

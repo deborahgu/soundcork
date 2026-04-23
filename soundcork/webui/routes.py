@@ -3,7 +3,6 @@ import ipaddress
 import json
 import logging
 import os
-import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
 
 import httpx
@@ -47,24 +46,6 @@ _IMAGE_PROXY_ALLOWED_DOMAINS = frozenset(
     }
 )
 
-# Additional domains discovered at runtime via RadioBrowser favicons.
-# RadioBrowser stations can have logos hosted on any domain, so we maintain
-# a mutable set that gets extended when the proxy fetches station metadata.
-_radiobrowser_image_domains: set[str] = set()
-
-
-def _register_radiobrowser_favicon(url: str) -> None:
-    """Add the hostname of a RadioBrowser favicon to the dynamic allowlist."""
-    if not url:
-        return
-    try:
-        hostname = urlparse(url).hostname
-        if hostname and not _is_private_ip(hostname):
-            _radiobrowser_image_domains.add(hostname)
-    except Exception:
-        pass
-
-
 # Allowed mgmt proxy paths (prevents exposing token endpoints)
 _MGMT_ALLOWED_PATHS = frozenset(
     {
@@ -94,15 +75,7 @@ def _is_allowed_image_url(url: str) -> bool:
         hostname = parsed.hostname or ""
         if _is_private_ip(hostname):
             return False
-        # Allow known CDN domains, RadioBrowser favicon domains discovered
-        # during search, and any domain serving common image file extensions
-        # (these URLs originate from preset containerArt saved by the user).
-        if hostname in _IMAGE_PROXY_ALLOWED_DOMAINS or hostname in _radiobrowser_image_domains:
-            return True
-        path_lower = parsed.path.lower()
-        if any(path_lower.endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico")):
-            return True
-        return False
+        return hostname in _IMAGE_PROXY_ALLOWED_DOMAINS
     except Exception:
         return False
 
@@ -396,7 +369,6 @@ async def proxy_speaker_post(ip: str, path: str, request: Request):
     if not _get_speaker_allowlist().is_registered_speaker(ip):
         return JSONResponse({"detail": "Forbidden: unregistered speaker IP"}, status_code=403)
     body = await request.body()
-    logger.debug("Proxying POST to speaker %s at /%s: %s", ip, path, body.decode("utf-8", errors="replace"))
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -470,8 +442,8 @@ async def proxy_image(url: str):
         )
 
 
-# --- Radio Proxy API ---
-# Avoids CORS issues when the browser needs to search radio providers.
+# --- TuneIn Proxy API ---
+# Avoids CORS issues when the browser needs to search TuneIn.
 
 
 @router.get("/api/tunein/{path:path}")
@@ -493,70 +465,6 @@ async def proxy_tunein(path: str, request: Request):
     except (httpx.ConnectError, httpx.TimeoutException) as e:
         logger.warning(f"TuneIn proxy error: {e}")
         return Response(content="TuneIn unreachable", status_code=502)
-
-
-@router.get("/api/radiobrowser/{path:path}")
-async def proxy_radiobrowser(path: str, request: Request):
-    """Proxy GET requests to the RadioBrowser API and convert to SoundTouch XML."""
-    params = dict(request.query_params)
-    try:
-        if path == "search.ashx":
-            query = params.get("query", "")
-            url = "https://de1.api.radio-browser.info/xml/stations/search"
-            rb_params = {"name": query, "limit": 50}
-        elif path == "describe.ashx":
-            station_id = params.get("id", "")
-            url = f"https://de1.api.radio-browser.info/xml/stations/byuuid/{station_id}"
-            rb_params = {}
-        else:
-            return Response(content="Not Found", status_code=404)
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, params=rb_params, timeout=SPEAKER_TIMEOUT)
-
-        if resp.status_code != 200:
-            return Response(content=resp.content, status_code=resp.status_code)
-
-        # Convert RadioBrowser XML to SoundTouch-like OPML
-        rb_root = ET.fromstring(resp.content)
-        opml_root = ET.Element("opml", version="1")
-        body = ET.SubElement(opml_root, "body")
-
-        if path == "search.ashx":
-            for station in rb_root.findall("station"):
-                outline = ET.SubElement(body, "outline")
-                outline.set("type", "audio")
-                outline.set("guide_id", station.get("stationuuid", ""))
-                outline.set("text", station.get("name", ""))
-                codec_val = station.get("codec", "UNKNOWN")
-                hls_val = " [HLS]" if station.get("hls") == "1" else ""
-                bitrate = station.get("bitrate")
-                bitrate_val = f" {bitrate}kbps" if bitrate and bitrate != "0" else ""
-                outline.set("subtext", f"{station.get('country', '')} - {codec_val}{hls_val}{bitrate_val}")
-                favicon = station.get("favicon", "")
-                outline.set("image", favicon)
-                outline.set("bitrate", station.get("bitrate", ""))
-                _register_radiobrowser_favicon(favicon)
-        elif path == "describe.ashx":
-            station = rb_root.find("station")
-            if station is not None:
-                outline = ET.SubElement(body, "outline")
-                outline.set("type", "audio")
-                outline.set("guide_id", station.get("stationuuid", ""))
-                outline.set("text", station.get("name", ""))
-                favicon = station.get("favicon", "")
-                outline.set("image", favicon)
-                _register_radiobrowser_favicon(favicon)
-                outline.set("description", station.get("tags", ""))
-                outline.set("location", station.get("country", ""))
-                outline.set("genre_name", station.get("tags", "").split(",")[0] if station.get("tags") else "")
-
-        content = ET.tostring(opml_root, encoding="utf-8")
-        return Response(content=content, media_type="text/xml")
-
-    except Exception as e:
-        logger.warning(f"RadioBrowser proxy error: {e}")
-        return Response(content="RadioBrowser error", status_code=502)
 
 
 # --- WebSocket Proxy ---

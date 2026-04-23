@@ -88,13 +88,8 @@ class SpeakerAllowlist:
         return ip in _LOOPBACK or ip in self._allowed_ips or _is_private_ip(ip)
 
     def is_registered_speaker(self, ip: str) -> bool:
-        """Check if an IP is a registered speaker (excludes loopback).
-
-        Private IPs are also accepted because when running behind Docker
-        or a reverse-proxy the speaker's requests may arrive from a
-        different RFC1918 address than the one stored in the allowlist.
-        """
-        return ip in self._allowed_ips or _is_private_ip(ip)
+        """Check if an IP is a registered speaker (excludes loopback)."""
+        return ip in self._allowed_ips
 
     def get_allowed_ips(self) -> set[str]:
         """Return a copy of the current allowed IP set."""

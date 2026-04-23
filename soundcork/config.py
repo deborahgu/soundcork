@@ -31,10 +31,6 @@ class Settings(BaseSettings):
     log_request_body: bool = False
     log_request_headers: bool = False
 
-    # Comma-separated list of proxy/tunnel IPs to trust as speaker sources
-    # (e.g. Cloudflare tunnel IPs that forward speaker traffic)
-    trusted_proxy_ips: str = ""
-
     # ZeroConf primer: periodic push of Spotify tokens to speakers
     # Disable if speakers self-prime at boot via /mnt/nv/rc.local
     zeroconf_primer_enabled: bool = True

@@ -201,7 +201,7 @@
           "enabled": true
         }
       },
-      "baseUrl": "{BMX_SERVER}/bmx/radiobrowser",
+      "baseUrl": "https://all.api.radio-browser.info/soundtouch",
       "id": {
         "name": "RADIO_BROWSER",
         "value": 39

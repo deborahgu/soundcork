@@ -539,7 +539,6 @@ input[type="range"]::-moz-range-thumb {
 }
 .badge-spotify { background: var(--badge-spotify); }
 .badge-tunein { background: var(--badge-tunein); }
-.badge-radiobrowser { background: #5865f2; }
 .badge-radio { background: var(--badge-radio); }
 .badge-product { background: var(--badge-product); }
 
