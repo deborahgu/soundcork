@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Soundcork Dashboard</title>
-    <link rel="stylesheet" href="/static/css/miniapp.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
 </head>
 <body>
     <a href="#main" class="skip-link">Skip to main content</a>
@@ -12,10 +12,37 @@
     <header>
         <div class="header-content">
             <h1>Soundcork</h1>
+            <div class="device-info">
+                {% if selected_device %}
+                <div>{{ selected_device }}</div>
+                {% endif %}
+            </div>
+            <div class="content-item-info">
+                {% if selected_content_item %}
+                <div>{{ selected_content_item }}</div>
+                {% endif %}
+            </div>
+            <div class="playback-control">
+                {% if selected_content_item and selected_device_id %}
+                    {% if is_playing == "true" %}
+                    <form action="/miniapp/stop" method="post">
+                        <button type="submit" class="control-button stop-button">
+                            <span aria-hidden="true" class="icon">■</span> Stop
+                        </button>
+                    </form>
+                    {% else %}
+                    <form action="/miniapp/play" method="post">
+                        <button type="submit" class="control-button play-button">
+                            <span aria-hidden="true" class="icon">▶</span> Play
+                        </button>
+                    </form>
+                    {% endif %}
+                {% endif %}
+            </div>
             <div class="account-info">
                 {{ account_label }}
                 <form action="/miniapp/logout" method="post" style="display:inline;">
-                    <button type="submit" class="button-secondary" style="margin-left:1rem;">Logout</button>
+                    <button type="submit">Logout</button>
                 </form>
             </div>
         </div>
@@ -33,12 +60,18 @@
             {% if presets %}
             <ol class="presets-grid">
                 {% for preset in presets %}
-                <li class="preset-card">
-                    {% if preset.container_art %}
-                    <img src="{{ preset.container_art }}" alt="">
-                    {% endif %}
-                    <span class="preset-number" aria-label="Preset">{{ preset.id }}</span>
-                    <span class="preset-name">{{ preset.name }}</span>
+                <li>
+                    <form action="/miniapp/select-content-item" method="post" style="display:contents;">
+                        <input type="hidden" name="content_item_id" value="{{ preset.id }}">
+                        <input type="hidden" name="content_item_name" value="{{ preset.name }}">
+                        <button type="submit" class="preset-card">
+                            {% if preset.container_art %}
+                            <img src="{{ preset.container_art }}" alt="">
+                            {% endif %}
+                            <span class="preset-number">{{ preset.id }}</span>
+                            <span class="preset-name">{{ preset.name }}</span>
+                        </button>
+                    </form>
                 </li>
                 {% endfor %}
             </ol>
@@ -54,15 +87,22 @@
             {% if devices %}
             <ul class="devices-grid">
                 {% for device in devices %}
-                <li class="device-card">
-                    <img 
-                        src="/static/images/devices/{{ device.image_file }}" 
-                        alt="" 
-                        class="device-image">
-                    <div class="device-info">
-                        <div class="device-name">{{ device.name }}</div>
-                        <div class="device-type">{{ device.product_code }}</div>
-                    </div>
+                <li class="device-card {{device.status}}">
+                    <form action="/miniapp/select-device" method="post" style="display:contents;">
+                        <input type="hidden" name="device_id" value="{{ device.device_id }}">
+                        <input type="hidden" name="device_name" value="{{ device.name }}">
+                        <button type="submit"
+                            {% if device.status == 'offline' %} disabled aria-disabled="true" {% endif %}>
+                        <img 
+                            src="/static/images/devices/{{ device.image_file }}" 
+                            alt="" 
+                            class="device-image">
+                        <div class="device-info">
+                            <div class="device-name">{{ device.name }}</div>
+                            <div class="device-type">{{ device.product_code }}</div>
+                        </div>
+                        </button>
+                    </form>
                 </li>
                 {% endfor %}
             </ul>

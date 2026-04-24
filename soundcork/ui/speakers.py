@@ -1,11 +1,15 @@
 import logging
 
-from bosesoundtouchapi.soundtouchclient import SoundTouchDevice  # type: ignore
+from bosesoundtouchapi.soundtouchclient import (  # type: ignore
+    SoundTouchClient,
+    SoundTouchDevice,
+)
 from bosesoundtouchapi.soundtouchdiscovery import SoundTouchDiscovery  # type: ignore
 from pydantic import BaseModel
 
 from soundcork.config import Settings
 from soundcork.datastore import DataStore
+from soundcork.model import ContentItem
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +70,11 @@ class Speakers:
                 self._st_discovery.VerifiedDevices.pop(f"{st.Host}:8090")
                 self._st_discovery.DiscoveredDeviceNames.pop(f"{st.Host}:8090")
 
-    def device_by_id(self, device_id: str) -> SoundTouchDevice:
-        return self._st_discovery.VerifiedDevices.get(device_id)
+    def device_by_id(self, ip_port: str) -> SoundTouchDevice:
+        logger.debug(f"Getting device by id: {ip_port}")
+        return self._st_discovery.VerifiedDevices.get(ip_port)
 
-    def all_devices(self) -> dict:
+    def all_devices(self) -> dict[str, CombinedDevice]:
         """
         Returns a combination of all devices seen on the network and
         all devices configured in soundcork as a dict with the device
@@ -133,3 +138,59 @@ class Speakers:
                 sc_device.marge_server = f"Unknown ({st_device.StreamingUrl})"
 
         return combined_devices
+
+    def play_content_item(self, device_id: str, content_item_id: str) -> bool:
+        """Play a content_item on a specific device.
+
+        Args:
+            device_id: The device ID to play on
+            content_item: The content item ID to play
+
+        Returns:
+            True if successful, False otherwise
+        """
+        cd = self.all_devices().get(device_id)
+        if not cd or not cd.st_device:
+            logger.error(f"Device {device_id} not found or not online")
+            return False
+
+        content_item = self._datastore.get_content_item(
+            account=cd.account,
+            device_id=cd.id,
+            ci_id=content_item_id,
+        )
+        if not content_item:
+            logger.error(f"{content_item_id} is not a defined ContentItem")
+            return False
+
+        logger.info(
+            f"Attempting playback of content item {content_item_id} on device {device_id}"
+        )
+        bose_content_item = content_item.to_soundtouchclient()
+        client = SoundTouchClient(cd.st_device)
+        client.PlayContentItem(bose_content_item)
+
+        return True
+
+    def stop_playback(self, device_id: str) -> bool:
+        """Stop playback on a specific device.
+
+        Args:
+            device_id: The device ID to stop
+
+        Returns:
+            True if successful, False otherwise
+        """
+        cd = self.all_devices().get(device_id)
+        if not cd or not cd.st_device:
+            logger.error(f"Device {device_id} not found or not online")
+            return False
+
+        client = SoundTouchClient(cd.st_device)
+        try:
+            client.MediaStop()
+            logger.info(f"Stopped playback on device {device_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error stopping playback on device {device_id}: {e}")
+            return False

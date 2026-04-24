@@ -22,7 +22,14 @@ from soundcork.constants import (
     RECENTS_FILE,
     SOURCES_FILE,
 )
-from soundcork.model import ConfiguredSource, DeviceInfo, Group, Preset, Recent
+from soundcork.model import (
+    ConfiguredSource,
+    ContentItem,
+    DeviceInfo,
+    Group,
+    Preset,
+    Recent,
+)
 from soundcork.utils import strip_element_text
 
 # pyright: reportOptionalMemberAccess=false
@@ -204,7 +211,22 @@ class DataStore:
         ) as presets_file:
             presets_file.write(presets_xml)
 
-    def get_presets(self, account: str, device: str = "") -> list[Preset]:
+    def get_content_items(
+        self, account: str, device_id: str
+    ) -> dict[str, Recent | Preset | ContentItem]:
+        """All known items that are subclasses of ContentItem (ie. Preset, Recent)"""
+        return {
+            ci.id: ci for ci in self.get_presets(account=account, device_id=device_id)
+        }
+
+    def get_content_item(
+        self, account: str, device_id: str, ci_id: str
+    ) -> Recent | Preset | ContentItem | None:
+        """Get a single ContentItem by ID"""
+        ci_dict = self.get_content_items(account=account, device_id=device_id)
+        return ci_dict.get(ci_id, None)
+
+    def get_presets(self, account: str, device_id: str) -> list[Preset]:
         """Gets Presets for a Device associated with an Account"""
         storedTree = ET.parse(path.join(self.account_dir(account), PRESETS_FILE))
         root = storedTree.getroot()
