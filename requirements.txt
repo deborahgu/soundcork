@@ -7,7 +7,7 @@ isort==8.0.1  # dev only
 mypy==1.20.1  # dev only
 paramiko==4.0.0
 pydantic-settings==2.13.1
-pytest==9.0.2  # dev only
+pytest==9.0.3  # dev only
 pytest-cov==7.1.0  # dev only
 scp==0.15.0
 types-paramiko==4.0.0.20260322
