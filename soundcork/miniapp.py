@@ -3,6 +3,7 @@ Endpoints for a miniapp UI.
 """
 
 import logging
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -11,6 +12,9 @@ from fastapi.templating import Jinja2Templates
 from soundcork.constants import DEFAULT_DEVICE_IMAGE, DEVICE_IMAGE_MAP
 from soundcork.datastore import DataStore
 from soundcork.ui.speakers import Speakers
+
+if TYPE_CHECKING:
+    from soundcork.model import Preset
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +154,7 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             }
 
             devices: list[dict[str, str]] = []
-            presets: list[dict[str, str]] = []
+            presets: list["Preset"] = []
 
             for device_id in my_combined_devices.keys():
                 try:

@@ -22,6 +22,6 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run Linters
         run: |
-          black .
+          black --target-version py312 .
           isort .
           mypy .
