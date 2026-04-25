@@ -10,5 +10,5 @@ pydantic-settings==2.13.1
 pytest==9.0.2  # dev only
 pytest-cov==7.1.0  # dev only
 scp==0.15.0
-types-paramiko==4.0.0.20260322
+types-paramiko==4.0.0.20260408
 upnpclient==2.0.3
