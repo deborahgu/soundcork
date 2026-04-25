@@ -92,7 +92,8 @@ def test_get_device_info(
     sample_device: DeviceInfo,
     monkeypatch,
 ):
-    xml = ET.fromstring(f"""
+    xml = ET.fromstring(
+        f"""
             <info deviceID="{sample_device.device_id}">
             <name>{sample_device.name}</name>
             <type>SoundTouch and Relative Dimensions in Space</type>
@@ -113,7 +114,8 @@ def test_get_device_info(
                 <ipAddress>{sample_device.ip_address}</ipAddress>
             </networkInfo>
             </info>
-        """)
+        """
+    )
 
     monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
@@ -135,7 +137,8 @@ def test_save_device_info_returns_object_and_writes_file(
         "account_device_dir",
         lambda *_: f"/virtual/data/12345/{DEVICES_DIR}/{sample_device.device_id}",
     )
-    xml = ET.fromstring(f"""
+    xml = ET.fromstring(
+        f"""
     <info deviceID="{sample_device.device_id}">
     <name>{sample_device.name}</name>
     <type>{sample_device.product_code}</type>
@@ -157,7 +160,8 @@ def test_save_device_info_returns_object_and_writes_file(
     <createdOn>{sample_device.created_on}</createdOn>
     <updatedOn>{sample_device.updated_on}</updatedOn>
     </info>
-    """)
+    """
+    )
     monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
 
     updated_device = datastore.save_device_info(sample_device, "12345")
@@ -384,7 +388,8 @@ def test_get_presets_parses_xml_from_mocked_parse(
     sample_device: DeviceInfo,
     monkeypatch,
 ):
-    xml = ET.fromstring("""
+    xml = ET.fromstring(
+        """
         <presets>
           <preset id="1" createdOn="" updatedOn="">
             <ContentItem source="INTERNET_RADIO" type="uri" location="http://a" sourceAccount="acct" isPresetable="true">
@@ -399,11 +404,12 @@ def test_get_presets_parses_xml_from_mocked_parse(
             </ContentItem>
           </preset>
         </presets>
-        """)
+        """
+    )
     monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
 
-    loaded = datastore.get_presets("12345", sample_device.device_id)
+    loaded = datastore.get_presets("12345")
 
     assert len(loaded) == 2
     assert loaded[0].name == "A"
@@ -417,7 +423,8 @@ def test_get_recents_parses_xml_from_mocked_parse(
     sample_device: DeviceInfo,
     monkeypatch,
 ):
-    xml = ET.fromstring(f"""
+    xml = ET.fromstring(
+        f"""
         <recents>
           <recent id="1" deviceID="{sample_device.device_id}" utcTime="2026-03-05T00:00:00Z">
             <contentItem source="INTERNET_RADIO" type="uri" location="http://a" sourceAccount="acct" isPresetable="true">
@@ -432,7 +439,8 @@ def test_get_recents_parses_xml_from_mocked_parse(
             </contentItem>
           </recent>
         </recents>
-        """)
+        """
+    )
     monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
 
@@ -450,7 +458,8 @@ def test_get_configured_sources_parses_and_generates_missing_id(
     sample_device: DeviceInfo,
     monkeypatch,
 ):
-    xml = ET.fromstring("""
+    xml = ET.fromstring(
+        """
         <sources>
           <source displayName="One" secret="s1" secretType="token" id="500">
             <createdOn>1</createdOn>
@@ -463,7 +472,8 @@ def test_get_configured_sources_parses_and_generates_missing_id(
             <sourceKey account="b" type="u" />
           </source>
         </sources>
-        """)
+        """
+    )
     monkeypatch.setattr("soundcork.datastore.ET.parse", lambda _: ET.ElementTree(xml))
     monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: True)
 

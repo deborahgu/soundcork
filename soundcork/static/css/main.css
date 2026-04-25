@@ -42,12 +42,40 @@ body {
     min-height: 100vh;
 }
 
+/* grid container */
+.left-sidebar-grid {
+    display:grid;
+    grid-template-areas:
+        'header'
+        'main-content'
+        'left-sidebar'
+        'footer';
+}
+
+/* general column padding */
+.left-sidebar-grid > * {
+    padding:1rem;
+}
+
+/* assign columns to grid areas */
+.left-sidebar-grid > .header {
+    grid-area:header;
+}
+.left-sidebar-grid > .main-content {
+    grid-area:main-content;
+}
+.left-sidebar-grid > .left-sidebar {
+    grid-area:left-sidebar;
+}
+.left-sidebar-grid > .footer {
+    grid-area:footer;
+}
 /* tablet breakpoint */
 @media (min-width:768px) {
     .left-sidebar-grid {
         grid-template-columns: 1fr 3fr;
         grid-template-areas:
-            'header header header headr'
+            'header header header header'
             'left-sidebar main-content main-content main-contet'
             'footer footer footer footer';
     }
@@ -77,35 +105,6 @@ input:focus,
 select:focus {
     outline: 3px solid var(--color-primary);
     outline-offset: 2px;
-}
-
-/* grid container */
-.left-sidebar-grid {
-    display:grid;
-    grid-template-areas:
-        'header'
-        'main-content'
-        'left-sidebar'
-        'footer';
-}
-
-/* general column padding */
-.left-sidebar-grid > * {
-    padding:1rem;
-}
-
-/* assign columns to grid areas */
-.left-sidebar-grid > .header {
-    grid-area:header;
-}
-.left-sidebar-grid > .main-content {
-    grid-area:main-content;
-}
-.left-sidebar-grid > .left-sidebar {
-    grid-area:left-sidebar;
-}
-.left-sidebar-grid > .footer {
-    grid-area:footer;
 }
 
 /*
@@ -328,15 +327,15 @@ select:hover {
 /* Presets grid */
 .presets-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
     gap: var(--spacing-md);
     list-style: none;
 }
 
 .preset-card {
     position: relative;
-    width: 10rem;
-    height: 10rem;
+    width: 8rem;
+    height: 8rem;
     border: 2px solid var(--color-border);
     border-radius: 8px;
     overflow: hidden;

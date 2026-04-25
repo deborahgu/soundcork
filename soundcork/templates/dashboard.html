@@ -7,9 +7,10 @@
     <link rel="stylesheet" href="/static/css/admin.css">
 </head>
 <body>
+  <div class="left-sidebar-grid">
     <a href="#main" class="skip-link">Skip to main content</a>
     
-    <header>
+    <header class="header">
         <div class="header-content">
             <h1>Soundcork</h1>
             <div class="device-info">
@@ -48,7 +49,7 @@
         </div>
     </header>
     
-    <main id="main" class="container">
+    <main id="main" class="main-content container">
         {% if error %}
         <div class="error-message" role="alert" aria-live="polite">
             <p>{{ error }}</p>
@@ -113,5 +114,10 @@
             {% endif %}
         </section>
     </main>
+    <section class="left-sidebar">
+        <img src="/static/images/soundcork.png" alt="Soundcork">
+    </section>
+    <footer class="footer"></footer>
+  </div>
 </body>
 </html>

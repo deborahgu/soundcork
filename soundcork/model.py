@@ -201,17 +201,6 @@ class ContentItem(BaseModel):
     created_on: Optional[str] = None
     updated_on: Optional[str] = None
 
-    def to_soundtouchclient(self) -> BCContentItem:
-        """Maps to a SoundTouchClient ContentItem"""
-        return BCContentItem(
-            name=self.name,
-            source=self.source,
-            typeValue=self.type,
-            location=self.location,
-            sourceAccount=self.source_account,
-            isPresetable=self.is_presetable,
-        )
-
 
 class Preset(ContentItem):
     container_art: str

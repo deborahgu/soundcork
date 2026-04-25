@@ -173,20 +173,9 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                         }
                     )
 
-                    # Get presets for first device only
                     if not presets:
                         try:
-                            device_presets = datastore.get_presets(
-                                account_id, device_id
-                            )
-                            presets = [
-                                {
-                                    "id": p.id,
-                                    "name": p.name,
-                                    "container_art": p.container_art,
-                                }
-                                for p in device_presets
-                            ]
+                            presets = datastore.get_presets(account_id)
                         except Exception as e:
                             logger.warning(
                                 f"Error getting presets for device {device_id}: {e}"

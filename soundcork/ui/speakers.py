@@ -1,6 +1,7 @@
 import logging
 
 from bosesoundtouchapi.soundtouchclient import (  # type: ignore
+    ContentItem as BCContentItem,
     SoundTouchClient,
     SoundTouchDevice,
 )
@@ -139,6 +140,17 @@ class Speakers:
 
         return combined_devices
 
+    def _content_item_to_soundtouchclient(self, ci: ContentItem) -> BCContentItem:
+        """Maps our ContentItem to a SoundTouchClient ContentItem."""
+        return BCContentItem(
+            name=ci.name,
+            source=ci.source,
+            typeValue=ci.type,
+            location=ci.location,
+            sourceAccount=ci.source_account,
+            isPresetable=ci.is_presetable,
+        )
+
     def play_content_item(self, device_id: str, content_item_id: str) -> bool:
         """Play a content_item on a specific device.
 
@@ -166,7 +178,7 @@ class Speakers:
         logger.info(
             f"Attempting playback of content item {content_item_id} on device {device_id}"
         )
-        bose_content_item = content_item.to_soundtouchclient()
+        bose_content_item = self._content_item_to_soundtouchclient(content_item)
         client = SoundTouchClient(cd.st_device)
         client.PlayContentItem(bose_content_item)
 

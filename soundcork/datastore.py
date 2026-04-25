@@ -216,7 +216,11 @@ class DataStore:
     ) -> dict[str, Recent | Preset | ContentItem]:
         """All known items that are subclasses of ContentItem (ie. Preset, Recent)"""
         return {
-            ci.id: ci for ci in self.get_presets(account=account, device_id=device_id)
+            ci.id: ci
+            for ci in [
+                *self.get_presets(account=account),
+                *self.get_recents(account=account, device=device_id),
+            ]
         }
 
     def get_content_item(
@@ -226,7 +230,7 @@ class DataStore:
         ci_dict = self.get_content_items(account=account, device_id=device_id)
         return ci_dict.get(ci_id, None)
 
-    def get_presets(self, account: str, device_id: str) -> list[Preset]:
+    def get_presets(self, account: str) -> list[Preset]:
         """Gets Presets for a Device associated with an Account"""
         storedTree = ET.parse(path.join(self.account_dir(account), PRESETS_FILE))
         root = storedTree.getroot()
