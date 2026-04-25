@@ -1,9 +1,5 @@
 from typing import List, Optional
 
-from bosesoundtouchapi.soundtouchclient import (  # type: ignore
-    ContentItem as BCContentItem,
-    Preset as BCPreset,
-)
 from fastapi import Response
 from pydantic import AliasChoices, BaseModel, Field
 
