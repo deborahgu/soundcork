@@ -2,11 +2,14 @@
 Endpoints for a miniapp UI.
 """
 
+import asyncio
 import logging
+import urllib.parse
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -18,6 +21,24 @@ if TYPE_CHECKING:
     from soundcork.model import Preset
 
 logger = logging.getLogger(__name__)
+
+NOW_PLAYING_TIMEOUT = 3.0
+
+
+@dataclass
+class NowPlaying:
+    """The state of a currently playing speaker device."""
+
+    name: str
+    image: str
+    status: str
+    volume_actual: int
+    volume_target: int
+    is_muted: bool
+
+    def is_volume_changing(self) -> bool:
+        """Target and Actual values will only be different while volume is changing."""
+        return self.volume_actual != self.volume_target
 
 
 def encode_cookie_value(value: object) -> str:
@@ -138,8 +159,27 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             )
 
     @router.get("/miniapp/dashboard", response_class=HTMLResponse)
-    async def dashboard_page(request: Request):
-        """Display dashboard with devices and presets."""
+    async def dashboard_page(
+        request: Request,
+        selected_content_item_id: str | None = Query(None),
+        selected_device_id: str | None = Query(None),
+        stopped: bool = Query(False),
+    ):
+        """Display dashboard with devices and presets.
+
+        Args:
+            request: The Request object
+
+            selected_content_item_id: The playable ContentItem, if one is selected
+                in the user's context.
+
+            selected_device_id: The speaker, if one is selected
+                in the user's context.
+
+            stopped: If the stream on the current device was just stopped
+                by the user's request. Passing as an argument to avoid
+                timing issues in the query.
+        """
         account_id = ""
         try:
             # Get account from cookie
@@ -171,7 +211,11 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
 
             for device_id in my_combined_devices.keys():
                 try:
-                    ready = "offline"
+                    if stopped and device_id == selected_device_id:
+                        np = NowPlaying("", "", "", 0, 0, False)
+                    else:
+                        np = await _get_now_playing(device_id)
+                    online = "offline"
                     cd = my_combined_devices[device_id]
                     device_info = datastore.get_device_info(account_id, device_id)
                     if (
@@ -179,14 +223,19 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                         and cd.in_soundcork
                         and (cd.marge_server == "Soundcork")
                     ):
-                        ready = "online"
+                        online = "online"
                     devices.append(
                         {
                             "name": device_info.name,
                             "product_code": device_info.product_code,
                             "device_id": device_info.device_id,
-                            "status": ready,
+                            "online_status": online,
+                            "play_state": np.status,
                             "image_file": get_device_image(device_info.product_code),
+                            "now_playing": np.name,
+                            "now_playing_image": np.image,
+                            "now_playing_volume": str(np.volume_actual),
+                            "now_playing_is_muted": str(np.is_muted),
                         }
                     )
 
@@ -206,16 +255,6 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                 f"Rendering dashboard for account {account_id} with {len(devices)} devices and {len(presets)} presets"
             )
 
-            # Get selected content_item and device from cookies
-            selected_content_item = decode_cookie_value(
-                request.cookies.get("soundcork_selected_content_item_name")
-            )
-            selected_device = decode_cookie_value(
-                request.cookies.get("soundcork_selected_device")
-            )
-            selected_device_id = request.cookies.get("soundcork_selected_device_id")
-            is_playing = request.cookies.get("soundcork_is_playing", "false")
-
             return templates.TemplateResponse(
                 request=request,
                 name="dashboard.html",
@@ -224,26 +263,14 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                     "account_label": account_label,
                     "devices": devices,
                     "presets": presets,
-                    "selected_content_item": selected_content_item,
-                    "selected_device": selected_device,
+                    "selected_content_item_id": selected_content_item_id,
                     "selected_device_id": selected_device_id,
-                    "is_playing": is_playing,
                     "error": None,
                 },
             )
 
         except Exception as e:
             logger.error(f"Error rendering dashboard: {e}")
-
-            # Still try to get selected content_item/device from cookies
-            selected_content_item = decode_cookie_value(
-                request.cookies.get("soundcork_selected_content_item_name")
-            )
-            selected_device = decode_cookie_value(
-                request.cookies.get("soundcork_selected_device")
-            )
-            selected_device_id = request.cookies.get("soundcork_selected_device_id")
-            is_playing = request.cookies.get("soundcork_is_playing", "false")
 
             return templates.TemplateResponse(
                 request=request,
@@ -253,17 +280,45 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                     "account_label": "Unknown",
                     "devices": [],
                     "presets": [],
-                    "selected_content_item": selected_content_item,
-                    "selected_device": selected_device,
+                    "selected_content_item_id": selected_content_item_id,
                     "selected_device_id": selected_device_id,
-                    "is_playing": is_playing,
                     "error": "Error loading dashboard data",
                 },
             )
 
+    async def _get_now_playing(device_id) -> NowPlaying:
+        """Get now_playing info for a device"""
+        loop = asyncio.get_event_loop()
+        try:
+            np = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: speakers.get_now_playing_status(device_id=device_id),
+                ),
+                timeout=NOW_PLAYING_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout getting now playing status for {device_id}")
+            return NowPlaying("[Unknown]", "", "", 0, 0, False)
+
+        if np:
+            volume = speakers.get_volume(device_id)
+            return NowPlaying(
+                f"{np.StationName or np.ContentItem.Name}",
+                np.ContainerArtUrl or "",
+                np.PlayStatus,
+                volume.Actual if volume else 0,
+                volume.Target if volume else 0,
+                volume.IsMuted if volume else False,
+            )
+        else:
+            return NowPlaying("", "", "", 0, 0, False)
+
     @router.post("/miniapp/select-content-item")
-    async def select_content_item(request: Request):
-        """Handle content_item selection and set cookie."""
+    async def select_content_item(
+        request: Request, selected_device_id: str | None = Query(None)
+    ):
+        """Handle content_item selection."""
         try:
             form_data = await request.form()
             content_item_id = form_data.get("content_item_id")
@@ -277,50 +332,21 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             ):
                 return RedirectResponse(url="/miniapp/dashboard", status_code=303)
 
-            response = RedirectResponse(url="/miniapp/dashboard", status_code=303)
-            response.set_cookie(
-                key="soundcork_selected_content_item_name",
-                value=encode_cookie_value(content_item_name),
-                max_age=86400 * 30,  # 30 days
-                httponly=False,
-                samesite="strict",
-            )
-            response.set_cookie(
-                key="soundcork_selected_content_item_id",
-                value=content_item_id,
-                max_age=86400 * 30,  # 30 days
-                httponly=False,
-                samesite="strict",
-            )
-
-            selected_device_id = request.cookies.get("soundcork_selected_device_id")
+            params: dict[str, str] = {"selected_content_item_id": content_item_id}
             if selected_device_id:
-                success = speakers.play_content_item(
-                    selected_device_id, content_item_id
-                )
-                response.set_cookie(
-                    key="soundcork_is_playing",
-                    value="true" if success else "false",
-                    max_age=86400 * 30,
-                    httponly=False,
-                    samesite="strict",
-                )
-                if success:
-                    logger.info(
-                        f"Started playback from preset click: content_item {content_item_id} on device {selected_device_id}"
-                    )
-                else:
-                    logger.error("Failed to start playback from preset click")
-
-            return response
+                params["selected_device_id"] = selected_device_id
+            qs = urllib.parse.urlencode(params)
+            return RedirectResponse(url=f"/miniapp/dashboard?{qs}", status_code=303)
 
         except Exception as e:
             logger.error(f"Error selecting content_item: {e}")
             return RedirectResponse(url="/miniapp/dashboard", status_code=303)
 
     @router.post("/miniapp/select-device")
-    async def select_device(request: Request):
-        """Handle device selection and set cookie."""
+    async def select_device(
+        request: Request, selected_content_item_id: str | None = Query(None)
+    ):
+        """Handle device selection."""
         try:
             form_data = await request.form()
             device_id = form_data.get("device_id")
@@ -334,103 +360,79 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             ):
                 return RedirectResponse(url="/miniapp/dashboard", status_code=303)
 
-            response = RedirectResponse(url="/miniapp/dashboard", status_code=303)
-            response.set_cookie(
-                key="soundcork_selected_device",
-                value=encode_cookie_value(device_name),
-                max_age=86400 * 30,  # 30 days
-                httponly=False,
-                samesite="strict",
-            )
-            # Also store device_id for future use
-            response.set_cookie(
-                key="soundcork_selected_device_id",
-                value=device_id,
-                max_age=86400 * 30,
-                httponly=True,
-                samesite="strict",
-            )
+            params: dict[str, str] = {"selected_device_id": str(device_id)}
+            if selected_content_item_id:
+                params["selected_content_item_id"] = selected_content_item_id
+            qs = urllib.parse.urlencode(params)
             logger.info(f"Device selected: {device_name} ({device_id})")
-            return response
+            return RedirectResponse(url=f"/miniapp/dashboard?{qs}", status_code=303)
 
         except Exception as e:
             logger.error(f"Error selecting device: {e}")
             return RedirectResponse(url="/miniapp/dashboard", status_code=303)
 
     @router.post("/miniapp/play")
-    async def play(request: Request):
+    async def play(
+        request: Request,
+        selected_content_item_id: str | None = Query(None),
+        selected_device_id: str | None = Query(None),
+    ):
         """Play the selected content_item on the selected device."""
         try:
-            # Get content_item and device from cookies
-            selected_content_item = decode_cookie_value(
-                request.cookies.get("soundcork_selected_content_item_name")
-            )
-            selected_content_item_id = request.cookies.get(
-                "soundcork_selected_content_item_id"
-            )
-            selected_device_id = request.cookies.get("soundcork_selected_device_id")
-
-            if not selected_content_item or not selected_device_id:
+            if not selected_content_item_id or not selected_device_id:
                 logger.warning("Cannot play: content_item or device not selected")
                 return RedirectResponse(url="/miniapp/dashboard", status_code=303)
 
-            logger.info(
-                f"content_item: {selected_content_item}, {selected_content_item_id}"
-            )
-
             # Play the content_item
-            success = speakers.play_content_item(
-                selected_device_id, str(selected_content_item_id)
-            )
-
-            response = RedirectResponse(url="/miniapp/dashboard", status_code=303)
-            if success:
-                response.set_cookie(
-                    key="soundcork_is_playing",
-                    value="true",
-                    max_age=86400 * 30,
-                    httponly=False,
-                    samesite="strict",
-                )
+            if speakers.play_content_item(selected_device_id, selected_content_item_id):
                 logger.info(
                     f"Started playback: content_item {selected_content_item_id} on device {selected_device_id}"
                 )
             else:
                 logger.error("Failed to start playback")
 
-            return response
+            params = {
+                "selected_device_id": selected_device_id,
+                "selected_content_item_id": selected_content_item_id,
+            }
+            return RedirectResponse(
+                url=f"/miniapp/dashboard?{urllib.parse.urlencode(params)}",
+                status_code=303,
+            )
 
         except Exception as e:
             logger.error(f"Error in play endpoint: {e}")
             return RedirectResponse(url="/miniapp/dashboard", status_code=303)
 
     @router.post("/miniapp/stop")
-    async def stop(request: Request):
+    async def stop(
+        request: Request,
+        selected_device_id: str | None = Query(None),
+        selected_content_item_id: str | None = Query(None),
+    ):
         """Stop playback on the selected device."""
         try:
-            selected_device_id = request.cookies.get("soundcork_selected_device_id")
-
             if not selected_device_id:
                 logger.warning("Cannot stop: device not selected")
                 return RedirectResponse(url="/miniapp/dashboard", status_code=303)
 
             # Stop playback
             success = speakers.stop_playback(selected_device_id)
-
-            response = RedirectResponse(url="/miniapp/dashboard", status_code=303)
             if success:
-                response.set_cookie(
-                    key="soundcork_is_playing",
-                    value="false",
-                    max_age=86400 * 30,
-                    httponly=False,
-                    samesite="strict",
-                )
                 logger.info(f"Stopped playback on device {selected_device_id}")
             else:
                 logger.error("Failed to stop playback")
 
-            return response
+            params: dict[str, str] = {
+                "selected_device_id": selected_device_id,
+                "stopped": "true",
+            }
+            if selected_content_item_id:
+                params["selected_content_item_id"] = selected_content_item_id
+            return RedirectResponse(
+                url=f"/miniapp/dashboard?{urllib.parse.urlencode(params)}",
+                status_code=303,
+            )
 
         except Exception as e:
             logger.error(f"Error in stop endpoint: {e}")
@@ -442,11 +444,6 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
         response = RedirectResponse(url="/miniapp/login", status_code=303)
         response.delete_cookie("soundcork_account_id")
         response.delete_cookie("soundcork_account_label")
-        response.delete_cookie("soundcork_selected_content_item_name")
-        response.delete_cookie("soundcork_selected_content_item_id")
-        response.delete_cookie("soundcork_selected_device")
-        response.delete_cookie("soundcork_selected_device_id")
-        response.delete_cookie("soundcork_is_playing")
         logger.info("User logged out")
         return response
 

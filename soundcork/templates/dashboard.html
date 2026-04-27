@@ -1,123 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Soundcork Dashboard</title>
     <link rel="stylesheet" href="/static/css/main.css">
 </head>
+
 <body>
-  <div class="left-sidebar-grid">
-    <a href="#main" class="skip-link">Skip to main content</a>
-    
-    <header class="header">
-        <div class="header-content">
-            <h1>Soundcork</h1>
-            <div class="device-info">
-                {% if selected_device %}
-                <div>{{ selected_device }}</div>
-                {% endif %}
-            </div>
-            <div class="content-item-info">
-                {% if selected_content_item %}
-                <div>{{ selected_content_item }}</div>
-                {% endif %}
-            </div>
-            <div class="playback-control">
-                {% if selected_content_item and selected_device_id %}
-                    {% if is_playing == "true" %}
-                    <form action="/miniapp/stop" method="post">
+    <div class="left-sidebar-grid">
+        <a href="#main" class="skip-link">Skip to main content</a>
+
+        <header class="header">
+            <div class="header-content">
+                <h1>Soundcork</h1>
+                {% set ns = namespace(selected_device_obj=none, selected_preset_obj=none) %}
+                {% for d in devices %}{% if d.device_id == selected_device_id %}{% set ns.selected_device_obj = d %}{%
+                endif %}{% endfor %}
+                {% for p in presets %}{% if p.id == selected_content_item_id %}{% set ns.selected_preset_obj = p %}{%
+                endif %}{% endfor %}
+                <div class="playback-control">
+                    {% if ns.selected_device_obj %}
+                    {% if ns.selected_device_obj.play_state == "PLAY_STATE" %}
+                    <form
+                        action="/miniapp/stop?selected_device_id={{ selected_device_id }}&amp;selected_content_item_id={{ selected_content_item_id }}"
+                        method="post">
                         <button type="submit" class="control-button stop-button">
                             <span aria-hidden="true" class="icon">■</span> Stop
                         </button>
                     </form>
-                    {% else %}
-                    <form action="/miniapp/play" method="post">
+                    {% elif ns.selected_preset_obj %}
+                    <form
+                        action="/miniapp/play?selected_device_id={{ selected_device_id }}&amp;selected_content_item_id={{ selected_content_item_id }}"
+                        method="post">
                         <button type="submit" class="control-button play-button">
                             <span aria-hidden="true" class="icon">▶</span> Play
                         </button>
                     </form>
                     {% endif %}
+                    {% endif %}
+                </div>
+                <div class="account-info">
+                    {{ account_label }}
+                    <form action="/miniapp/logout" method="post" style="display:inline;">
+                        <button type="submit">Logout</button>
+                    </form>
+                </div>
+            </div>
+        </header>
+
+        <main id="main" class="main-content container">
+            {% if error %}
+            <div class="error-message" role="alert" aria-live="polite">
+                <p>{{ error }}</p>
+            </div>
+            {% endif %}
+
+            <section class="dashboard-section" aria-labelledby="presets-heading">
+                <h2 id="presets-heading">Presets</h2>
+                {% if presets %}
+                <ol class="presets-grid">
+                    {% for preset in presets %}
+                    <li>
+                        <form
+                            action="/miniapp/select-content-item{% if selected_device_id %}?selected_device_id={{ selected_device_id }}{% endif %}"
+                            method="post" style="display:contents;">
+                            <input type="hidden" name="content_item_id" value="{{ preset.id }}">
+                            <input type="hidden" name="content_item_name" value="{{ preset.name }}">
+                            <button type="submit" class="preset-card">
+                                {% if preset.container_art %}
+                                <img src="{{ preset.container_art }}" alt="">
+                                {% endif %}
+                                <span class="preset-number">{{ preset.id }}</span>
+                                <span class="preset-name">{{ preset.name }}</span>
+                            </button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ol>
+                {% else %}
+                <div class="empty-state">
+                    <p>No presets configured yet.</p>
+                </div>
+                {% endif %}
+            </section>
+
+            <section class="dashboard-section" aria-labelledby="devices-heading">
+                <h2 id="devices-heading">Devices</h2>
+                {% if devices %}
+                <ul class="devices-grid">
+                    {% for device in devices %}
+                    <li class="device-card {{device.online_status}}">
+                        <form
+                            action="/miniapp/select-device{% if selected_content_item_id %}?selected_content_item_id={{ selected_content_item_id }}{% endif %}"
+                            method="post" style="display:contents;">
+                            <input type="hidden" name="device_id" value="{{ device.device_id }}">
+                            <input type="hidden" name="device_name" value="{{ device.name }}">
+                            <button type="submit" {% if device.status=='offline' %} disabled aria-disabled="true" {%
+                                endif %}>
+                                <img src="/static/images/devices/{{ device.image_file }}" alt="" class="device-image">
+                                <div class="device-info">
+                                    <div class="device-name">{{ device.name }}</div>
+                                    {% if device.now_playing and device.play_state == "PLAY_STATE" %}
+                                    <div class="device-now-playing">{{ device.now_playing }}</div>
+                                    <div class="device-now-playing">Volume: {{ device.now_playing_volume }}</div>
+                                    {% endif %}
+                                </div>
+                            </button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="empty-state">
+                    <p>No devices found for this account.</p>
+                </div>
+                {% endif %}
+            </section>
+        </main>
+        <section class="left-sidebar">
+            <div class="device-info">
+                {% if ns.selected_device_obj %}
+                Selected speaker: {{ ns.selected_device_obj.name }}
+                {% if ns.selected_device_obj.now_playing and ns.selected_device_obj.play_state == "PLAY_STATE" %}
+                <p>Now Playing on {{ ns.selected_device_obj.name }}:<br>
+                    {{ ns.selected_device_obj.now_playing }}</p>
+                {% if ns.selected_device_obj.now_playing_image %}
+                <img alt="" src="{{  ns.selected_device_obj.now_playing_image }}" width=100px;>
+                {% endif %}
+                {# TODO: right now this is read-only #}
+                <p><input type="range" min="1" max="100" value={{ ns.selected_device_obj.now_playing_volume }}
+                        class="slider" id="volume"></p>
+                {% endif %}
+                {% else %}
+                No speaker selected.
                 {% endif %}
             </div>
-            <div class="account-info">
-                {{ account_label }}
-                <form action="/miniapp/logout" method="post" style="display:inline;">
-                    <button type="submit">Logout</button>
-                </form>
+            <div class="content-item-info">
+                {% if ns.selected_preset_obj %}
+                Selected audio source: {{ ns.selected_preset_obj.name }}
+                {% if ns.selected_preset_obj.now_playing_image %}
+                <img alt="" src="{{  ns.selected_preset_obj.container_art }}" width=100px;>
+                {% endif %}
+                {% else %}
+                No preset selected.
+                {% endif %}
             </div>
-        </div>
-    </header>
-    
-    <main id="main" class="main-content container">
-        {% if error %}
-        <div class="error-message" role="alert" aria-live="polite">
-            <p>{{ error }}</p>
-        </div>
-        {% endif %}
-        
-        <section class="dashboard-section" aria-labelledby="presets-heading">
-            <h2 id="presets-heading">Presets</h2>
-            {% if presets %}
-            <ol class="presets-grid">
-                {% for preset in presets %}
-                <li>
-                    <form action="/miniapp/select-content-item" method="post" style="display:contents;">
-                        <input type="hidden" name="content_item_id" value="{{ preset.id }}">
-                        <input type="hidden" name="content_item_name" value="{{ preset.name }}">
-                        <button type="submit" class="preset-card">
-                            {% if preset.container_art %}
-                            <img src="{{ preset.container_art }}" alt="">
-                            {% endif %}
-                            <span class="preset-number">{{ preset.id }}</span>
-                            <span class="preset-name">{{ preset.name }}</span>
-                        </button>
-                    </form>
-                </li>
-                {% endfor %}
-            </ol>
-            {% else %}
-            <div class="empty-state">
-                <p>No presets configured yet.</p>
-            </div>
-            {% endif %}
         </section>
-        
-        <section class="dashboard-section" aria-labelledby="devices-heading">
-            <h2 id="devices-heading">Devices</h2>
-            {% if devices %}
-            <ul class="devices-grid">
-                {% for device in devices %}
-                <li class="device-card {{device.status}}">
-                    <form action="/miniapp/select-device" method="post" style="display:contents;">
-                        <input type="hidden" name="device_id" value="{{ device.device_id }}">
-                        <input type="hidden" name="device_name" value="{{ device.name }}">
-                        <button type="submit"
-                            {% if device.status == 'offline' %} disabled aria-disabled="true" {% endif %}>
-                        <img 
-                            src="/static/images/devices/{{ device.image_file }}" 
-                            alt="" 
-                            class="device-image">
-                        <div class="device-info">
-                            <div class="device-name">{{ device.name }}</div>
-                            <div class="device-type">{{ device.product_code }}</div>
-                        </div>
-                        </button>
-                    </form>
-                </li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <div class="empty-state">
-                <p>No devices found for this account.</p>
-            </div>
-            {% endif %}
-        </section>
-    </main>
-    <section class="left-sidebar">
-        <img src="/static/images/soundcork.png" alt="Soundcork">
-    </section>
-    <footer class="footer"></footer>
-  </div>
+        <footer class="footer"></footer>
+    </div>
 </body>
+
 </html>
