@@ -4,8 +4,9 @@ Endpoints for a miniapp UI.
 
 import logging
 from typing import TYPE_CHECKING
+from urllib.parse import quote, unquote
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -17,6 +18,17 @@ if TYPE_CHECKING:
     from soundcork.model import Preset
 
 logger = logging.getLogger(__name__)
+
+
+def encode_cookie_value(value: object) -> str:
+    """Encode text for Set-Cookie's latin-1 constrained header value."""
+    return quote(str(value), safe="")
+
+
+def decode_cookie_value(value: str | None, default: str | None = None) -> str | None:
+    if value is None:
+        return default
+    return unquote(value)
 
 
 def get_device_image(product_code: str) -> str:
@@ -110,7 +122,7 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             )
             response.set_cookie(
                 key="soundcork_account_label",
-                value=account_label,
+                value=encode_cookie_value(account_label),
                 max_age=86400 * 30,
                 httponly=False,  # Allow JS to read for display
                 samesite="strict",
@@ -128,11 +140,12 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
     @router.get("/miniapp/dashboard", response_class=HTMLResponse)
     async def dashboard_page(request: Request):
         """Display dashboard with devices and presets."""
+        account_id = ""
         try:
             # Get account from cookie
-            account_id = request.cookies.get("soundcork_account_id")
-            account_label = request.cookies.get(
-                "soundcork_account_label", "Unknown Account"
+            account_id = request.cookies.get("soundcork_account_id", "")
+            account_label = decode_cookie_value(
+                request.cookies.get("soundcork_account_label"), "Unknown Account"
             )
 
             if not account_id:
@@ -194,13 +207,12 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             )
 
             # Get selected content_item and device from cookies
-            selected_content_item = request.cookies.get(
-                "soundcork_selected_content_item_name"
+            selected_content_item = decode_cookie_value(
+                request.cookies.get("soundcork_selected_content_item_name")
             )
-            selected_content_item = request.cookies.get(
-                "soundcork_selected_content_item_name"
+            selected_device = decode_cookie_value(
+                request.cookies.get("soundcork_selected_device")
             )
-            selected_device = request.cookies.get("soundcork_selected_device")
             selected_device_id = request.cookies.get("soundcork_selected_device_id")
             is_playing = request.cookies.get("soundcork_is_playing", "false")
 
@@ -224,10 +236,12 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             logger.error(f"Error rendering dashboard: {e}")
 
             # Still try to get selected content_item/device from cookies
-            selected_content_item = request.cookies.get(
-                "soundcork_selected_content_item_name"
+            selected_content_item = decode_cookie_value(
+                request.cookies.get("soundcork_selected_content_item_name")
             )
-            selected_device = request.cookies.get("soundcork_selected_device")
+            selected_device = decode_cookie_value(
+                request.cookies.get("soundcork_selected_device")
+            )
             selected_device_id = request.cookies.get("soundcork_selected_device_id")
             is_playing = request.cookies.get("soundcork_is_playing", "false")
 
@@ -235,7 +249,7 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                 request=request,
                 name="dashboard.html",
                 context={
-                    "account_id": "",
+                    "account_id": account_id,
                     "account_label": "Unknown",
                     "devices": [],
                     "presets": [],
@@ -252,16 +266,21 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
         """Handle content_item selection and set cookie."""
         try:
             form_data = await request.form()
-            content_item_id = str(form_data.get("content_item_id"))
-            content_item_name = str(form_data.get("content_item_name"))
+            content_item_id = form_data.get("content_item_id")
+            content_item_name = form_data.get("content_item_name")
 
-            if not content_item_id or not content_item_name:
+            if (
+                not isinstance(content_item_id, str)
+                or not isinstance(content_item_name, str)
+                or not content_item_id
+                or not content_item_name
+            ):
                 return RedirectResponse(url="/miniapp/dashboard", status_code=303)
 
             response = RedirectResponse(url="/miniapp/dashboard", status_code=303)
             response.set_cookie(
                 key="soundcork_selected_content_item_name",
-                value=content_item_name,
+                value=encode_cookie_value(content_item_name),
                 max_age=86400 * 30,  # 30 days
                 httponly=False,
                 samesite="strict",
@@ -273,6 +292,26 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                 httponly=False,
                 samesite="strict",
             )
+
+            selected_device_id = request.cookies.get("soundcork_selected_device_id")
+            if selected_device_id:
+                success = speakers.play_content_item(
+                    selected_device_id, content_item_id
+                )
+                response.set_cookie(
+                    key="soundcork_is_playing",
+                    value="true" if success else "false",
+                    max_age=86400 * 30,
+                    httponly=False,
+                    samesite="strict",
+                )
+                if success:
+                    logger.info(
+                        f"Started playback from preset click: content_item {content_item_id} on device {selected_device_id}"
+                    )
+                else:
+                    logger.error("Failed to start playback from preset click")
+
             return response
 
         except Exception as e:
@@ -287,13 +326,18 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             device_id = form_data.get("device_id")
             device_name = form_data.get("device_name")
 
-            if not device_id or not device_name:
+            if (
+                not isinstance(device_id, str)
+                or not isinstance(device_name, str)
+                or not device_id
+                or not device_name
+            ):
                 return RedirectResponse(url="/miniapp/dashboard", status_code=303)
 
             response = RedirectResponse(url="/miniapp/dashboard", status_code=303)
             response.set_cookie(
                 key="soundcork_selected_device",
-                value=str(device_name),
+                value=encode_cookie_value(device_name),
                 max_age=86400 * 30,  # 30 days
                 httponly=False,
                 samesite="strict",
@@ -301,7 +345,7 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             # Also store device_id for future use
             response.set_cookie(
                 key="soundcork_selected_device_id",
-                value=str(device_id),
+                value=device_id,
                 max_age=86400 * 30,
                 httponly=True,
                 samesite="strict",
@@ -318,8 +362,8 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
         """Play the selected content_item on the selected device."""
         try:
             # Get content_item and device from cookies
-            selected_content_item = request.cookies.get(
-                "soundcork_selected_content_item_name"
+            selected_content_item = decode_cookie_value(
+                request.cookies.get("soundcork_selected_content_item_name")
             )
             selected_content_item_id = request.cookies.get(
                 "soundcork_selected_content_item_id"
@@ -399,6 +443,7 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
         response.delete_cookie("soundcork_account_id")
         response.delete_cookie("soundcork_account_label")
         response.delete_cookie("soundcork_selected_content_item_name")
+        response.delete_cookie("soundcork_selected_content_item_id")
         response.delete_cookie("soundcork_selected_device")
         response.delete_cookie("soundcork_selected_device_id")
         response.delete_cookie("soundcork_is_playing")
