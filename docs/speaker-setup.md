@@ -6,8 +6,8 @@ your speaker's cloud traffic to your SoundCork server.
 
 ## Prerequisites
 
-- Bose SoundTouch speaker (tested on SoundTouch 20, firmware 27.0.6)
-- Clean FAT32-formatted USB stick
+- Bose SoundTouch speaker (tested on SoundTouch 10, 20, and 30; firmware 27.0.6)
+- Clean FAT32-formatted USB stick (see model-specific notes below for connector type)
 - Ethernet cable (recommended for initial setup)
 - Computer on the same network as the speaker
 
@@ -18,7 +18,24 @@ your speaker's cloud traffic to your SoundCork server.
 The old `remote_services on` TAP command (port 17000) was **removed** in
 firmware 27.x. You must use the USB stick method instead:
 
-1. Format a USB stick as FAT32.
+1. Format a USB stick as **FAT32** with the **bootable flag set**.
+   This is critical — without the bootable flag, the speaker will not detect the
+   USB stick. How to set it:
+   - **Linux** (`fdisk`): `sudo fdisk /dev/sdX` → press `a` to toggle the
+     bootable flag on partition 1 → press `w` to write and exit
+   - **Linux** (GParted): right-click the partition → Manage Flags → check
+     `boot`
+   - **Windows** (Diskpart): `diskpart` → `list disk` → `select disk X` →
+     `select partition 1` → `active`
+   - **macOS** (diskutil): macOS's `diskutil` does not set a bootable/active
+     flag on MBR partitions. Use `fdisk` instead:
+     ```sh
+     # Find the USB disk (e.g., /dev/disk4)
+     diskutil list
+     # Set the active flag on partition 1
+     sudo fdisk -e /dev/disk4
+     # At the fdisk prompt: type "f 1" then "write" then "quit"
+     ```
 2. Create a single empty file called `remote_services` (no file extension).
 3. **Critical for macOS users** — remove the junk files that macOS creates
    automatically:
@@ -30,16 +47,29 @@ firmware 27.x. You must use the USB stick method instead:
    ```
    These hidden files can prevent the speaker from detecting the
    `remote_services` file.
-4. Power off the speaker completely.
-5. Insert the USB stick into the USB port on the back of the speaker.
-6. Power on the speaker.
-7. Wait approximately 60 seconds.
+4. Power off the speaker completely (unplug the power cable).
+5. Insert the USB stick (see model-specific notes below).
+6. Plug the power cable back in and wait approximately 60 seconds.
 
-> **A note on connectivity**: During our testing, we initially failed with WiFi
-> and a USB stick containing macOS junk files. We succeeded after cleaning the
-> USB AND switching to Ethernet. We changed both variables simultaneously, so we
-> cannot confirm which was the actual fix. If WiFi doesn't work for you, try
-> connecting the speaker via Ethernet cable as well.
+### Model-Specific Notes
+
+| Model | USB Port | Adapter Needed | Boot Procedure |
+|-------|----------|---------------|----------------|
+| **SoundTouch 10** | Micro USB | Yes — USB-A female to Micro USB-B male (OTG) adapter. The adapter's fifth pin must connect ID to GND. | Insert USB via OTG adapter, then power on. |
+| **SoundTouch 20** | USB-A | No | Insert USB directly, then power on. |
+| **SoundTouch 30** | USB-A | No | Insert USB directly, then power on. |
+| **SoundTouch 300** | Micro USB | Yes — same OTG adapter as ST10. | Insert USB via OTG adapter, hold the SoundTouch button (2nd button, 2nd row) on the remote while plugging in power. Yellow LED blink confirms detection. |
+
+> **SoundTouch 10 stereo pairs**: If your ST10 is part of a stereo pair, you
+> **must unpair it before** attempting the USB method. Failing to do so may
+> brick the device, requiring a full firmware reinstallation. (Source:
+> [FHEM wiki](https://wiki.fhem.de/wiki/BOSE_SoundTouch_de-clouding))
+
+> **Connectivity**: During our testing, we initially failed with WiFi and a USB
+> stick containing macOS junk files. We succeeded after cleaning the USB AND
+> switching to Ethernet. We changed both variables simultaneously, so we cannot
+> confirm which was the actual fix. If WiFi doesn't work for you, try connecting
+> the speaker via Ethernet cable as well.
 
 Then SSH in:
 
@@ -167,3 +197,11 @@ cloud traffic to your SoundCork server.
 > **Read-only filesystem**: The speaker's root filesystem is read-only by
 > default. Always run `rw` before editing files. The filesystem reverts to
 > read-only on reboot.
+
+## References
+
+- [FHEM wiki — BOSE SoundTouch de-clouding](https://wiki.fhem.de/wiki/BOSE_SoundTouch_de-clouding)
+  (German) — detailed instructions for SSH access, including model-specific
+  procedures and the bootable flag requirement
+- [SoundTouch 10 hardware guide (PDF)](https://images-eu.ssl-images-amazon.com/images/I/81lM15SASzS.pdf)
+  — OTG adapter pinout and USB setup for the ST10
