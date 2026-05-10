@@ -97,7 +97,6 @@ There are a few ways to find the speaker's IP:
 
 - Check your router's DHCP client list for a device named "SoundTouch".
 - If you have the [Bose CLI](https://github.com/timvw/bose): `bose status`
-- The Bose SoundTouch app shows the speaker's IP in device settings.
 
 ## Step 2: Extract Speaker Data
 
