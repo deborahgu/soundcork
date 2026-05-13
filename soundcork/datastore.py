@@ -134,7 +134,7 @@ class DataStore:
 
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Gets definition of a Device associated with an Account"""
-
+        logger.info(f"getting device info for {account} {device}")
         stored_tree = ET.parse(
             path.join(self.account_device_dir(account, device), DEVICE_INFO_FILE)
         )

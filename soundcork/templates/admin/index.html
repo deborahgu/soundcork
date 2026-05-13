@@ -63,6 +63,49 @@
             </tbody>
         </table>
         {% endfor %}
+
+        {% if unassociated %}
+        <h2>Unassociated Devices</h2>
+        <table>
+            <thead>
+                <th>Device</th>
+                <th>IP Address</th>
+                <th>Name</th>
+                <th>Marge</th>
+                <th>Online</th>
+                <th>Reachable</th>
+                <th>Action</th>
+            </thead>
+            <tbody></tbody>
+            {% for device in unassociated %}
+                <tr>
+                    <td>{{device.id}}</td>
+                    <td>{{device.ip}}</td>
+                    <td>{{device.name}}</td>
+                    <td>{{device.marge_server}}</td>
+                    <td>{{device.online}}</td>
+                    <td>{{device.reachable}}</td>
+                    <td>
+                            <form action="/admin/addDevice/{{device.id}}" method="POST">
+                              <input type="submit" value="Add to Soundcork">
+                            </form>
+                    </td>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        <form action="/admin/addAccount" method="POST">
+            <input type="submit" value="Create New Account">
+        </form>
+        <form action="/admin/B0D5CC0391DB/setAccount" method="POST">
+            <input type="submit" value="Set Account">
+        </form>
+        <form action="/admin/B0D5CC0391DB/setName" method="POST">
+            <input type="submit" value="Rename Speaker">
+        </form>
+        <form action="/admin/switchToSoundcork/B0D5CC0391DB" method="POST">
+            <input type="submit" value="Test config">
+        </form>
     </main>
     <section class="left-sidebar">
         <div><img src="/static/images/soundcork.png" alt="Soundcork"></div>

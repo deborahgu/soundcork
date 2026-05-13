@@ -1,9 +1,12 @@
 import logging
+import xml.etree.ElementTree as ET
 
+from bosesoundtouchapi.models import SimpleConfig  # type: ignore
 from bosesoundtouchapi.soundtouchclient import (  # type: ignore
     ContentItem as BCContentItem,
     SoundTouchClient,
     SoundTouchDevice,
+    SoundTouchNodes,
 )
 from bosesoundtouchapi.soundtouchdiscovery import SoundTouchDiscovery  # type: ignore
 from pydantic import BaseModel
@@ -38,7 +41,7 @@ class CombinedDevice(BaseModel):
     ip: str
     name: str
     online: bool
-    account: str
+    account: str | None
     in_soundcork: bool
     marge_server: str
     reachable: bool
@@ -166,6 +169,10 @@ class Speakers:
             logger.error(f"Device {device_id} not found or not online")
             return False
 
+        if not cd.account:
+            logger.error(f"Device {device_id} not associated with an account")
+            return False
+
         content_item = self._datastore.get_content_item(
             account=cd.account,
             device_id=cd.id,
@@ -206,3 +213,46 @@ class Speakers:
         except Exception as e:
             logger.error(f"Error stopping playback on device {device_id}: {e}")
             return False
+
+    def set_name(self, device_id: str, name: str) -> bool:
+        """Sets the name of a device.
+
+        Args:
+            device_id: The device ID of the device
+            name: the new name
+
+        Returns:
+            True if successful, False otherwise
+        """
+        combined_device = self.all_devices().get(device_id)
+        if combined_device:
+            speaker = combined_device.st_device
+            st_client = SoundTouchClient(speaker)
+            st_client.SetName(name)
+            return True
+        return False
+
+    def set_account(self, device_id: str, account_id: str) -> bool:
+        """Sets the account for a device.
+
+        Args:
+            device_id: The device ID of the device
+            account_id: The ID of the account
+
+        Returns:
+            True if successful, False otherwise
+        """
+        combined_device = self.all_devices().get(device_id)
+
+        if combined_device:
+            root = ET.Element("PairDeviceWithAccount")
+            ET.SubElement(root, "accountId").text = account_id
+            ET.SubElement(root, "userAuthToken").text = "dontcare"
+            payload = ET.tostring(root, "utf-8").decode()
+            logger.info(f"sending set account payload {payload}")
+            speaker = combined_device.st_device
+            st_client = SoundTouchClient(speaker)
+
+            st_client.Put(SoundTouchNodes.setMargeAccount, payload)
+            return True
+        return False

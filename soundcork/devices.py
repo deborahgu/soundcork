@@ -5,6 +5,7 @@ these will be the physical SoundTouch speakers, running the SoundTouch
 software on a BusyBox system.
 """
 
+import asyncio
 import logging
 import socket
 import tempfile
@@ -17,6 +18,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import paramiko
+import telnetlib3
 import upnpclient  # type: ignore
 from scp import SCPClient  # type: ignore
 
@@ -84,6 +86,33 @@ def override_speaker_config(host: str) -> bool:
         bytesio.write(override_xml.encode())
         bytesio.seek(0)
     return write_file_to_speaker(bytesio, host, SPEAKER_OVERRIDE_SDK_LOCATION)
+
+
+async def override_speaker_config_non_rooted(host: str) -> bool:
+    logger.info("override speaker without root")
+    reader, writer = await telnetlib3.open_connection(host, 17000)
+    data = await asyncio.wait_for(reader.read(4096), timeout=2)
+    writer.write(
+        f"sys configuration bmxRegistryUrl {settings.base_url}/bmx/registry/v1/services\r\n"
+    )
+    data = await asyncio.wait_for(reader.read(4096), timeout=2)
+    writer.write(f"sys configuration statsServerUrl {settings.base_url}\r\n")
+    data = await asyncio.wait_for(reader.read(4096), timeout=2)
+    writer.write(f"sys configuration margeServerUrl {settings.base_url}/marge\r\n")
+    data = await asyncio.wait_for(reader.read(4096), timeout=2)
+    writer.write(
+        f"sys configuration swUpdateUrl {settings.base_url}/updates/soundtouch\r\n"
+    )
+    data = await asyncio.wait_for(reader.read(4096), timeout=2)
+    writer.write(
+        f"envswitch boseurls set {settings.base_url}/marge {settings.base_url}/updates/soundtouch\r\n"
+    )
+    data = await asyncio.wait_for(reader.read(4096), timeout=2)
+    writer.write("getpdo CurrentSystemConfiguration\r\n")
+    reply = await asyncio.wait_for(reader.read(4096), timeout=2)
+    logger.info(f"reply: {reply}")
+    writer.write("sys reboot\r\n")
+    return True
 
 
 def write_file_to_speaker(payload: BytesIO, host: str, remote_path: str) -> bool:
