@@ -152,6 +152,19 @@ def read_root():
         return RedirectResponse(url="/admin", status_code=303)
 
 
+@app.get("/healthcheck")
+def read_root():
+    """ Service healthcheck endpoint
+        
+        Returns 200 and JSON on good poll, opportunity for stats
+        reporting.
+    """
+    return JSONResponse(
+            status_code=200,
+            content={"healthcheck": "OK"}
+    )
+
+
 @app.post(
     "/marge/streaming/support/power_on",
     tags=["marge"],
