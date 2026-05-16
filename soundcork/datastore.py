@@ -4,7 +4,7 @@ import random
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from http import HTTPStatus
-from os import listdir, mkdir, path, remove, rmdir, walk
+from os import listdir, makedirs, mkdir, path, remove, rmdir, walk
 from random import randint
 from typing import Optional
 
@@ -53,6 +53,13 @@ class DataStore:
     def __init__(self) -> None:
         logger.info("Initiating Datastore")
         self.data_dir = settings.data_dir
+        self.ensure_data_dir()
+
+    def ensure_data_dir(self) -> None:
+        """Ensure the configured datastore directory exists."""
+        if not self.data_dir:
+            raise RuntimeError("Soundcork data_dir is not configured")
+        makedirs(self.data_dir, exist_ok=True)
 
     def poweron_devices_dir(self) -> str:
         """returns the top-level directory that stores poweron info for all devices"""
@@ -647,6 +654,9 @@ class DataStore:
 
         If no accounts have been created, returns an empty list.
         """
+        if not path.exists(self.data_dir):
+            return []
+
         accounts: list[str | None] = []
         for account_id in next(walk(self.data_dir))[1]:
             # Check if the ID is digits to distinguish between accounts and power_on devices.
@@ -660,6 +670,9 @@ class DataStore:
 
         If the account has no devices, returns an empty list.
         """
+        if not path.exists(self.account_devices_dir(account_id)):
+            return []
+
         devices: list[str | None] = []
         for device_id in next(walk(self.account_devices_dir(account_id)))[1]:
             devices.append(device_id)
