@@ -46,6 +46,7 @@ class CombinedDevice(BaseModel):
     marge_server: str
     reachable: bool
     st_device: SoundTouchDevice | None
+    language_code: str | None = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -214,7 +215,7 @@ class Speakers:
             logger.error(f"Error stopping playback on device {device_id}: {e}")
             return False
 
-    def set_name(self, device_id: str, name: str) -> bool:
+    async def set_name(self, device_id: str, name: str) -> bool:
         """Sets the name of a device.
 
         Args:
@@ -224,11 +225,39 @@ class Speakers:
         Returns:
             True if successful, False otherwise
         """
+        logger.info(f"setting name {device_id} to {name}")
+        combined_device = self.all_devices().get(device_id)
+        if combined_device:
+            logger.info(f"found device {combined_device.id}")
+            speaker = combined_device.st_device
+            st_client = SoundTouchClient(speaker)
+            logger.info("setting name")
+            root = ET.Element("name")
+            root.text = name
+            payload = ET.tostring(root, "utf-8").decode()
+            logger.info(f"sending set name payload {payload}")
+
+            st_client.Put(SoundTouchNodes.name, payload)
+            # st_client.SetName(name)
+            logger.info("set name was successful")
+            return True
+        return False
+
+    async def set_language(self, device_id: str, language: str) -> bool:
+        """Sets the language for a device.
+
+        Args:
+            device_id: The device ID of the device
+            language: the new language
+
+        Returns:
+            True if successful, False otherwise
+        """
         combined_device = self.all_devices().get(device_id)
         if combined_device:
             speaker = combined_device.st_device
             st_client = SoundTouchClient(speaker)
-            st_client.SetName(name)
+            st_client.SetLanguage(language)
             return True
         return False
 

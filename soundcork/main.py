@@ -510,7 +510,7 @@ async def post_account_device(
     "/marge/streaming/account/{account}/device/{device_id}",
     response_class=BoseXMLResponse,
     tags=["marge"],
-    status_code=HTTPStatus.CREATED,
+    status_code=HTTPStatus.OK,
     dependencies=[
         Depends(
             Etag(
@@ -774,6 +774,8 @@ def bmx_local_internet_radio() -> Service:
     bmx_json_obj = json.loads(bmx_json)
     # this is hardcoded so we know where it is in the array
     return bmx_json_obj["bmx_services"][1]
+
+
 @app.post(
     "/bmx/tunein/v1/report",
     status_code=HTTPStatus.OK,

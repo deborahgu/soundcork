@@ -86,21 +86,51 @@
                     <td>{{device.online}}</td>
                     <td>{{device.reachable}}</td>
                     <td>
-                            <form action="/admin/addDevice/{{device.id}}" method="POST">
-                              <input type="submit" value="Add to Soundcork">
-                            </form>
+                        {% if device.language_code == "0" %}
+                        <form action = "/admin/{{device.id}}/setLanguage" method="POST">
+                            <select name="language">
+                                {% for lang_code in language_codes %}
+                                <option value="{{lang_code.value}}">{{lang_code.name}}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="submit" value="Set Language">
+                        </form>
+                        {% elif device.marge_server != "Soundcork" %}
+                        <form action="/admin/switchToSoundcork/B0D5CC0391DB" method="POST">
+                            <input type="submit" value="Swtich To Soundcork">
+                        </form>
+                        {% else %}
+                        <form action="/admin/{{device.id}}/setAccount" method="POST">
+                            <select name="account_id">
+                            {% for id, account in accounts.items() %}
+                                <option value="{{id}}">{{id}}</option>
+                            {% endfor %}
+                            </select>
+                        <input type="submit" value="Set Account">
+                        </form>
+                        {% endif %}
                     </td>
             {% endfor %}
             </tbody>
         </table>
         {% endif %}
+
+        <div style="border: 1px solid black; border-radius: 5px; padding: 1em;">
+            <h3>Create New Account</h3>
         <form action="/admin/addAccount" method="POST">
+            <label for="account_id">Account ID</label>
+            <input type="text" size="9" name="account_id">
+            <label for="account_name">Account Name</label>
+            <input type="text" name="account_name">
             <input type="submit" value="Create New Account">
         </form>
-        <form action="/admin/B0D5CC0391DB/setAccount" method="POST">
-            <input type="submit" value="Set Account">
-        </form>
+        </div>
+        <div style="border: 1px solid black; border-radius: 5px; padding: 1em;">
+
+        </div>
         <form action="/admin/B0D5CC0391DB/setName" method="POST">
+            <label for="name">Name</label>
+            <input type="text" name="name">
             <input type="submit" value="Rename Speaker">
         </form>
         <form action="/admin/switchToSoundcork/B0D5CC0391DB" method="POST">

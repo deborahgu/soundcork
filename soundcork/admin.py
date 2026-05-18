@@ -6,13 +6,15 @@ Endpoints for an admin UI.
 import logging
 from datetime import datetime, timezone
 from http import HTTPStatus
+from typing import Annotated
 
+from bosesoundtouchapi.models.languagecodes import LanguageCodes  # type: ignore
 from bosesoundtouchapi.soundtouchclient import (  # type: ignore
     SoundTouchClient,
     SoundTouchDevice,
 )
 from bosesoundtouchapi.soundtouchdiscovery import SoundTouchDiscovery  # type: ignore
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, BackgroundTasks, Form, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
@@ -76,14 +78,25 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
 
                 found_account.devices.append(dev)
             else:
+                logger.info(f"unassociated device {dev.id}")
                 unassociated_devices.append(dev)
+                client = SoundTouchClient(dev.st_device)
+                lang = client.GetLanguage()
+                lang_code = lang.Value
+                logger.info(f"language={lang_code}")
+                dev.language_code = lang_code
+
             # also check to see if it's available via ssh
             dev.reachable = addr_is_reachable(dev.ip)
 
         return templates.TemplateResponse(
             request=request,
             name="admin/index.html",
-            context={"accounts": accounts, "unassociated": unassociated_devices},
+            context={
+                "accounts": accounts,
+                "unassociated": unassociated_devices,
+                "language_codes": LanguageCodes,
+            },
         )
 
     @router.post("/admin/switchToSoundcork/{device_id}")
@@ -139,14 +152,15 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
         return RedirectResponse(url=f"/admin/", status_code=HTTPStatus.FOUND)
 
     @router.post("/admin/addAccount")
-    async def add_account(request: Request):
-        logger.info("adding new account")
-        account_id = "1234567"
-        account_name = "New Account"
+    async def add_account(
+        account_id: Annotated[str, Form()], account_name: Annotated[str, Form()]
+    ):
+        logger.info(f"adding new account '{account_name}' with id {account_id}")
         now = datetime.fromtimestamp(
             datetime.now().timestamp(), timezone.utc
         ).isoformat(timespec="milliseconds")
-        account = datastore.create_account(account_id, account_name)
+        success = datastore.create_account(account_id, account_name)
+        logger.info(f"created account success={success}")
         datastore.save_configured_sources(
             account_id,
             [
@@ -171,8 +185,18 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
                     updated_on=now,
                 ),
                 ConfiguredSource(
-                    display_name="",
+                    display_name="LOCAL_INTERNET RADIO",
                     id="112347",
+                    secret="",
+                    secret_type="token",
+                    source_key_type="LOCAL_INTERNET_RADIO",
+                    source_key_account="",
+                    created_on=now,
+                    updated_on=now,
+                ),
+                ConfiguredSource(
+                    display_name="",
+                    id="112348",
                     secret="",
                     secret_type="token",
                     source_key_type="TUNEIN",
@@ -188,14 +212,26 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
         return RedirectResponse(url="/admin/", status_code=HTTPStatus.FOUND)
 
     @router.post("/admin/{device_id}/setAccount")
-    async def set_account(request: Request, device_id: str):
-        success = speakers.set_account(device_id, "3380435")
+    async def set_account(
+        request: Request, device_id: str, account_id: Annotated[str, Form()]
+    ):
+        success = speakers.set_account(device_id, account_id)
         logger.info(f"success={success}")
         return RedirectResponse(url="/admin/", status_code=HTTPStatus.FOUND)
 
     @router.post("/admin/{device_id}/setName")
-    async def set_name(request: Request, device_id: str):
-        speakers.set_name(device_id, "Test Name")
+    async def set_name(
+        device_id: str, name: Annotated[str, Form()], background_tasks: BackgroundTasks
+    ):
+        logger.info(f"creating background task to set name to {name}")
+        background_tasks.add_task(speakers.set_name, device_id, name)
+        logger.info("done creating task to set name")
+
+        return RedirectResponse(url="/admin/", status_code=HTTPStatus.FOUND)
+
+    @router.post("/admin/{device_id}/setLanguage")
+    async def set_language(device_id: str, language: Annotated[str, Form()]):
+        await speakers.set_language(device_id, language)
 
         return RedirectResponse(url="/admin/", status_code=HTTPStatus.FOUND)
 
