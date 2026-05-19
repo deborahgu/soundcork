@@ -262,7 +262,6 @@ def etag_for_recents(request: Request) -> str:
 
 
 def etag_for_account(request: Request) -> str:
-    logger.info(f"checking etag for account {request.path_params.get('account')}")
     return str(datastore.etag_for_account(str(request.path_params.get("account"))))
 
 
@@ -479,9 +478,6 @@ async def post_account_recent(
     return bose_xml_str(xml_resp)
 
 
-# /marge/streaming/account/3380435/device/
-
-
 @app.post(
     "/marge/streaming/account/{account}/device/",
     response_class=BoseXMLResponse,
@@ -504,7 +500,6 @@ async def post_account_device(
     account: Annotated[str, Path(pattern=ACCOUNT_RE)],
     request: Request,
 ):
-    logger.info("POSTING ACCOUNT DEVICE")
     xml = await request.body()
     device_id, xml_resp = add_device_to_account(datastore, account, xml.decode())
 
