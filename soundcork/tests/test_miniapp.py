@@ -13,6 +13,9 @@ DEVICE_ID = "device-1"
 
 
 class FakeDatastore:
+    def __init__(self, content_source: str = "LOCAL_INTERNET_RADIO") -> None:
+        self.content_source = content_source
+
     def account_exists(self, account_id: str) -> bool:
         return account_id == ACCOUNT_ID
 
@@ -35,6 +38,11 @@ class FakeDatastore:
             product_code="SoundTouch10",
             device_id=DEVICE_ID,
         )
+
+    def get_content_item(self, account: str, device_id: str, ci_id: str):
+        assert account == ACCOUNT_ID
+        assert device_id == DEVICE_ID
+        return SimpleNamespace(source=self.content_source)
 
     def get_presets(self, account_id: str) -> list[Preset]:
         assert account_id == ACCOUNT_ID
@@ -70,12 +78,37 @@ class FakeSpeakers:
         return self.play_result
 
 
-def make_client(monkeypatch, speakers: FakeSpeakers | None = None):
+class FakePrimer:
+    enabled = True
+
+    def __init__(self) -> None:
+        self.prime_calls: list[tuple[str, str | None, bool, float]] = []
+
+    def prime_before_play(
+        self,
+        device_id: str,
+        account_id: str | None = None,
+        force: bool = True,
+        wait_seconds: float = 1.0,
+    ) -> bool:
+        self.prime_calls.append((device_id, account_id, force, wait_seconds))
+        return False
+
+
+def make_client(
+    monkeypatch,
+    speakers: FakeSpeakers | None = None,
+    datastore: FakeDatastore | None = None,
+    primer: FakePrimer | None = None,
+):
     monkeypatch.chdir(Path(__file__).resolve().parents[1])
     app = FastAPI()
     fake_speakers = speakers or FakeSpeakers()
+    fake_datastore = datastore or FakeDatastore()
     app.include_router(
-        get_miniapp_router(cast(Any, FakeDatastore()), cast(Any, fake_speakers))
+        get_miniapp_router(
+            cast(Any, fake_datastore), cast(Any, fake_speakers), cast(Any, primer)
+        )
     )
     return TestClient(app), fake_speakers
 
@@ -99,3 +132,43 @@ def test_dashboard_decodes_display_cookies(monkeypatch):
 
     assert response.status_code == 200
     assert "Účet ložnice" in response.text
+
+
+def test_play_primes_spotify_before_playback_when_primer_configured(monkeypatch):
+    primer = FakePrimer()
+    client, speakers = make_client(
+        monkeypatch,
+        datastore=FakeDatastore("SPOTIFY"),
+        primer=primer,
+    )
+    client.cookies.set("soundcork_account_id", ACCOUNT_ID)
+
+    response = client.post(
+        "/miniapp/play?selected_device_id=device-1&selected_content_item_id=content-1",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert "selected_device_id=device-1" in response.headers["location"]
+    assert "selected_content_item_id=content-1" in response.headers["location"]
+    assert primer.prime_calls == [(DEVICE_ID, ACCOUNT_ID, True, 1.0)]
+    assert speakers.play_calls == [(DEVICE_ID, "content-1")]
+
+
+def test_play_does_not_prime_non_spotify_content(monkeypatch):
+    primer = FakePrimer()
+    client, speakers = make_client(
+        monkeypatch,
+        datastore=FakeDatastore("LOCAL_INTERNET_RADIO"),
+        primer=primer,
+    )
+    client.cookies.set("soundcork_account_id", ACCOUNT_ID)
+
+    response = client.post(
+        "/miniapp/play?selected_device_id=device-1&selected_content_item_id=content-1",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert primer.prime_calls == []
+    assert speakers.play_calls == [(DEVICE_ID, "content-1")]

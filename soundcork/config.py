@@ -1,3 +1,4 @@
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +29,25 @@ class Settings(BaseSettings):
     spotify_client_id: str = ""
     spotify_client_secret: str = ""
     spotify_redirect_uri: str = ""
+    spotify_scopes: str = "streaming user-read-email user-read-private"
+
+    # Spotify ZeroConf primer (optional, disabled by default)
+    spotify_zeroconf_primer_enabled: bool = False
+    spotify_zeroconf_prime_devices: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "spotify_zeroconf_prime_devices",
+            "SPOTIFY_ZEROCONF_PRIME_DEVICES",
+            "SOUNDCORK_SPOTIFY_PRIME_DEVICES",
+        ),
+    )
+    spotify_zeroconf_primer_interval_seconds: int = Field(
+        default=45 * 60,
+        validation_alias=AliasChoices(
+            "spotify_zeroconf_primer_interval_seconds",
+            "SPOTIFY_ZEROCONF_PRIMER_INTERVAL_SECONDS",
+        ),
+    )
 
     # (optional) local directory for soundcork to store detailed logs of 404 errors
     #  used for development/debugging

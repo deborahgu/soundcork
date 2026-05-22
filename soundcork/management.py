@@ -30,7 +30,7 @@ router = APIRouter(prefix="/mgmt", tags=["management"])
 
 datastore = DataStore()
 settings = Settings()
-spotify = SpotifyService()
+spotify = SpotifyService(settings)
 
 
 # --- Spotify ---
