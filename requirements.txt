@@ -1,5 +1,5 @@
-black==26.3.1  # dev only
-bosesoundtouchapi==1.0.86
+black==26.5.1  # dev only
+bosesoundtouchapi==1.0.87
 fastapi[standard]==0.136.1
 fastapi-etag==0.4.0
 httpx==0.28.1
@@ -12,5 +12,5 @@ pytest==9.0.3  # dev only
 pytest-cov==7.1.0  # dev only
 scp==0.15.0
 telnetlib3==4.0.2
-types-paramiko==4.0.0.20260508
+types-paramiko==4.0.0.20260518
 upnpclient==2.0.3
