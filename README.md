@@ -12,9 +12,9 @@ Read [SECURITY.md](SECURITY.md) carefully. This should only be run inside your h
 We'll maintain a forum post with the [Current Status of Bose Cloud Services](https://github.com/deborahgu/soundcork/discussions/181). Check there for updates. We will update whenever we learn new information.
 
 ## Background
-[Bose has announced that they are shutting down the servers for the SoundTouch system in February, 2026. ](https://www.bose.com/soundtouch-end-of-life) When those servers go away, certain network-based functionality currently available to SoundTouch devices will stop working.
+[Bose has shut down the servers for the SoundTouch system in May 2026. ](https://www.bose.com/soundtouch-end-of-life) When they did so, certain network-based functionality previously available to SoundTouch devices will stop working.
 
-This is an attempt to reverse-engineer those servers so that users can continue to use the full set of SoundTouch functionality after Bose shuts the official servers down.
+This project replaces those servers so that users can continue to use the full set of SoundTouch functionality.
 
 ### Context
 
