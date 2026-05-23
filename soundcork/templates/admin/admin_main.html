@@ -1,0 +1,116 @@
+{% extends "/admin/base_template.html" %}
+{% block title %}Soundcork Admin{% endblock %}
+{% block header %}Soundcork:  Can't Brick Us{% endblock %}
+{% block main %}
+        {% for id, account in accounts.items() %}
+        <h2>Account {{account.id}}
+            {% if not account.in_soundcork %}
+            <em>Not in soundcork</em>
+            {% endif %}
+        </h2>
+        <table>
+            <thead>
+                <th>Device</th>
+                <th>IP Address</th>
+                <th>Name</th>
+                <th>Marge</th>
+                <th>Online</th>
+                <th>In Soundcork</th>
+                <th>Reachable</th>
+                <th>Action</th>
+            </thead>
+            <tbody></tbody>
+            {% for device in account.devices %}
+                <tr>
+                    <td><a href = "/admin/edit_device/{{device.id}}">{{device.id}}</a></td>
+                    <td>{{device.ip}}</td>
+                    <td>{{device.name}}</td>
+                    <td>{{device.marge_server}}</td>
+                    <td>{{device.online}}</td>
+                    <td>{{device.in_soundcork}}</td>
+                    <td>{{device.reachable}}</td>
+                    <td>
+                        {% if not device.in_soundcork %}
+                          {% if not account.in_soundcork and device.reachable %}
+                            <form action="/admin/addDevice/{{device.id}}" method="POST">
+                              <input type="submit" value="Configure Account">
+                            </form>
+                          {% elif account.in_soundcork %}
+                            <form action="/admin/addDevice/{{device.id}}" method="POST">
+                              <input type="submit" value="Add to Soundcork">
+                            </form>
+                          {% endif %}
+                        {% elif device.reachable and device.marge_server != "Soundcork"%}
+                        <form action="/admin/switchToSoundcork/{{device.id}}" method="POST">
+                            <input type="submit" value="Switch to Soundcork">
+                        </form>
+                        {% endif %}
+                    </td>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% endfor %}
+
+        {% if not accounts %}
+        <p>There does not seem to be an account available. That could either mean that you are setting
+            up newly configured speakers, or that the Soundcork server doesn't have proper access to
+            your network.
+        </p>
+        <p>If you are setting up new speakers and do not have an existing account, you can
+            <a href = "/admin/create_account">Create a new account</a>
+        </p>
+        {% endif %}
+
+        {% if unassociated %}
+        <h2>Unassociated Devices</h2>
+        <table>
+            <thead>
+                <th>Device</th>
+                <th>IP Address</th>
+                <th>Name</th>
+                <th>Marge</th>
+                <th>Online</th>
+                <th>Reachable</th>
+                <th>Action</th>
+            </thead>
+            <tbody></tbody>
+            {% for device in unassociated %}
+                <tr>
+                    <td>{{device.id}}</td>
+                    <td>{{device.ip}}</td>
+                    <td>{{device.name}}</td>
+                    <td>{{device.marge_server}}</td>
+                    <td>{{device.online}}</td>
+                    <td>{{device.reachable}}</td>
+                    <td>
+                        {% if device.language_code == "0" %}
+                        <form class="inline-form" action = "/admin/{{device.id}}/setLanguage" method="POST">
+                            <select name="language">
+                                {% for lang_code in language_codes %}
+                                <option value="{{lang_code.value}}">{{lang_code.name}}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="submit" value="Set Language">
+                        </form>
+                        {% elif device.marge_server != "Soundcork" %}
+                        <form action="/admin/switchToSoundcork/B0D5CC0391DB" method="POST">
+                            <input type="submit" value="Swtich To Soundcork">
+                        </form>
+                        {% else %}
+                        <form class="inline-form" action="/admin/{{device.id}}/setAccount" method="POST">
+                            <select name="account_id">
+                            {% for id, account in accounts.items() %}
+                                {% if account.in_soundcork %}
+                                <option value="{{id}}">{{id}}</option>
+                                {% endif %}
+                            {% endfor %}
+                            </select>
+                        <input type="submit" value="Set Account">
+                        </form>
+                        {% endif %}
+                    </td>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+{% endblock %}

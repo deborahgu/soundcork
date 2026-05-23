@@ -5,11 +5,13 @@ these will be the physical SoundTouch speakers, running the SoundTouch
 software on a BusyBox system.
 """
 
+import asyncio
 import logging
 import socket
 import tempfile
 import urllib.request
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from io import BytesIO
 from os import unlink
 from subprocess import run
@@ -19,6 +21,7 @@ from urllib.parse import urlparse
 import paramiko
 import upnpclient  # type: ignore
 from scp import SCPClient  # type: ignore
+from telnetlib3 import TelnetReaderUnicode, TelnetWriterUnicode, open_connection
 
 from soundcork.config import Settings
 from soundcork.constants import (
@@ -30,6 +33,7 @@ from soundcork.constants import (
     SPEAKER_SOURCES_FILE_LOCATION,
 )
 from soundcork.datastore import DataStore
+from soundcork.model import ConfiguredSource
 
 logging.basicConfig(
     level=logging.INFO,
@@ -84,6 +88,43 @@ def override_speaker_config(host: str) -> bool:
         bytesio.write(override_xml.encode())
         bytesio.seek(0)
     return write_file_to_speaker(bytesio, host, SPEAKER_OVERRIDE_SDK_LOCATION)
+
+
+async def override_speaker_config_non_rooted(host: str) -> bool:
+    logger.info("override speaker without root")
+    reader, writer = await open_connection(host, 17000, encoding="utf-8")
+    if isinstance(reader, TelnetReaderUnicode) and isinstance(
+        writer, TelnetWriterUnicode
+    ):
+        # the telnet reader can read up to a certain number of characters
+        # or until EOF, but in order to say "fill this buffer or return after
+        # a timeout" you have to wrap it with asyncio.wait_for
+        data = await asyncio.wait_for(reader.read(4096), timeout=2)
+        writer.write(
+            f"sys configuration bmxRegistryUrl {settings.base_url}/bmx/registry/v1/services\r\n"
+        )
+        data = await asyncio.wait_for(reader.read(4096), timeout=2)
+        writer.write(f"sys configuration statsServerUrl {settings.base_url}\r\n")
+        data = await asyncio.wait_for(reader.read(4096), timeout=2)
+        writer.write(f"sys configuration margeServerUrl {settings.base_url}/marge\r\n")
+        data = await asyncio.wait_for(reader.read(4096), timeout=2)
+        writer.write(
+            f"sys configuration swUpdateUrl {settings.base_url}/updates/soundtouch\r\n"
+        )
+        data = await asyncio.wait_for(reader.read(4096), timeout=2)
+        writer.write(
+            f"envswitch boseurls set {settings.base_url}/marge {settings.base_url}/updates/soundtouch\r\n"
+        )
+        data = await asyncio.wait_for(reader.read(4096), timeout=2)
+        # this isn't actually necessary but good to have in the logs
+        writer.write("getpdo CurrentSystemConfiguration\r\n")
+        reply = await asyncio.wait_for(reader.read(4096), timeout=2)
+        logger.info(f"pdo for device: {reply}")
+        writer.write("sys reboot\r\n")
+        return True
+    else:
+        logger.warning("Error: telnet could not get UTF reader/writer")
+        return False
 
 
 def write_file_to_speaker(payload: BytesIO, host: str, remote_path: str) -> bool:
@@ -203,7 +244,8 @@ def add_device(device: upnpclient.upnp.Device) -> bool:
     return add_device_by_ip(hostname)
 
 
-def add_device_by_ip(hostname: str) -> bool:
+def add_device_by_ip(hostname: str, reachable: bool = True) -> bool:
+    logger.info(f"loading by ip, reachable={reachable}")
     info_elem = ET.fromstring(read_device_info(hostname))
     device_id = info_elem.attrib.get("deviceID", "")
     # If margeAccountUUID is not present, the .text will correctly raise an error here
@@ -212,7 +254,11 @@ def add_device_by_ip(hostname: str) -> bool:
         if not datastore.account_exists(account_id):  # type: ignore
             recents = read_recents(hostname)
             presets = read_presets(hostname)
-            sources = read_sources(hostname)
+            if reachable:
+                sources = read_sources(hostname)
+            else:
+                sources = default_sources_string()
+            logger.info(f"sources={sources}")
             # FIXME get the account email address for this
             account_name = None
             add_account(account_id, recents, presets, sources, account_name)
@@ -242,3 +288,59 @@ def add_account(
     datastore.save_configured_sources_xml(account_id, sources)
 
     return True
+
+
+def default_sources() -> list[ConfiguredSource]:
+    # this is a basic set of sources that all can be
+    # used without a configured account
+    now = datetime.fromtimestamp(datetime.now().timestamp(), timezone.utc).isoformat(
+        timespec="milliseconds"
+    )
+    return [
+        ConfiguredSource(
+            display_name="AUX IN",
+            id="112345",
+            secret="",
+            secret_type="",
+            source_key_type="AUX",
+            source_key_account="AUX",
+            created_on=now,
+            updated_on=now,
+        ),
+        ConfiguredSource(
+            display_name="INTERNET RADIO",
+            id="112346",
+            secret="",
+            secret_type="token",
+            source_key_type="INTERNET_RADIO",
+            source_key_account="",
+            created_on=now,
+            updated_on=now,
+        ),
+        ConfiguredSource(
+            display_name="LOCAL_INTERNET RADIO",
+            id="112347",
+            secret="",
+            secret_type="token",
+            source_key_type="LOCAL_INTERNET_RADIO",
+            source_key_account="",
+            created_on=now,
+            updated_on=now,
+        ),
+        ConfiguredSource(
+            display_name="",
+            id="112348",
+            secret="",
+            secret_type="token",
+            source_key_type="TUNEIN",
+            source_key_account="",
+            created_on=now,
+            updated_on=now,
+        ),
+    ]
+
+
+def default_sources_string() -> str:
+    sources_root = datastore.sources_to_xml(default_sources())
+    ET.indent(sources_root, space="    ", level=0)
+    return ET.tostring(sources_root, xml_declaration=True, encoding="UTF-8").decode()

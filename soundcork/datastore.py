@@ -134,7 +134,7 @@ class DataStore:
 
     def get_device_info(self, account: str, device: str) -> DeviceInfo:
         """Gets definition of a Device associated with an Account"""
-
+        logger.debug(f"getting device info for {account} {device}")
         stored_tree = ET.parse(
             path.join(self.account_device_dir(account, device), DEVICE_INFO_FILE)
         )
@@ -418,6 +418,13 @@ class DataStore:
         self, account: str, sources_list: list[ConfiguredSource]
     ) -> ET.Element:
         save_file = path.join(self.account_dir(account), SOURCES_FILE)
+        sources_root = self.sources_to_xml(sources_list)
+        sources_tree = ET.ElementTree(sources_root)
+        ET.indent(sources_tree, space="    ", level=0)
+        sources_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
+        return sources_root
+
+    def sources_to_xml(self, sources_list: list[ConfiguredSource]) -> ET.Element:
         sources_root = ET.Element("sources")
         for source in sources_list:
             source_elem = ET.SubElement(sources_root, "source")
@@ -430,9 +437,6 @@ class DataStore:
             key_elem.attrib["account"] = source.source_key_account
             ET.SubElement(source_elem, "createdOn").text = source.created_on
             ET.SubElement(source_elem, "updatedOn").text = source.updated_on
-        sources_tree = ET.ElementTree(sources_root)
-        ET.indent(sources_tree, space="    ", level=0)
-        sources_tree.write(save_file, xml_declaration=True, encoding="UTF-8")
         return sources_root
 
     def remove_source(self, account: str, source_id: str) -> bool:

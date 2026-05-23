@@ -240,6 +240,10 @@ header button:hover {
 }
 
 /* Form styles */
+.inline-form select {
+    width: 50%;
+}
+
 .form-group {
     margin-bottom: var(--spacing-lg);
 }

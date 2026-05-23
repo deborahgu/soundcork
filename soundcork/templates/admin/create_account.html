@@ -1,0 +1,15 @@
+{% extends "/admin/base_template.html" %}
+{% block title %}Soundcork Admin - Create Account{% endblock %}
+{% block header %}Soundcork:  Can't Brick Us{% endblock %}
+{% block main %}
+
+        <div style="border: 1px solid black; border-radius: 5px; padding: 1em;">
+            <h3>Create New Account</h3>
+        <form action="/admin/addAccount" method="POST">
+            <label for="account_id">Account ID</label>
+            <input type="text" size="9" name="account_id">
+            <label for="account_name">Account Name</label>
+            <input type="text" name="account_name">
+            <input type="submit" value="Create New Account">
+        </form>
+{% endblock %}

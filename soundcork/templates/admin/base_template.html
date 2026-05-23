@@ -1,0 +1,32 @@
+<html>
+    <head>
+        {% block head %}
+        <title>{% block title %}{% endblock %}</title>
+        <link id="favicon" rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+        <link rel="stylesheet" href="/static/css/main.css">
+        <meta charset="UTF-8">
+        <meta name="viewport"
+          content="width=device-width,
+                   initial-scale=1.0">
+        {% endblock %}
+    </head>
+    <body>
+        <div class="left-sidebar-grid">
+            <header class="header">
+                {% block header %}{% endblock %}
+            </header>
+            <main class="main-content">
+                {% block main %}
+                {% endblock %}
+    </main>
+    <section class="left-sidebar">
+        <div><img src="/static/images/soundcork.png" alt="Soundcork"></div>
+        <div><a href="/admin">Account Admin</a></div>
+        <div><a href="/admin/create_account">Create New Account</a></div>
+        <div><a href="/miniapp">App (alpha)</a></div>
+    </section>
+    <footer class="footer"></footer>
+</div>
+
+</body>
+</html>
