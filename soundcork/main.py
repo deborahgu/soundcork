@@ -224,7 +224,7 @@ async def log_unknown_requests(request: Request, call_next):
 # Bose protocol endpoints are only accessible from registered speaker IPs.
 # Paths starting with /webui, /mgmt, /docs, /openapi.json, or / (root) are exempt.
 
-_EXEMPT_PREFIXES = ("/webui", "/mgmt", "/docs", "/openapi.json", "/auth")
+_EXEMPT_PREFIXES = ("/webui", "/mgmt", "/docs", "/openapi.json", "/auth", "/soundcloud")
 
 
 @app.middleware("http")
@@ -1146,8 +1146,8 @@ def bmx_playback(station_id: str) -> BmxPlaybackResponse:
         info = _sc_cache.get(track_id)
         if not info:
             raise HTTPException(status_code=404, detail="Track not resolved")
-        base_url = settings.base_url.rstrip("/")
-        playlist_url = f"{base_url}/soundcloud/playlist/{track_id}.m3u8"
+        seg_base = os.environ.get("SOUNDCLOUD_SEG_BASE_URL", settings.base_url.rstrip("/"))
+        playlist_url = f"{seg_base}/soundcloud/playlist/{track_id}.m3u8"
         stream_list = [Stream(hasPlaylist=True, isRealtime=True, streamUrl=playlist_url)]
         audio = Audio(hasPlaylist=True, isRealtime=True, streamUrl=playlist_url, streams=stream_list)
         return BmxPlaybackResponse(
@@ -1321,8 +1321,8 @@ def sc_bmx_playback(track_id: str, request: Request) -> BmxPlaybackResponse:
     info = _sc_cache.get(track_id)
     if not info:
         raise HTTPException(status_code=404, detail="Track not resolved")
-    base_url = settings.base_url.rstrip("/")
-    playlist_url = f"{base_url}/soundcloud/playlist/{track_id}.m3u8"
+    seg_base = os.environ.get("SOUNDCLOUD_SEG_BASE_URL", settings.base_url.rstrip("/"))
+    playlist_url = f"{seg_base}/soundcloud/playlist/{track_id}.m3u8"
     stream_list = [
         Stream(
             hasPlaylist=True,
