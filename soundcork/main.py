@@ -1146,6 +1146,7 @@ def bmx_playback(station_id: str) -> BmxPlaybackResponse:
         info = _sc_cache.get(track_id)
         if not info:
             raise HTTPException(status_code=404, detail="Track not resolved")
+        info["cursor"] = 0
         seg_base = os.environ.get("SOUNDCLOUD_SEG_BASE_URL", settings.base_url.rstrip("/"))
         playlist_url = f"{seg_base}/soundcloud/playlist/{track_id}.m3u8"
         stream_list = [Stream(hasPlaylist=True, isRealtime=True, streamUrl=playlist_url)]
@@ -1246,7 +1247,7 @@ def bmx_orion_playback(data: str) -> BmxPlaybackResponse:
 import hashlib
 import time
 
-from soundcork.soundcloud_service import fetch_segment, resolve_track, rewrite_m3u8
+from soundcork.soundcloud_service import build_m3u8_window, fetch_segment, resolve_track
 
 _sc_cache: dict[str, dict] = {}
 _SC_CACHE_TTL = 3600  # 1 hour
@@ -1290,12 +1291,12 @@ def sc_resolve(url: str, request: Request):
 
 @app.get("/soundcloud/playlist/{track_id}.m3u8", tags=["soundcloud"])
 def sc_playlist(track_id: str, request: Request):
-    """Serve a rewritten HLS playlist with short proxy segment URLs."""
+    """Serve a sliding-window HLS playlist with short proxy segment URLs."""
     info = _sc_cache.get(track_id)
     if not info:
         raise HTTPException(status_code=404, detail="Track not resolved — call /soundcloud/resolve first")
     seg_base = os.environ.get("SOUNDCLOUD_SEG_BASE_URL", settings.base_url.rstrip("/"))
-    m3u8 = rewrite_m3u8(track_id, seg_base, info["raw_m3u8"], info["segments"], info.get("init_url"))
+    m3u8 = build_m3u8_window(track_id, seg_base, info)
     return Response(content=m3u8, media_type="audio/mpegurl")
 
 
@@ -1306,10 +1307,14 @@ def sc_segment(track_id: str, index: int):
     info = _sc_cache.get(track_id)
     if not info:
         raise HTTPException(status_code=404, detail="Track not resolved")
-    if index < 0 or index >= len(info["segments"]):
+    segments = info["segments"]
+    if index < 0 or index >= len(segments):
         raise HTTPException(status_code=404, detail="Segment index out of range")
+    if index >= info.get("cursor", 0):
+        info["cursor"] = index + 1
     try:
-        data = fetch_segment(info["segments"][index])
+        _, cdn_url = segments[index]
+        data = fetch_segment(cdn_url)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
     return Response(content=data, media_type="audio/mpeg")
