@@ -1260,7 +1260,7 @@ def sc_resolve(url: str, request: Request):
         track_id, info = _sc_get_or_resolve(url)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
-    base_url = str(request.base_url).rstrip("/")
+    base_url = settings.base_url.rstrip("/")
     playlist_url = f"{base_url}/soundcloud/playlist/{track_id}.m3u8"
     return {
         "trackId": track_id,
@@ -1279,7 +1279,7 @@ def sc_playlist(track_id: str, request: Request):
     info = _sc_cache.get(track_id)
     if not info:
         raise HTTPException(status_code=404, detail="Track not resolved — call /soundcloud/resolve first")
-    base_url = str(request.base_url).rstrip("/")
+    base_url = settings.base_url.rstrip("/")
     m3u8 = rewrite_m3u8(track_id, base_url, info["durations"], len(info["segments"]))
     return Response(content=m3u8, media_type="application/vnd.apple.mpegurl")
 
@@ -1305,7 +1305,7 @@ def sc_bmx_playback(track_id: str, request: Request) -> BmxPlaybackResponse:
     info = _sc_cache.get(track_id)
     if not info:
         raise HTTPException(status_code=404, detail="Track not resolved")
-    base_url = str(request.base_url).rstrip("/")
+    base_url = settings.base_url.rstrip("/")
     playlist_url = f"{base_url}/soundcloud/playlist/{track_id}.m3u8"
     stream_list = [
         Stream(
