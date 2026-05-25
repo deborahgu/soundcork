@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 def resolve_track(url: str) -> dict:
     """Resolve a SoundCloud URL to track metadata and HLS playlist info."""
     ydl_opts = {
-        "format": "hls_mp3_1_0/hls_aac_96k/best",
+        "format": "hls_aac_96k/hls_mp3_1_0/best",
         "quiet": True,
         "no_warnings": True,
     }
