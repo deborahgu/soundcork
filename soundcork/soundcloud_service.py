@@ -13,7 +13,7 @@ _OVERLAP = 3  # segments of overlap between windows
 def resolve_track(url: str) -> dict:
     """Resolve a SoundCloud URL to track metadata and HLS playlist info."""
     ydl_opts = {
-        "format": "hls_mp3_0_1/hls_mp3_1_0/hls_aac_96k/best",
+        "format": "bestaudio[acodec=mp3][protocol=m3u8_native]/hls_aac_96k/best",
         "quiet": True,
         "no_warnings": True,
     }
