@@ -1295,7 +1295,7 @@ def sc_playlist(track_id: str, request: Request):
     if not info:
         raise HTTPException(status_code=404, detail="Track not resolved — call /soundcloud/resolve first")
     base_url = settings.base_url.rstrip("/")
-    m3u8 = rewrite_m3u8(track_id, base_url, info["durations"], len(info["segments"]))
+    m3u8 = rewrite_m3u8(track_id, base_url, info["raw_m3u8"], info["segments"])
     return Response(content=m3u8, media_type="application/vnd.apple.mpegurl")
 
 

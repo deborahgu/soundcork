@@ -18,13 +18,10 @@ def resolve_track(url: str) -> dict:
 
     m3u8_url = info["url"]
 
-    raw = urllib.request.urlopen(m3u8_url, timeout=10).read().decode()
-    durations = []
+    raw_m3u8 = urllib.request.urlopen(m3u8_url, timeout=10).read().decode()
     segment_urls = []
-    for line in raw.splitlines():
-        if line.startswith("#EXTINF:"):
-            durations.append(float(line.split(":")[1].rstrip(",")))
-        elif line.startswith("https://"):
+    for line in raw_m3u8.splitlines():
+        if line.startswith("https://"):
             segment_urls.append(line)
 
     return {
@@ -33,25 +30,17 @@ def resolve_track(url: str) -> dict:
         "duration": info.get("duration"),
         "thumbnail": info.get("thumbnail", ""),
         "m3u8_url": m3u8_url,
+        "raw_m3u8": raw_m3u8,
         "segments": segment_urls,
-        "durations": durations,
     }
 
 
-def rewrite_m3u8(track_id: str, base_url: str, durations: list[float], segment_count: int) -> str:
-    """Generate a rewritten HLS playlist with short proxy segment URLs."""
-    max_dur = max(durations) if durations else 10
-    lines = [
-        "#EXTM3U",
-        "#EXT-X-VERSION:3",
-        f"#EXT-X-TARGETDURATION:{int(max_dur) + 1}",
-        "#EXT-X-MEDIA-SEQUENCE:0",
-    ]
-    for i in range(segment_count):
-        dur = durations[i] if i < len(durations) else 10.0
-        lines.append(f"#EXTINF:{dur:.6f},")
-        lines.append(f"{base_url}/soundcloud/seg/{track_id}/{i}")
-    return "\n".join(lines) + "\n"
+def rewrite_m3u8(track_id: str, base_url: str, raw_m3u8: str, segments: list[str]) -> str:
+    """Replace long CDN URLs in the original m3u8 with short proxy URLs."""
+    result = raw_m3u8
+    for i, long_url in enumerate(segments):
+        result = result.replace(long_url, f"{base_url}/soundcloud/seg/{track_id}/{i}")
+    return result
 
 
 def fetch_segment(url: str) -> bytes:
