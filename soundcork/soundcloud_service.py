@@ -43,7 +43,7 @@ def resolve_track(url: str) -> dict:
     }
 
 
-_MAX_SEGMENTS = 360  # ~1 hour at 10s per segment
+_MAX_SEGMENTS = 60  # ~10 minutes at 10s per segment
 
 
 def rewrite_m3u8(track_id: str, base_url: str, raw_m3u8: str, segments: list[str], init_url: str | None) -> str:
