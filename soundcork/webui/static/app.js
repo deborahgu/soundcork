@@ -1555,12 +1555,11 @@ function renderEditSoundCloudPreset(main, ip, presetId) {
 
   main.querySelector('#sc-save').addEventListener('click', async () => {
     if (!resolved) return;
-    const baseUrl = state.config.baseUrl || window.location.origin;
-    const location = `${baseUrl}/soundcloud/playlist/${escapeXml(resolved.trackId)}.m3u8`;
+    const location = `/v1/playback/station/sc-${escapeXml(resolved.trackId)}`;
     const containerArt = resolved.thumbnail || '';
     const name = resolved.title || 'SoundCloud';
 
-    const xmlBody = `<preset id="${presetId}"><ContentItem source="LOCAL_INTERNET_RADIO" type="stationurl" location="${escapeXml(location)}" isPresetable="true"><itemName>${escapeXml(name)}</itemName><containerArt>${escapeXml(containerArt)}</containerArt></ContentItem></preset>`;
+    const xmlBody = `<preset id="${presetId}"><ContentItem source="TUNEIN" type="stationurl" location="${escapeXml(location)}" isPresetable="true"><itemName>${escapeXml(name)}</itemName><containerArt>${escapeXml(containerArt)}</containerArt></ContentItem></preset>`;
     try {
       await api.speakerPost(ip, 'storePreset', xmlBody);
       showToast('Preset saved', 'success');

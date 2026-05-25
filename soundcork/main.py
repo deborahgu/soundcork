@@ -1141,6 +1141,21 @@ def bmx_services() -> BmxResponse:
     tags=["bmx"],
 )
 def bmx_playback(station_id: str) -> BmxPlaybackResponse:
+    if station_id.startswith("sc-"):
+        track_id = station_id[3:]
+        info = _sc_cache.get(track_id)
+        if not info:
+            raise HTTPException(status_code=404, detail="Track not resolved")
+        base_url = settings.base_url.rstrip("/")
+        playlist_url = f"{base_url}/soundcloud/playlist/{track_id}.m3u8"
+        stream_list = [Stream(hasPlaylist=True, isRealtime=True, streamUrl=playlist_url)]
+        audio = Audio(hasPlaylist=True, isRealtime=True, streamUrl=playlist_url, streams=stream_list)
+        return BmxPlaybackResponse(
+            audio=audio,
+            imageUrl=info.get("thumbnail", ""),
+            name=info.get("title", "SoundCloud"),
+            streamType="liveRadio",
+        )
     return tunein_playback(station_id)
 
 
