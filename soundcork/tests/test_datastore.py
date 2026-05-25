@@ -2,6 +2,7 @@
 
 These tests mock out all filesystem interactions and focus on logic."""
 
+import json
 import xml.etree.ElementTree as ET
 from unittest.mock import MagicMock, call, mock_open
 
@@ -213,6 +214,21 @@ def test_create_account_returns_false_if_account_dir_present(
 
     assert created is False
     mkdir_mock.assert_not_called()
+
+
+def test_get_account_info_initializes_file_and_returns_default_label(
+    tmp_path, monkeypatch
+):
+    account_dir = tmp_path / "12345"
+    account_dir.mkdir()
+    monkeypatch.setattr("soundcork.datastore.settings.data_dir", str(tmp_path))
+    datastore = DataStore()
+
+    label = datastore.get_account_info("12345")
+
+    assert label == "Unnamed account 12345"
+    accounts = json.loads((tmp_path / "Accounts.json").read_text())
+    assert accounts == {"12345": {"label": "Unnamed account 12345"}}
 
 
 def test_add_device_returns_none_if_account_device_dir_missing(
@@ -592,6 +608,17 @@ def test_save_xml_helpers_open_files_to_write(datastore: DataStore, monkeypatch)
     datastore.save_configured_sources_xml("12345", "<sources />")
 
     assert open_mock.call_count == 3
+
+
+def test_save_configured_sources_xml_skips_empty_source_payload(tmp_path, monkeypatch):
+    account_dir = tmp_path / "12345"
+    account_dir.mkdir()
+    monkeypatch.setattr("soundcork.datastore.settings.data_dir", str(tmp_path))
+    datastore = DataStore()
+
+    datastore.save_configured_sources_xml("12345", "")
+
+    assert not (account_dir / "Sources.xml").exists()
 
 
 def test_etag_for_account_correctly_finds_max(datastore: DataStore, monkeypatch):
