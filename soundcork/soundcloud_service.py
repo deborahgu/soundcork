@@ -1,28 +1,21 @@
 import logging
-import subprocess
-import json
 import urllib.request
-from typing import Optional
+
+import yt_dlp
 
 logger = logging.getLogger(__name__)
 
-_YTDLP_CMD = "yt-dlp"
-
 
 def resolve_track(url: str) -> dict:
-    """Resolve a SoundCloud URL to track metadata and HLS playlist info.
+    """Resolve a SoundCloud URL to track metadata and HLS playlist info."""
+    ydl_opts = {
+        "format": "hls_mp3_1_0/hls_aac_96k/best",
+        "quiet": True,
+        "no_warnings": True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
 
-    Returns dict with keys: title, uploader, duration, thumbnail, m3u8_url, segments.
-    """
-    result = subprocess.run(
-        [_YTDLP_CMD, "-j", "--no-download", "-f", "hls_mp3_1_0/hls_aac_96k/best",
-         url],
-        capture_output=True, text=True, timeout=30,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"yt-dlp failed: {result.stderr.strip()}")
-
-    info = json.loads(result.stdout)
     m3u8_url = info["url"]
 
     raw = urllib.request.urlopen(m3u8_url, timeout=10).read().decode()
@@ -53,13 +46,11 @@ def rewrite_m3u8(track_id: str, base_url: str, durations: list[float], segment_c
         "#EXT-X-VERSION:3",
         f"#EXT-X-TARGETDURATION:{int(max_dur) + 1}",
         "#EXT-X-MEDIA-SEQUENCE:0",
-        "#EXT-X-PLAYLIST-TYPE:VOD",
     ]
     for i in range(segment_count):
         dur = durations[i] if i < len(durations) else 10.0
         lines.append(f"#EXTINF:{dur:.6f},")
         lines.append(f"{base_url}/soundcloud/seg/{track_id}/{i}")
-    lines.append("#EXT-X-ENDLIST")
     return "\n".join(lines) + "\n"
 
 

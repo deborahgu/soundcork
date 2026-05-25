@@ -1556,7 +1556,7 @@ function renderEditSoundCloudPreset(main, ip, presetId) {
   main.querySelector('#sc-save').addEventListener('click', async () => {
     if (!resolved) return;
     const baseUrl = state.config.baseUrl || window.location.origin;
-    const location = `${baseUrl}/soundcloud/playback/${escapeXml(resolved.trackId)}`;
+    const location = `${baseUrl}/soundcloud/playlist/${escapeXml(resolved.trackId)}.m3u8`;
     const containerArt = resolved.thumbnail || '';
     const name = resolved.title || 'SoundCloud';
 
