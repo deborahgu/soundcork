@@ -1148,13 +1148,13 @@ def bmx_playback(station_id: str) -> BmxPlaybackResponse:
             raise HTTPException(status_code=404, detail="Track not resolved")
         base_url = settings.base_url.rstrip("/")
         playlist_url = f"{base_url}/soundcloud/playlist/{track_id}.m3u8"
-        stream_list = [Stream(hasPlaylist=False, isRealtime=False, streamUrl=playlist_url)]
-        audio = Audio(hasPlaylist=False, isRealtime=False, streamUrl=playlist_url, streams=stream_list)
+        stream_list = [Stream(hasPlaylist=True, isRealtime=True, streamUrl=playlist_url)]
+        audio = Audio(hasPlaylist=True, isRealtime=True, streamUrl=playlist_url, streams=stream_list)
         return BmxPlaybackResponse(
             audio=audio,
             imageUrl=info.get("thumbnail", ""),
             name=info.get("title", "SoundCloud"),
-            streamType="onDemand",
+            streamType="liveRadio",
         )
     return tunein_playback(station_id)
 
@@ -1296,7 +1296,7 @@ def sc_playlist(track_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Track not resolved — call /soundcloud/resolve first")
     base_url = settings.base_url.rstrip("/")
     m3u8 = rewrite_m3u8(track_id, base_url, info["raw_m3u8"], info["segments"])
-    return Response(content=m3u8, media_type="application/vnd.apple.mpegurl")
+    return Response(content=m3u8, media_type="audio/mpegurl")
 
 
 @app.get("/soundcloud/seg/{track_id}/{index}", tags=["soundcloud"])
