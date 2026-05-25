@@ -1143,7 +1143,7 @@ def bmx_services() -> BmxResponse:
 def bmx_playback(station_id: str) -> BmxPlaybackResponse:
     if station_id.startswith("sc-"):
         track_id = station_id[3:]
-        info = _sc_cache.get(track_id)
+        info = _sc_ensure_cached(track_id)
         if not info:
             raise HTTPException(status_code=404, detail="Track not resolved")
         info["cursor"] = 0
@@ -1251,10 +1251,29 @@ from soundcork.soundcloud_service import build_m3u8_window, fetch_segment, resol
 
 _sc_cache: dict[str, dict] = {}
 _SC_CACHE_TTL = 3600  # 1 hour
+_SC_URL_MAP_FILE = os.path.join(os.environ.get("data_dir", "."), "sc_urls.json")
 
 
 def _sc_track_id(url: str) -> str:
     return hashlib.sha256(url.encode()).hexdigest()[:16]
+
+
+def _sc_load_url_map() -> dict[str, str]:
+    try:
+        with open(_SC_URL_MAP_FILE) as f:
+            import json
+            return json.load(f)
+    except (FileNotFoundError, ValueError):
+        return {}
+
+
+def _sc_save_url(track_id: str, url: str) -> None:
+    url_map = _sc_load_url_map()
+    url_map[track_id] = url
+    import json
+    os.makedirs(os.path.dirname(_SC_URL_MAP_FILE), exist_ok=True)
+    with open(_SC_URL_MAP_FILE, "w") as f:
+        json.dump(url_map, f)
 
 
 def _sc_get_or_resolve(soundcloud_url: str) -> tuple[str, dict]:
@@ -1266,7 +1285,25 @@ def _sc_get_or_resolve(soundcloud_url: str) -> tuple[str, dict]:
     info["resolved_at"] = time.time()
     info["soundcloud_url"] = soundcloud_url
     _sc_cache[track_id] = info
+    _sc_save_url(track_id, soundcloud_url)
     return track_id, info
+
+
+def _sc_ensure_cached(track_id: str) -> dict | None:
+    """Return cached info, auto-resolving from persisted URL if needed."""
+    info = _sc_cache.get(track_id)
+    if info and time.time() - info["resolved_at"] < _SC_CACHE_TTL:
+        return info
+    url_map = _sc_load_url_map()
+    url = url_map.get(track_id)
+    if not url:
+        return None
+    logger.info("Auto-resolving SoundCloud track %s from persisted URL", track_id)
+    info = resolve_track(url)
+    info["resolved_at"] = time.time()
+    info["soundcloud_url"] = url
+    _sc_cache[track_id] = info
+    return info
 
 
 @app.get("/soundcloud/resolve", tags=["soundcloud"])
@@ -1292,7 +1329,7 @@ def sc_resolve(url: str, request: Request):
 @app.get("/soundcloud/playlist/{track_id}.m3u8", tags=["soundcloud"])
 def sc_playlist(track_id: str, request: Request):
     """Serve a sliding-window HLS playlist with short proxy segment URLs."""
-    info = _sc_cache.get(track_id)
+    info = _sc_ensure_cached(track_id)
     if not info:
         raise HTTPException(status_code=404, detail="Track not resolved — call /soundcloud/resolve first")
     seg_base = os.environ.get("SOUNDCLOUD_SEG_BASE_URL", settings.base_url.rstrip("/"))
@@ -1304,7 +1341,7 @@ def sc_playlist(track_id: str, request: Request):
 @app.get("/soundcloud/seg/{track_id}/{index}", tags=["soundcloud"])
 def sc_segment(track_id: str, index: int):
     """Proxy a single audio segment from SoundCloud's CDN."""
-    info = _sc_cache.get(track_id)
+    info = _sc_ensure_cached(track_id)
     if not info:
         raise HTTPException(status_code=404, detail="Track not resolved")
     segments = info["segments"]
@@ -1324,7 +1361,7 @@ def sc_segment(track_id: str, index: int):
 @app.get("/soundcloud/init/{track_id}", tags=["soundcloud"])
 def sc_init_segment(track_id: str):
     """Proxy the HLS init segment (EXT-X-MAP) for AAC fMP4 streams."""
-    info = _sc_cache.get(track_id)
+    info = _sc_ensure_cached(track_id)
     if not info:
         raise HTTPException(status_code=404, detail="Track not resolved")
     init_url = info.get("init_url")
@@ -1340,7 +1377,7 @@ def sc_init_segment(track_id: str):
 @app.get("/soundcloud/playback/{track_id}", tags=["soundcloud"])
 def sc_bmx_playback(track_id: str, request: Request) -> BmxPlaybackResponse:
     """BMX playback response for SoundCloud — speaker calls this to get the stream URL."""
-    info = _sc_cache.get(track_id)
+    info = _sc_ensure_cached(track_id)
     if not info:
         raise HTTPException(status_code=404, detail="Track not resolved")
     seg_base = os.environ.get("SOUNDCLOUD_SEG_BASE_URL", settings.base_url.rstrip("/"))
