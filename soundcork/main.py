@@ -1295,7 +1295,7 @@ def sc_playlist(track_id: str, request: Request):
     if not info:
         raise HTTPException(status_code=404, detail="Track not resolved — call /soundcloud/resolve first")
     seg_base = os.environ.get("SOUNDCLOUD_SEG_BASE_URL", settings.base_url.rstrip("/"))
-    m3u8 = rewrite_m3u8(track_id, seg_base, info["raw_m3u8"], info["segments"])
+    m3u8 = rewrite_m3u8(track_id, seg_base, info["raw_m3u8"], info["segments"], info.get("init_url"))
     return Response(content=m3u8, media_type="audio/mpegurl")
 
 
@@ -1313,6 +1313,23 @@ def sc_segment(track_id: str, index: int):
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
     return Response(content=data, media_type="audio/mpeg")
+
+
+@app.head("/soundcloud/init/{track_id}", tags=["soundcloud"])
+@app.get("/soundcloud/init/{track_id}", tags=["soundcloud"])
+def sc_init_segment(track_id: str):
+    """Proxy the HLS init segment (EXT-X-MAP) for AAC fMP4 streams."""
+    info = _sc_cache.get(track_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="Track not resolved")
+    init_url = info.get("init_url")
+    if not init_url:
+        raise HTTPException(status_code=404, detail="No init segment for this track")
+    try:
+        data = fetch_segment(init_url)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return Response(content=data, media_type="video/mp4")
 
 
 @app.get("/soundcloud/playback/{track_id}", tags=["soundcloud"])
