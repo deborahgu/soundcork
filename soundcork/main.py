@@ -1374,6 +1374,49 @@ def sc_init_segment(track_id: str):
     return Response(content=data, media_type="video/mp4")
 
 
+@app.post("/soundcloud/skip/{track_id}", tags=["soundcloud"])
+async def sc_skip(track_id: str, request: Request):
+    """Skip forward or backward by adjusting the cursor. delta is in segments (±)."""
+    info = _sc_ensure_cached(track_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="Track not resolved")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    delta = int(body.get("delta", 3))
+    total = len(info["segments"])
+    cursor = info.get("cursor", 0)
+    new_cursor = max(0, min(cursor + delta, total))
+    info["cursor"] = new_cursor
+    target_duration = info.get("target_duration", 10)
+    return {
+        "cursor": new_cursor,
+        "total": total,
+        "positionSeconds": new_cursor * target_duration,
+        "durationSeconds": total * target_duration,
+    }
+
+
+@app.get("/soundcloud/status/{track_id}", tags=["soundcloud"])
+def sc_status(track_id: str):
+    """Get current playback position for a SoundCloud track."""
+    info = _sc_ensure_cached(track_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="Track not resolved")
+    total = len(info["segments"])
+    cursor = info.get("cursor", 0)
+    target_duration = info.get("target_duration", 10)
+    return {
+        "trackId": track_id,
+        "title": info.get("title", ""),
+        "cursor": cursor,
+        "total": total,
+        "positionSeconds": cursor * target_duration,
+        "durationSeconds": total * target_duration,
+    }
+
+
 @app.get("/soundcloud/playback/{track_id}", tags=["soundcloud"])
 def sc_bmx_playback(track_id: str, request: Request) -> BmxPlaybackResponse:
     """BMX playback response for SoundCloud — speaker calls this to get the stream URL."""

@@ -885,11 +885,12 @@ function renderSpeakerDetail(main, ip) {
   function renderNowPlaying(np) {
     const section = main.querySelector('#now-playing-section');
     const hasArt = np.art && np.artImageStatus === 'IMAGE_PRESENT';
-    // Use album art if available, fall back to station/container art (album CDN may be dead)
     const artUrl = hasArt ? np.art : np.containerArt;
     const spotifyUri = np.source === 'SPOTIFY' ? decodeSpotifyUri(np.location || '') : null;
     const spotifyUrl = spotifyWebUrl(spotifyUri);
     const fallbackSrc = np.containerArt && np.containerArt !== np.art ? proxyImage(np.containerArt) : '';
+    const scMatch = (np.location || '').match(/\/v1\/playback\/station\/sc-(.+)/);
+    const scTrackId = scMatch ? scMatch[1] : null;
     section.innerHTML = `
       <div class="now-playing">
         ${artUrl
@@ -899,15 +900,20 @@ function renderSpeakerDetail(main, ip) {
           <div class="now-playing-track">${escapeHtml(np.track || 'Nothing playing')}</div>
           ${np.artist ? `<div class="now-playing-artist">${escapeHtml(np.artist)}</div>` : ''}
           ${np.album ? `<div class="now-playing-album">${escapeHtml(np.album)}</div>` : ''}
+          ${scTrackId ? `<div class="sc-progress" id="sc-progress"><span class="text-hint" id="sc-position">--:-- / --:--</span></div>` : ''}
           <div class="now-playing-controls">
-            <button class="btn btn-icon" id="prev-btn" title="Previous Track">&#x23EE;</button>
-            <button class="btn btn-icon btn-lg" id="play-pause-btn" title="Play/Pause">&#x23EF;</button>
-            <button class="btn btn-icon" id="next-btn" title="Next Track">&#x23ED;</button>
+            ${scTrackId
+              ? `<button class="btn btn-icon" id="sc-back-btn" title="Back 30s">-30s</button>
+                 <button class="btn btn-icon btn-lg" id="play-pause-btn" title="Play/Pause">&#x23EF;</button>
+                 <button class="btn btn-icon" id="sc-fwd-btn" title="Forward 30s">+30s</button>`
+              : `<button class="btn btn-icon" id="prev-btn" title="Previous Track">&#x23EE;</button>
+                 <button class="btn btn-icon btn-lg" id="play-pause-btn" title="Play/Pause">&#x23EF;</button>
+                 <button class="btn btn-icon" id="next-btn" title="Next Track">&#x23ED;</button>`}
           </div>
           <div class="now-playing-controls-secondary">
-            <button class="btn btn-icon btn-sm ${np.shuffleSetting === 'SHUFFLE_ON' ? 'active' : ''}" id="shuffle-btn" title="Shuffle">&#x1F500;</button>
-            <button class="btn btn-icon btn-sm ${np.repeatSetting !== 'REPEAT_OFF' ? 'active' : ''}" id="repeat-btn" title="Repeat">${np.repeatSetting === 'REPEAT_ONE' ? '&#x1F502;' : '&#x1F501;'}</button>
-            ${sourceBadge(np.source)}
+            ${scTrackId ? '' : `<button class="btn btn-icon btn-sm ${np.shuffleSetting === 'SHUFFLE_ON' ? 'active' : ''}" id="shuffle-btn" title="Shuffle">&#x1F500;</button>
+            <button class="btn btn-icon btn-sm ${np.repeatSetting !== 'REPEAT_OFF' ? 'active' : ''}" id="repeat-btn" title="Repeat">${np.repeatSetting === 'REPEAT_ONE' ? '&#x1F502;' : '&#x1F501;'}</button>`}
+            ${scTrackId ? '<span class="badge">SoundCloud</span>' : sourceBadge(np.source)}
             ${spotifyUrl ? `<a href="${escapeHtml(spotifyUrl)}" target="_blank" rel="noopener" class="btn btn-sm">Open Spotify</a>` : ''}
           </div>
         </div>
@@ -929,6 +935,35 @@ function renderSpeakerDetail(main, ip) {
       else if (np.repeatSetting === 'REPEAT_ALL') sendKey('REPEAT_ONE');
       else sendKey('REPEAT_OFF');
     });
+
+    if (scTrackId) {
+      function fmtTime(s) {
+        const m = Math.floor(s / 60);
+        return m + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+      }
+      async function scSkip(delta) {
+        try {
+          const resp = await fetch(`/webui/api/soundcloud/skip/${encodeURIComponent(scTrackId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ delta }),
+          });
+          if (!resp.ok) throw new Error('Skip failed');
+          const data = await resp.json();
+          updateScPosition(data);
+        } catch (err) { showToast(err.message, 'error'); }
+      }
+      function updateScPosition(data) {
+        const el = section.querySelector('#sc-position');
+        if (el) el.textContent = fmtTime(data.positionSeconds) + ' / ' + fmtTime(data.durationSeconds);
+      }
+      section.querySelector('#sc-back-btn')?.addEventListener('click', () => scSkip(-3));
+      section.querySelector('#sc-fwd-btn')?.addEventListener('click', () => scSkip(3));
+      fetch(`/webui/api/soundcloud/status/${encodeURIComponent(scTrackId)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) updateScPosition(data); })
+        .catch(() => {});
+    }
   }
 
   function renderVolumeControl(vol) {
