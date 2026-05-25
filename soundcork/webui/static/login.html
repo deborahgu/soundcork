@@ -128,6 +128,10 @@
     </div>
   </div>
   <script>
+    // Clear any stale CSRF token from a previous session (e.g. after pod restart,
+    // the server redirects here with 302 — the fetch wrapper's 401 handler never fires)
+    sessionStorage.removeItem('csrf_token');
+
     // Check if OIDC is enabled and show the appropriate login method
     (async function() {
       try {
