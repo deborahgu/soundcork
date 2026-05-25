@@ -561,6 +561,9 @@ class DataStore:
         name = strip_element_text(info_elem.find("name"))
         type = strip_element_text(info_elem.find("type"))
         module_type = strip_element_text(info_elem.find("moduleType"))
+        product_code = type
+        if module_type and not type.lower().endswith(f" {module_type.lower()}"):
+            product_code = f"{type} {module_type}"
 
         try:
             components = info_elem.find("components").findall("component")  # type: ignore
@@ -598,7 +601,7 @@ class DataStore:
         try:
             return DeviceInfo(
                 device_id=device_id,
-                product_code=f"{type} {module_type}",
+                product_code=product_code,
                 device_serial_number=str(device_serial_number),
                 product_serial_number=str(product_serial_number),
                 firmware_version=str(firmware_version),

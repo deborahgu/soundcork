@@ -125,6 +125,67 @@ def test_get_device_info(
     assert result.name == sample_device.name
 
 
+def test_device_info_from_device_info_xml_does_not_append_empty_module_type(
+    datastore: DataStore,
+):
+    xml = ET.fromstring("""
+        <info deviceID="2C6B7D49B097">
+            <name>kuchyn</name>
+            <type>SoundTouch 10 sm2</type>
+            <components>
+                <component>
+                    <componentCategory>SCM</componentCategory>
+                    <softwareVersion>1</softwareVersion>
+                    <serialNumber>A</serialNumber>
+                </component>
+                <component>
+                    <componentCategory>PackagedProduct</componentCategory>
+                    <serialNumber>B</serialNumber>
+                </component>
+            </components>
+            <networkInfo type="SCM">
+                <macAddress>2C6B7D49B097</macAddress>
+                <ipAddress>192.168.11.71</ipAddress>
+            </networkInfo>
+        </info>
+    """)
+
+    result = datastore.device_info_from_device_info_xml(xml)
+
+    assert result.product_code == "SoundTouch 10 sm2"
+
+
+def test_device_info_from_device_info_xml_appends_present_module_type(
+    datastore: DataStore,
+):
+    xml = ET.fromstring("""
+        <info deviceID="2C6B7D49B097">
+            <name>kuchyn</name>
+            <type>SoundTouch 10</type>
+            <moduleType>sm2</moduleType>
+            <components>
+                <component>
+                    <componentCategory>SCM</componentCategory>
+                    <softwareVersion>1</softwareVersion>
+                    <serialNumber>A</serialNumber>
+                </component>
+                <component>
+                    <componentCategory>PackagedProduct</componentCategory>
+                    <serialNumber>B</serialNumber>
+                </component>
+            </components>
+            <networkInfo type="SCM">
+                <macAddress>2C6B7D49B097</macAddress>
+                <ipAddress>192.168.11.71</ipAddress>
+            </networkInfo>
+        </info>
+    """)
+
+    result = datastore.device_info_from_device_info_xml(xml)
+
+    assert result.product_code == "SoundTouch 10 sm2"
+
+
 def test_save_device_info_returns_object_and_writes_file(
     datastore: DataStore,
     sample_device: DeviceInfo,
