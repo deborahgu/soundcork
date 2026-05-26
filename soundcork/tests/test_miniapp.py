@@ -84,12 +84,22 @@ def set_cookie_headers(response) -> list[str]:
     return response.headers.get_list("set-cookie")
 
 
+def cookie_headers_text(response) -> str:
+    return "\n".join(set_cookie_headers(response))
+
+
+def assert_cookie_deleted(cookies: str, cookie_name: str) -> None:
+    assert f"{cookie_name}=" in cookies
+    assert "Max-Age=0" in cookies
+
+
 def test_select_device_percent_encodes_unicode_cookie(monkeypatch):
     client, _speakers = make_client(monkeypatch)
 
     response = client.post(
         "/miniapp/select-device",
         data={"device_id": DEVICE_ID, "device_name": "ložnice"},
+        headers={"Cookie": f"soundcork_account_id={ACCOUNT_ID}"},
         follow_redirects=False,
     )
 
@@ -121,13 +131,71 @@ def test_dashboard_decodes_display_cookies(monkeypatch):
     assert "Rádio Proglas" in response.text
 
 
+def test_login_clears_stale_selection_cookies(monkeypatch):
+    client, _speakers = make_client(monkeypatch)
+
+    response = client.post(
+        "/miniapp/login",
+        data={"account_id": ACCOUNT_ID},
+        headers={
+            "Cookie": (
+                "soundcork_selected_device=Bos%C3%ADk; "
+                "soundcork_selected_device_id=stale-device; "
+                "soundcork_selected_content_item_name=BBC; "
+                "soundcork_selected_content_item_id=99; "
+                "soundcork_is_playing=true"
+            )
+        },
+        follow_redirects=False,
+    )
+
+    cookies = cookie_headers_text(response)
+    assert response.status_code == 303
+    assert_cookie_deleted(cookies, "soundcork_selected_device")
+    assert_cookie_deleted(cookies, "soundcork_selected_device_id")
+    assert_cookie_deleted(cookies, "soundcork_selected_content_item_name")
+    assert_cookie_deleted(cookies, "soundcork_selected_content_item_id")
+    assert_cookie_deleted(cookies, "soundcork_is_playing")
+
+
+def test_dashboard_clears_stale_selected_device(monkeypatch):
+    client, _speakers = make_client(monkeypatch)
+
+    response = client.get(
+        "/miniapp/dashboard",
+        headers={
+            "Cookie": (
+                f"soundcork_account_id={ACCOUNT_ID}; "
+                "soundcork_selected_device=Bos%C3%ADk; "
+                "soundcork_selected_device_id=stale-device; "
+                "soundcork_selected_content_item_name=R%C3%A1dio%20Proglas; "
+                "soundcork_selected_content_item_id=4; "
+                "soundcork_is_playing=true"
+            )
+        },
+    )
+
+    cookies = cookie_headers_text(response)
+    assert response.status_code == 200
+    assert "Bosík" not in response.text
+    assert "Play" not in response.text
+    assert_cookie_deleted(cookies, "soundcork_selected_device")
+    assert_cookie_deleted(cookies, "soundcork_selected_device_id")
+    assert_cookie_deleted(cookies, "soundcork_is_playing")
+
+
 def test_select_content_item_plays_when_device_is_selected(monkeypatch):
     client, speakers = make_client(monkeypatch)
 
     response = client.post(
         "/miniapp/select-content-item",
         data={"content_item_id": "4", "content_item_name": "Rádio Proglas"},
-        headers={"Cookie": f"soundcork_selected_device_id={DEVICE_ID}"},
+        headers={
+            "Cookie": (
+                f"soundcork_account_id={ACCOUNT_ID}; "
+                f"soundcork_selected_device_id={DEVICE_ID}"
+            )
+        },
         follow_redirects=False,
     )
 
@@ -136,6 +204,28 @@ def test_select_content_item_plays_when_device_is_selected(monkeypatch):
     assert speakers.play_calls == [(DEVICE_ID, "4")]
     assert "soundcork_selected_content_item_name=R%C3%A1dio%20Proglas" in cookies
     assert "soundcork_is_playing=true" in cookies
+
+
+def test_select_content_item_ignores_stale_selected_device(monkeypatch):
+    client, speakers = make_client(monkeypatch)
+
+    response = client.post(
+        "/miniapp/select-content-item",
+        data={"content_item_id": "4", "content_item_name": "Rádio Proglas"},
+        headers={
+            "Cookie": (
+                f"soundcork_account_id={ACCOUNT_ID}; "
+                "soundcork_selected_device_id=stale-device"
+            )
+        },
+        follow_redirects=False,
+    )
+
+    cookies = cookie_headers_text(response)
+    assert response.status_code == 303
+    assert speakers.play_calls == []
+    assert "soundcork_selected_content_item_name=R%C3%A1dio%20Proglas" in cookies
+    assert_cookie_deleted(cookies, "soundcork_selected_device_id")
 
 
 def test_select_content_item_without_device_only_selects(monkeypatch):
@@ -160,7 +250,12 @@ def test_select_content_item_records_failed_playback(monkeypatch):
     response = client.post(
         "/miniapp/select-content-item",
         data={"content_item_id": "4", "content_item_name": "Rádio Proglas"},
-        headers={"Cookie": f"soundcork_selected_device_id={DEVICE_ID}"},
+        headers={
+            "Cookie": (
+                f"soundcork_account_id={ACCOUNT_ID}; "
+                f"soundcork_selected_device_id={DEVICE_ID}"
+            )
+        },
         follow_redirects=False,
     )
 
