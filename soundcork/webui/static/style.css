@@ -626,10 +626,6 @@ input[type="range"]::-moz-range-thumb {
   color: var(--accent);
   background: var(--bg-secondary);
 }
-.sc-progress {
-  margin-top: 0.5rem;
-  text-align: center;
-}
 
 /* --- Remote Control Grid --- */
 .remote-grid {

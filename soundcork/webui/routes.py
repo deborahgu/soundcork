@@ -496,49 +496,6 @@ async def proxy_soundcloud_resolve(url: str):
         return Response(content="SoundCloud resolve failed", status_code=502)
 
 
-@router.post("/api/soundcloud/skip/{track_id}")
-async def proxy_soundcloud_skip(track_id: str, request: Request):
-    """Proxy SoundCloud skip requests to the main app."""
-    base = _settings.base_url or "http://localhost:8000"
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{base}/soundcloud/skip/{track_id}",
-                json=body,
-                timeout=5.0,
-            )
-        return Response(
-            content=resp.content,
-            status_code=resp.status_code,
-            headers={"Content-Type": resp.headers.get("content-type", "application/json")},
-        )
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
-        logger.warning(f"SoundCloud skip proxy error: {e}")
-        return Response(content="SoundCloud skip failed", status_code=502)
-
-
-@router.get("/api/soundcloud/status/{track_id}")
-async def proxy_soundcloud_status(track_id: str):
-    """Proxy SoundCloud status requests to the main app."""
-    base = _settings.base_url or "http://localhost:8000"
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{base}/soundcloud/status/{track_id}",
-                timeout=5.0,
-            )
-        return Response(
-            content=resp.content,
-            status_code=resp.status_code,
-            headers={"Content-Type": resp.headers.get("content-type", "application/json")},
-        )
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
-        logger.warning(f"SoundCloud status proxy error: {e}")
-        return Response(content="SoundCloud status failed", status_code=502)
 
 
 # --- WebSocket Proxy ---
