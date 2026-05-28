@@ -1146,7 +1146,8 @@ def bmx_playback(station_id: str) -> BmxPlaybackResponse:
         info = _sc_ensure_cached(track_id)
         if not info:
             raise HTTPException(status_code=404, detail="Track not resolved")
-        info["cursor"] = 0
+        if not info.pop("_skip_pending", False):
+            info["cursor"] = 0
         seg_base = os.environ.get("SOUNDCLOUD_SEG_BASE_URL", settings.base_url.rstrip("/"))
         playlist_url = f"{seg_base}/soundcloud/playlist/{track_id}.m3u8"
         stream_list = [Stream(hasPlaylist=True, isRealtime=True, streamUrl=playlist_url)]
@@ -1389,6 +1390,7 @@ async def sc_skip(track_id: str, request: Request):
     cursor = info.get("cursor", 0)
     new_cursor = max(0, min(cursor + delta, total))
     info["cursor"] = new_cursor
+    info["_skip_pending"] = True
     target_duration = info.get("target_duration", 10)
     return {
         "cursor": new_cursor,

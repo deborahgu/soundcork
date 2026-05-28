@@ -951,6 +951,9 @@ function renderSpeakerDetail(main, ip) {
           if (!resp.ok) throw new Error('Skip failed');
           const data = await resp.json();
           updateScPosition(data);
+          const loc = `/v1/playback/station/sc-${scTrackId}`;
+          const selectXml = `<ContentItem source="TUNEIN" type="stationurl" location="${escapeXml(loc)}" isPresetable="true"><itemName>${escapeXml(np.itemName || np.track || 'SoundCloud')}</itemName></ContentItem>`;
+          await api.speakerPost(ip, 'select', selectXml);
         } catch (err) { showToast(err.message, 'error'); }
       }
       function updateScPosition(data) {
