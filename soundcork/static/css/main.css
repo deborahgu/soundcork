@@ -172,8 +172,6 @@ header button:hover {
     content: "🎧"
 }
 
-.device-info,
-.content-item-info,
 .account-info
 {
     border: 2px solid var(--color-accent-bg);
@@ -184,8 +182,6 @@ header button:hover {
     font-size: 0.875rem;
     min-height: 3rem;
     display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .playback-control {
@@ -465,7 +461,7 @@ button.preset-card:hover {
     word-wrap: break-word;
 }
 
-.device-type {
+.device-now-playing {
     color: var(--color-text-secondary);
     font-size: 0.875rem;
 }

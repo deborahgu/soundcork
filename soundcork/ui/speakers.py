@@ -1,7 +1,7 @@
 import logging
 import xml.etree.ElementTree as ET
 
-from bosesoundtouchapi.models import SimpleConfig  # type: ignore
+from bosesoundtouchapi.models import NowPlayingStatus, Volume  # type: ignore
 from bosesoundtouchapi.soundtouchclient import (  # type: ignore
     ContentItem as BCContentItem,
     SoundTouchClient,
@@ -215,6 +215,29 @@ class Speakers:
             logger.error(f"Error stopping playback on device {device_id}: {e}")
             return False
 
+    def get_volume(self, device_id: str, refresh: bool = False) -> Volume | None:
+        """Get the volume of a specific speaker device
+
+        Args:
+            device_id: The device ID to play on
+
+            refresh (bool): True to query the device for realtime information
+               and refresh the cache; otherwise, False. Default False.
+
+        Returns:
+            Volume object if successful, None otherwise
+        """
+        cd = self.all_devices().get(device_id)
+        if not cd or not cd.st_device:
+            logger.error(f"Device {device_id} not found or not online")
+            return False
+
+        client = SoundTouchClient(cd.st_device)
+        volume = client.GetVolume(refresh=refresh)
+        logger.info(f"Volume: {volume.Actual, volume.Target, volume.IsMuted}")
+
+        return volume
+
     async def set_name(self, device_id: str, name: str) -> bool:
         """Sets the name of a device.
 
@@ -285,3 +308,20 @@ class Speakers:
             st_client.Put(SoundTouchNodes.setMargeAccount, payload)
             return True
         return False
+
+    def get_now_playing_status(self, device_id: str) -> NowPlayingStatus | None:
+        """Get the Now Playing information from the device.
+
+        Args:
+            device_id: The device being queried.
+
+        Returns:
+            A BoseSoundTouchApi NowPlayingStatus object.
+        """
+        cd = self.all_devices().get(device_id)
+        if not cd or not cd.st_device:
+            logger.error(f"Device {device_id} not found or not online")
+            return None
+
+        client = SoundTouchClient(cd.st_device)
+        return client.GetNowPlayingStatus()
