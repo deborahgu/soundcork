@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:element name="SoundTouchSdkPrivateCfg">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="margeServerUrl"/>
+        <xs:element ref="statsServerUrl"/>
+        <xs:element ref="swUpdateUrl"/>
+        <xs:element ref="usePandoraProductionServer"/>
+        <xs:element ref="isZeroconfEnabled"/>
+        <xs:element ref="saveMargeCustomerReport"/>
+        <xs:element ref="bmxRegistryUrl"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="margeServerUrl" type="xs:anyURI"/>
+  <xs:element name="statsServerUrl" type="xs:anyURI"/>
+  <xs:element name="swUpdateUrl" type="xs:anyURI"/>
+  <xs:element name="usePandoraProductionServer" type="xs:boolean"/>
+  <xs:element name="isZeroconfEnabled" type="xs:boolean"/>
+  <xs:element name="saveMargeCustomerReport" type="xs:boolean"/>
+  <xs:element name="bmxRegistryUrl" type="xs:anyURI"/>
+  <xs:element name="group">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="name"/>
+        <xs:element ref="masterDeviceId"/>
+        <xs:element ref="roles"/>
+        <xs:element minOccurs="0" ref="senderIPAddress"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:string" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="masterDeviceId" type="xs:NMTOKEN"/>
+  <xs:element name="roles">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="groupRole"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="groupRole">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="deviceId"/>
+        <xs:element ref="role"/>
+        <xs:element ref="ipAddress"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="deviceId" type="xs:NMTOKEN"/>
+  <xs:element name="role" type="xs:NCName"/>
+  <xs:element name="senderIPAddress" type="xs:NMTOKEN"/>
+  <xs:element name="info">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="name"/>
+        <xs:element ref="type"/>
+        <xs:element ref="margeAccountUUID"/>
+        <xs:element ref="components"/>
+        <xs:element ref="margeURL"/>
+        <xs:element maxOccurs="unbounded" ref="networkInfo"/>
+        <xs:element ref="moduleType"/>
+        <xs:element ref="variant"/>
+        <xs:element ref="variantMode"/>
+        <xs:element ref="countryCode"/>
+        <xs:element ref="regionCode"/>
+      </xs:sequence>
+      <xs:attribute name="deviceID" use="required" type="xs:NMTOKEN"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="type" type="xs:string"/>
+  <xs:element name="margeAccountUUID" type="xs:integer"/>
+  <xs:element name="components">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="component"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="component">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="componentCategory"/>
+        <xs:element ref="softwareVersion"/>
+        <xs:element ref="serialNumber"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="componentCategory" type="xs:NCName"/>
+  <xs:element name="softwareVersion" type="xs:string"/>
+  <xs:element name="serialNumber" type="xs:NMTOKEN"/>
+  <xs:element name="margeURL" type="xs:anyURI"/>
+  <xs:element name="networkInfo">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="macAddress"/>
+        <xs:element ref="ipAddress"/>
+      </xs:sequence>
+      <xs:attribute name="type" use="required" type="xs:NCName"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="macAddress" type="xs:NMTOKEN"/>
+  <xs:element name="moduleType" type="xs:NCName"/>
+  <xs:element name="variant" type="xs:NCName"/>
+  <xs:element name="variantMode" type="xs:NCName"/>
+  <xs:element name="countryCode" type="xs:NCName"/>
+  <xs:element name="regionCode" type="xs:NCName"/>
+  <xs:element name="presets">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="preset"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="preset">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="ContentItem"/>
+      </xs:sequence>
+      <xs:attribute name="createdOn" use="optional" type="xs:integer"/>
+      <xs:attribute name="id" use="required" type="xs:integer"/>
+      <xs:attribute name="updatedOn" use="required" type="xs:integer"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ContentItem">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="itemName"/>
+        <xs:element minOccurs="0" ref="containerArt"/>
+      </xs:sequence>
+      <xs:attribute name="isPresetable" use="required" type="xs:boolean"/>
+      <xs:attribute name="location" use="required"/>
+      <xs:attribute name="source" use="required" type="xs:NCName"/>
+      <xs:attribute name="sourceAccount" use="required"/>
+      <xs:attribute name="type" type="xs:NCName"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="recents">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="recent"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="recent">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="contentItem"/>
+      </xs:sequence>
+      <xs:attribute name="deviceID" use="required" type="xs:NCName"/>
+      <xs:attribute name="id" use="required" type="xs:integer"/>
+      <xs:attribute name="utcTime" use="required" type="xs:integer"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="contentItem">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="itemName"/>
+        <xs:element minOccurs="0" ref="containerArt"/>
+      </xs:sequence>
+      <xs:attribute name="isPresetable" use="required" type="xs:boolean"/>
+      <xs:attribute name="location" use="required" type="xs:string" />
+      <xs:attribute name="source" use="required" type="xs:NCName"/>
+      <xs:attribute name="sourceAccount" use="required" type="xs:string" />
+      <xs:attribute name="type" type="xs:NCName"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="sources">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="source"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="source">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="sourceKey"/>
+      </xs:sequence>
+      <xs:attribute name="displayName" type="xs:string" />
+      <xs:attribute name="secret" use="required" type="xs:string" />
+      <xs:attribute name="secretType" use="required" type="xs:string" />
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="sourceKey">
+    <xs:complexType>
+      <xs:attribute name="account" use="required" type="xs:string" />
+      <xs:attribute name="type" use="required" type="xs:NCName"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="itemName" type="xs:string"/>
+  <xs:element name="containerArt" type="xs:anyURI"/>
+  <xs:element name="name" type="xs:string"/>
+  <xs:element name="ipAddress" type="xs:NMTOKEN"/>
+</xs:schema>
