@@ -1,0 +1,89 @@
+play_preset:
+  name: Play Preset
+  description: Play a numbered preset (1-6) on a SoundCork speaker.
+  target:
+    entity:
+      integration: soundcork
+      domain: media_player
+  fields:
+    preset:
+      name: Preset Number
+      description: The preset slot to play (1-6).
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 6
+          mode: box
+
+store_preset_tunein:
+  name: Store TuneIn Preset
+  description: Save a TuneIn radio station to a preset slot on a SoundCork speaker.
+  target:
+    entity:
+      integration: soundcork
+      domain: media_player
+  fields:
+    preset:
+      name: Preset Number
+      description: The preset slot to save to (1-6).
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 6
+          mode: box
+    station_id:
+      name: Station ID
+      description: TuneIn station guide ID (e.g. s23452).
+      required: true
+      selector:
+        text:
+    name:
+      name: Station Name
+      description: Display name for the preset.
+      required: true
+      selector:
+        text:
+    art_url:
+      name: Artwork URL
+      description: URL for the station logo image (optional).
+      required: false
+      selector:
+        text:
+
+store_preset_radio:
+  name: Store Internet Radio Preset
+  description: Save a direct stream URL to a preset slot on a SoundCork speaker.
+  target:
+    entity:
+      integration: soundcork
+      domain: media_player
+  fields:
+    preset:
+      name: Preset Number
+      description: The preset slot to save to (1-6).
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 6
+          mode: box
+    stream_url:
+      name: Stream URL
+      description: Direct audio stream URL (mp3, aac, etc).
+      required: true
+      selector:
+        text:
+    name:
+      name: Station Name
+      description: Display name for the preset.
+      required: true
+      selector:
+        text:
+    art_url:
+      name: Artwork URL
+      description: URL for the station logo image (optional).
+      required: false
+      selector:
+        text:

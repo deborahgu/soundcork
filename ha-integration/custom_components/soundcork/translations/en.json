@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to SoundCork",
+        "description": "Enter the URL of your SoundCork server.",
+        "data": {
+          "base_url": "SoundCork URL"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to SoundCork. Check the URL and try again.",
+      "no_speakers": "Connected to SoundCork but no speakers were found.",
+      "unknown": "Unexpected error. Check logs for details."
+    },
+    "abort": {
+      "already_configured": "SoundCork is already configured."
+    }
+  }
+}

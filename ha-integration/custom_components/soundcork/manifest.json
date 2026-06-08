@@ -1,0 +1,14 @@
+{
+  "domain": "soundcork",
+  "name": "SoundCork",
+  "icon": "mdi:music",
+  "version": "1.0.0",
+  "documentation": "https://github.com/timvw/soundcork",
+  "issue_tracker": "https://github.com/timvw/soundcork/issues",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": [],
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "integration_type": "hub"
+}

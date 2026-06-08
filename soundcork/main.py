@@ -165,9 +165,11 @@ app.include_router(mgmt_router)
 
 from fastapi.staticfiles import StaticFiles
 
+from soundcork.api.v1 import router as api_v1_router
 from soundcork.oidc import router as oidc_router
 from soundcork.webui.routes import router as webui_router
 
+app.include_router(api_v1_router)
 app.include_router(webui_router)
 app.include_router(oidc_router)
 app.mount(
