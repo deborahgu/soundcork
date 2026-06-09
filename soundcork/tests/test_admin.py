@@ -59,6 +59,9 @@ def management_devices_response(
                 marge_url="https://streaming.bose.com",
                 marge_server=marge_server,
                 uses_this_soundcork=False,
+                internet_radio_ready=False,
+                playback_capability="Needs repair",
+                playback_capability_detail="Radio sources are not ready.",
                 source="datastore",
             )
         ]
@@ -94,9 +97,11 @@ def test_admin_shows_live_marge_and_telnet_repair_action(monkeypatch):
 
     assert response.status_code == 200
     assert "Status guide" in response.text
+    assert "Playback" in response.text
+    assert "Needs repair" in response.text
     assert "REST /info" in response.text
     assert "Telnet CLIServer" in response.text
-    assert "Repair Soundcork routing" in response.text
+    assert "Switch to Soundcork" in response.text
     assert f"/admin/switchToSoundcork/{DEVICE_ID}" in response.text
     assert "B0D5CC0391DB" not in response.text
     assert "Swtich" not in response.text

@@ -6,10 +6,11 @@
             <summary>Status guide</summary>
             <ul>
                 <li><strong>Live Marge</strong> is read from the speaker's current <code>/info</code> response. <strong>Soundcork</strong> means the speaker already points at this server, <strong>Bose</strong> means it still points at Bose cloud URLs, and <strong>Other</strong> means it points somewhere else.</li>
+                <li><strong>Playback</strong> is inferred from the live <code>/sources</code> response. <strong>Soundcork-ready</strong> means this server is selected and radio sources are ready, <strong>Legacy-ready</strong> means the speaker still points at Bose but radio sources are still ready until a reboot, and <strong>Needs repair</strong> means internet radio sources are not currently ready.</li>
                 <li><strong>REST /info</strong> means the speaker answered its HTTP API on port 8090. This is enough to inspect live state, but not enough to rewrite Bose URLs.</li>
                 <li><strong>SSH</strong> means root shell access is available on port 22. Soundcork can copy the override XML and reboot the speaker.</li>
                 <li><strong>Telnet CLIServer</strong> means the non-rooted SoundTouch command port 17000 is reachable. Soundcork can ask the speaker to update its Bose URLs and reboot.</li>
-                <li><strong>Repair Soundcork routing</strong> sets the Bose service URLs to this Soundcork instance. Use it when Live Marge is not Soundcork and either SSH or Telnet CLIServer is available.</li>
+                <li><strong>Switch to Soundcork</strong> sets the Bose service URLs to this Soundcork instance. Use it when Live Marge is not Soundcork and either SSH or Telnet CLIServer is available.</li>
             </ul>
         </details>
 
@@ -25,6 +26,7 @@
                 <th>IP Address</th>
                 <th>Name</th>
                 <th>Live Marge</th>
+                <th>Playback</th>
                 <th>REST /info</th>
                 <th>Discovery</th>
                 <th>In Soundcork</th>
@@ -39,6 +41,7 @@
                     <td>{{device.ip}}</td>
                     <td>{{device.name}}</td>
                     <td title="{{device.marge_url or ''}}">{{device.marge_server}}</td>
+                    <td title="{{device.playback_capability_detail or ''}}">{{device.playback_capability}}</td>
                     <td>{{device.rest_reachable}}</td>
                     <td>{{device.online}}</td>
                     <td>{{device.in_soundcork}}</td>
@@ -57,7 +60,7 @@
                           {% endif %}
                         {% elif device.repair_available %}
                         <form action="/admin/switchToSoundcork/{{device.id}}" method="POST">
-                            <input type="submit" value="Repair Soundcork routing">
+                            <input type="submit" value="Switch to Soundcork">
                         </form>
                         {% elif device.marge_server == "Soundcork" %}
                         Already using Soundcork
@@ -90,6 +93,7 @@
                 <th>IP Address</th>
                 <th>Name</th>
                 <th>Live Marge</th>
+                <th>Playback</th>
                 <th>REST /info</th>
                 <th>Discovery</th>
                 <th>SSH</th>
@@ -103,6 +107,7 @@
                     <td>{{device.ip}}</td>
                     <td>{{device.name}}</td>
                     <td title="{{device.marge_url or ''}}">{{device.marge_server}}</td>
+                    <td title="{{device.playback_capability_detail or ''}}">{{device.playback_capability}}</td>
                     <td>{{device.rest_reachable}}</td>
                     <td>{{device.online}}</td>
                     <td>{{device.ssh_reachable}}</td>
@@ -119,7 +124,7 @@
                         </form>
                         {% elif device.repair_available %}
                         <form action="/admin/switchToSoundcork/{{device.id}}" method="POST">
-                            <input type="submit" value="Repair Soundcork routing">
+                            <input type="submit" value="Switch to Soundcork">
                         </form>
                         {% elif device.marge_server != "Soundcork" %}
                         Needs SSH or Telnet CLIServer

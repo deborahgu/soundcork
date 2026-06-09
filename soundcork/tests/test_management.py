@@ -34,6 +34,21 @@ def device_info_xml(
 </info>"""
 
 
+def sources_xml(
+    local_internet_radio_status: str | None = "READY",
+    tunein_status: str | None = "READY",
+) -> str:
+    items = []
+    if tunein_status is not None:
+        items.append(f'<sourceItem source="TUNEIN" status="{tunein_status}" />')
+    if local_internet_radio_status is not None:
+        items.append(
+            '<sourceItem source="LOCAL_INTERNET_RADIO" '
+            f'status="{local_internet_radio_status}" />'
+        )
+    return "<sources>" + "".join(items) + "</sources>"
+
+
 class FakeDatastore:
     def __init__(self):
         self.device = DeviceInfo(
@@ -76,6 +91,7 @@ def test_list_management_devices_refreshes_marge_url_from_speaker_info():
         FakeDatastore(),
         SimpleNamespace(base_url=BASE_URL),
         fetch_info=lambda _host: device_info_xml(),
+        fetch_sources=lambda _host: sources_xml(),
     )
 
     device = response.devices[0]
@@ -87,6 +103,42 @@ def test_list_management_devices_refreshes_marge_url_from_speaker_info():
     assert device.marge_url == f"{BASE_URL}/marge"
     assert device.marge_server == "Soundcork"
     assert device.uses_this_soundcork is True
+    assert device.playback_capability == "Soundcork-ready"
+    assert device.internet_radio_ready is True
+    assert device.source_statuses["LOCAL_INTERNET_RADIO"] == "READY"
+
+
+def test_list_management_devices_reports_bose_legacy_ready_from_sources():
+    response = list_management_devices(
+        FakeDatastore(),
+        SimpleNamespace(base_url=BASE_URL),
+        fetch_info=lambda _host: device_info_xml(marge_url=BOSE_MARGE_URL),
+        fetch_sources=lambda _host: sources_xml(),
+    )
+
+    device = response.devices[0]
+
+    assert device.marge_server == "Bose"
+    assert device.playback_capability == "Legacy-ready"
+    assert "until reboot" in (device.playback_capability_detail or "")
+
+
+def test_list_management_devices_reports_bose_needs_repair_without_radio_sources():
+    response = list_management_devices(
+        FakeDatastore(),
+        SimpleNamespace(base_url=BASE_URL),
+        fetch_info=lambda _host: device_info_xml(marge_url=BOSE_MARGE_URL),
+        fetch_sources=lambda _host: sources_xml(
+            local_internet_radio_status=None,
+            tunein_status=None,
+        ),
+    )
+
+    device = response.devices[0]
+
+    assert device.marge_server == "Bose"
+    assert device.playback_capability == "Needs repair"
+    assert device.internet_radio_ready is False
 
 
 def test_list_management_devices_keeps_stored_device_when_refresh_fails():
@@ -94,6 +146,7 @@ def test_list_management_devices_keeps_stored_device_when_refresh_fails():
         FakeDatastore(),
         SimpleNamespace(base_url=BASE_URL),
         fetch_info=lambda _host: "",
+        fetch_sources=lambda _host: sources_xml(),
     )
 
     device = response.devices[0]
@@ -103,6 +156,7 @@ def test_list_management_devices_keeps_stored_device_when_refresh_fails():
     assert device.marge_url is None
     assert device.marge_server == "Unknown"
     assert device.uses_this_soundcork is False
+    assert device.playback_capability == "Unknown"
 
 
 def test_list_management_devices_reports_unparseable_speaker_info():
@@ -110,6 +164,7 @@ def test_list_management_devices_reports_unparseable_speaker_info():
         FakeDatastore(),
         SimpleNamespace(base_url=BASE_URL),
         fetch_info=lambda _host: "<info>",
+        fetch_sources=lambda _host: sources_xml(),
     )
 
     device = response.devices[0]
@@ -127,6 +182,10 @@ def test_management_devices_endpoint_uses_current_speaker_info(monkeypatch):
         "soundcork.management.read_device_info",
         lambda _host: device_info_xml(marge_url=BOSE_MARGE_URL),
     )
+    monkeypatch.setattr(
+        "soundcork.management.read_runtime_sources",
+        lambda _host: sources_xml(local_internet_radio_status=None, tunein_status=None),
+    )
 
     app = FastAPI()
     app.include_router(router)
@@ -136,3 +195,4 @@ def test_management_devices_endpoint_uses_current_speaker_info(monkeypatch):
     payload = response.json()
     assert payload["devices"][0]["marge_server"] == "Bose"
     assert payload["devices"][0]["uses_this_soundcork"] is False
+    assert payload["devices"][0]["playback_capability"] == "Needs repair"

@@ -69,6 +69,10 @@ def _apply_management_state(
     device.state_source = management_device.source
     device.error = management_device.error
     device.in_soundcork = management_device.in_soundcork
+    device.source_statuses = management_device.source_statuses
+    device.internet_radio_ready = management_device.internet_radio_ready
+    device.playback_capability = management_device.playback_capability
+    device.playback_capability_detail = management_device.playback_capability_detail
 
     if management_device.account_id:
         device.account = management_device.account_id

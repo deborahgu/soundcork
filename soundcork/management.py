@@ -22,11 +22,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from soundcork.config import Settings
 from soundcork.datastore import DataStore
-from soundcork.devices import get_bose_devices, hostname_for_device, read_device_info
+from soundcork.devices import (
+    get_bose_devices,
+    hostname_for_device,
+    read_device_info,
+    read_runtime_sources,
+)
 from soundcork.model import DeviceInfo
 from soundcork.spotify_service import SpotifyService
 
@@ -39,6 +44,7 @@ settings = Settings()
 spotify = SpotifyService()
 
 BOSE_MARGE_URL = "https://streaming.bose.com"
+RADIO_SOURCE_KEYS = ("LOCAL_INTERNET_RADIO", "TUNEIN")
 
 
 class ManagementDevice(BaseModel):
@@ -57,6 +63,10 @@ class ManagementDevice(BaseModel):
     marge_url: str | None = None
     marge_server: str
     uses_this_soundcork: bool
+    source_statuses: dict[str, str] = Field(default_factory=dict)
+    internet_radio_ready: bool | None = None
+    playback_capability: str = "Unknown"
+    playback_capability_detail: str | None = None
     source: str
     error: str | None = None
 
@@ -135,6 +145,82 @@ def _marge_server(marge_url: str | None, base_url: str) -> str:
     return "Other"
 
 
+def _source_statuses_from_xml(sources_xml: str) -> tuple[dict[str, str], str | None]:
+    if not sources_xml:
+        return {}, "Unable to fetch /sources"
+
+    try:
+        root = ET.fromstring(sources_xml)
+    except ET.ParseError:
+        return {}, "Unable to parse /sources"
+
+    statuses: dict[str, str] = {}
+    for source_item in root.findall("sourceItem"):
+        source = source_item.attrib.get("source", "").strip()
+        status = source_item.attrib.get("status", "").strip()
+        if not source:
+            continue
+        if statuses.get(source) == "READY":
+            continue
+        statuses[source] = status or "UNKNOWN"
+
+    return statuses, None
+
+
+def _radio_sources_ready(source_statuses: dict[str, str]) -> bool:
+    return any(source_statuses.get(source) == "READY" for source in RADIO_SOURCE_KEYS)
+
+
+def _radio_source_summary(source_statuses: dict[str, str]) -> str:
+    parts = [
+        f"{source}={source_statuses.get(source, 'missing')}"
+        for source in RADIO_SOURCE_KEYS
+    ]
+    return ", ".join(parts)
+
+
+def _playback_capability(
+    marge_server: str,
+    rest_reachable: bool,
+    source_statuses: dict[str, str],
+    sources_error: str | None = None,
+) -> tuple[str, str]:
+    if not rest_reachable:
+        return "Unknown", "REST /info is not reachable."
+    if sources_error:
+        return "Unknown", sources_error
+
+    radio_ready = _radio_sources_ready(source_statuses)
+    source_summary = _radio_source_summary(source_statuses)
+
+    if marge_server == "Soundcork":
+        if radio_ready:
+            return "Soundcork-ready", f"Radio sources are ready: {source_summary}."
+        return (
+            "Needs repair",
+            "Speaker points at this Soundcork, but radio sources are not ready: "
+            f"{source_summary}.",
+        )
+
+    if marge_server == "Bose":
+        if radio_ready:
+            return (
+                "Legacy-ready",
+                "Speaker still points at Bose, but radio sources are currently "
+                f"ready: {source_summary}. This may only last until reboot.",
+            )
+        return (
+            "Needs repair",
+            "Speaker points at Bose and radio sources are not ready: "
+            f"{source_summary}.",
+        )
+
+    if radio_ready:
+        return "Legacy-ready", f"Radio sources are ready: {source_summary}."
+
+    return "Unknown", f"Radio source state is inconclusive: {source_summary}."
+
+
 def _device_from_stored_info(
     account_id: str,
     stored: DeviceInfo,
@@ -150,6 +236,8 @@ def _device_from_stored_info(
         rest_reachable=False,
         marge_server="Unknown",
         uses_this_soundcork=False,
+        playback_capability="Unknown",
+        playback_capability_detail="REST /info is not reachable.",
         source="datastore",
     )
 
@@ -186,6 +274,35 @@ def _merge_fresh_info(
     return device
 
 
+def _merge_fresh_sources(
+    device: ManagementDevice,
+    hostname: str,
+    fetch_sources: Callable[[str], str],
+) -> ManagementDevice:
+    try:
+        sources_xml = fetch_sources(hostname)
+    except Exception as e:
+        logger.info("Failed to fetch speaker sources from %s: %s", hostname, e)
+        sources_xml = ""
+
+    source_statuses, sources_error = _source_statuses_from_xml(sources_xml)
+    if sources_error:
+        sources_error = f"{sources_error} from {hostname}"
+
+    device.source_statuses = source_statuses
+    device.internet_radio_ready = _radio_sources_ready(source_statuses)
+    (
+        device.playback_capability,
+        device.playback_capability_detail,
+    ) = _playback_capability(
+        device.marge_server,
+        device.rest_reachable,
+        source_statuses,
+        sources_error,
+    )
+    return device
+
+
 def _fetch_speaker_info(
     hostname: str,
     fetch_info: Callable[[str], str],
@@ -213,11 +330,14 @@ def list_management_devices(
     include_discovered: bool = False,
     refresh: bool = True,
     fetch_info: Callable[[str], str] | None = None,
+    fetch_sources: Callable[[str], str] | None = None,
     discover_devices: Callable[[], Iterable] | None = None,
 ) -> ManagementDevicesResponse:
     """Return a sanitized device inventory for management clients."""
     if fetch_info is None:
         fetch_info = read_device_info
+    if fetch_sources is None:
+        fetch_sources = read_runtime_sources
     if discover_devices is None:
         discover_devices = get_bose_devices
 
@@ -239,6 +359,9 @@ def list_management_devices(
                 fresh, error = _fetch_speaker_info(stored.ip_address, fetch_info)
                 if fresh:
                     _merge_fresh_info(device, fresh, base_url)
+                    _merge_fresh_sources(
+                        device, fresh.ip_address or stored.ip_address, fetch_sources
+                    )
                 elif error:
                     device.error = error
 
@@ -260,6 +383,7 @@ def list_management_devices(
             device = devices.get(fresh.device_id)
             if device:
                 _merge_fresh_info(device, fresh, base_url, source="datastore+discovery")
+                _merge_fresh_sources(device, hostname, fetch_sources)
                 continue
 
             marge_server = _marge_server(fresh.marge_url, base_url)
@@ -273,6 +397,7 @@ def list_management_devices(
                 source="discovery",
             )
             _merge_fresh_info(device, fresh, base_url, source="discovery")
+            _merge_fresh_sources(device, hostname, fetch_sources)
             devices[fresh.device_id] = device
 
     return ManagementDevicesResponse(devices=sorted(devices.values(), key=_device_key))

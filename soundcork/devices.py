@@ -31,6 +31,7 @@ from soundcork.constants import (
     SPEAKER_PRESETS_PATH,
     SPEAKER_RECENTS_PATH,
     SPEAKER_SOURCES_FILE_LOCATION,
+    SPEAKER_SOURCES_PATH,
 )
 from soundcork.datastore import DataStore
 from soundcork.model import ConfiguredSource
@@ -65,6 +66,10 @@ def read_device_info(hostname: str) -> str:
 
 def read_presets(hostname: str) -> str:
     return read_file_from_speaker_http(hostname, SPEAKER_PRESETS_PATH)
+
+
+def read_runtime_sources(hostname: str) -> str:
+    return read_file_from_speaker_http(hostname, SPEAKER_SOURCES_PATH)
 
 
 def read_sources(hostname: str) -> str:
