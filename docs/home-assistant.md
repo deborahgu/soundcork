@@ -2,6 +2,11 @@
 
 SoundCork integrates with Home Assistant through a custom integration and Lovelace card. Each Bose SoundTouch speaker appears as a `media_player` entity with real-time state updates.
 
+The HA integration and Lovelace card live in a separate repo for HACS compatibility:
+**[timvw/soundcork-hass](https://github.com/timvw/soundcork-hass)** — install via HACS as a custom repository.
+
+This document covers the server-side `/api/v1` router that the integration depends on.
+
 ## Architecture
 
 ```
