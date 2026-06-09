@@ -54,6 +54,24 @@ SPOTIFY_CLIENT_ID=your-client-id
 SPOTIFY_CLIENT_SECRET=your-client-secret
 ```
 
+Soundcork requests the minimal Spotify scope set needed for user identity and
+Web Playback SDK tokens by default:
+
+```bash
+SPOTIFY_SCOPES="streaming user-read-email user-read-private"
+```
+
+You can override `SPOTIFY_SCOPES` if your setup needs a broader Bose-like scope
+set:
+
+```bash
+SPOTIFY_SCOPES="streaming user-read-email user-read-private playlist-read-private playlist-read-collaborative user-library-read user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-recently-played"
+```
+
+If you change `SPOTIFY_SCOPES` after linking an account, link the Spotify
+account again. Existing refresh tokens keep the scopes that were granted during
+their original OAuth flow.
+
 ### Step 3: Link Your Spotify Account
 
 **Note: in the future we will add a web UI for account management**
@@ -110,16 +128,41 @@ If you don't want to configure Spotify credentials in soundcork, you can manuall
 
 ### ZeroConf Primer (Cold Boot Activation)
 
-**NOTE because the automatic token refresh works in soundcork, thie ZeroConf Primer method has been disabled. The code is still available and the documentation is available here as a reference in case issues with the automatic token refresh are found during testing.**
+The ZeroConf primer is disabled by default. Enable it only if a cold-booted
+speaker can refresh Spotify tokens through Soundcork but still leaves Spotify
+presets stuck until you cast to the speaker once with Spotify Connect.
 
 On cold boot, the speaker does **not** request a Spotify token — it only fetches account data, source providers, and streaming tokens. Without an active Spotify session, presets fail silently.
 
 The ZeroConf primer solves this by proactively pushing a fresh Spotify access token to the speaker via the ZeroConf endpoint (port 8200). This is the same mechanism the Spotify desktop app uses when you cast to a speaker.
 
+Configuration:
+
+```bash
+SPOTIFY_ZEROCONF_PRIMER_ENABLED=true
+
+# Required allowlist. Values can be device IDs, IP addresses,
+# account/device pairs, or "*" to allow all known devices.
+SPOTIFY_ZEROCONF_PRIME_DEVICES="A0B1C2D3E4F5,192.168.1.25"
+
+# Backward-compatible alias also accepted:
+SOUNDCORK_SPOTIFY_PRIME_DEVICES="A0B1C2D3E4F5"
+
+# Default: 2700 seconds (45 minutes). Set to 0 to disable periodic priming
+# while keeping boot/new-speaker priming enabled.
+SPOTIFY_ZEROCONF_PRIMER_INTERVAL_SECONDS=2700
+```
+
 **When it runs:**
 - On speaker boot (`power_on` event), with retry/backoff (5s, 10s, 20s delays)
-- Periodically every 45 minutes (tokens expire after 1 hour)
-- When a new speaker is first seen via marge requests
+- Periodically at `SPOTIFY_ZEROCONF_PRIMER_INTERVAL_SECONDS` if the interval is greater than 0
+- When a new allowlisted speaker is first seen via marge requests
+
+**Gunicorn workers:** the primer registry and timer are in-process. The default
+configuration is safe because the primer is disabled and the allowlist is empty.
+If you enable the primer, prefer running Soundcork with a single Gunicorn worker
+for predictable behavior. With multiple workers, more than one worker may try to
+prime the same allowlisted speaker.
 
 **Boot sequence observed:**
 ```
