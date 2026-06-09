@@ -23,6 +23,7 @@ from soundcork.model import ConfiguredSource, DeviceInfo, Preset, Recent
 @pytest.fixture
 def datastore(monkeypatch) -> DataStore:
     monkeypatch.setattr("soundcork.datastore.settings.data_dir", "/virtual/data")
+    monkeypatch.setattr("soundcork.datastore.makedirs", MagicMock())
     return DataStore()
 
 
@@ -65,6 +66,40 @@ def test_poweron_devices_dir_skips_mkdir_when_present(
 
     assert result == f"/virtual/data/{DEVICES_DIR}"
     mkdir_mock.assert_not_called()
+
+
+def test_datastore_creates_configured_data_dir(monkeypatch):
+    makedirs_mock = MagicMock()
+    monkeypatch.setattr("soundcork.datastore.settings.data_dir", "/virtual/data")
+    monkeypatch.setattr("soundcork.datastore.makedirs", makedirs_mock)
+
+    datastore = DataStore()
+
+    assert datastore.data_dir == "/virtual/data"
+    makedirs_mock.assert_called_once_with("/virtual/data", exist_ok=True)
+
+
+def test_datastore_raises_when_data_dir_is_not_configured(monkeypatch):
+    monkeypatch.setattr("soundcork.datastore.settings.data_dir", "")
+
+    with pytest.raises(RuntimeError, match="data_dir is not configured"):
+        DataStore()
+
+
+def test_list_accounts_returns_empty_when_data_dir_missing(
+    datastore: DataStore, monkeypatch
+):
+    monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: False)
+
+    assert datastore.list_accounts() == []
+
+
+def test_list_devices_returns_empty_when_account_devices_dir_missing(
+    datastore: DataStore, monkeypatch
+):
+    monkeypatch.setattr("soundcork.datastore.path.exists", lambda _: False)
+
+    assert datastore.list_devices("12345") == []
 
 
 def test_account_dir_raises_not_found_when_missing_datastore_dir(
@@ -437,7 +472,10 @@ def test_get_presets_fails_on_empty_item_name(
     assert "name" in str(validerr.value)
 
 
-def test_update_preset_uses_username_when_name_is_missing():
+def test_update_preset_uses_username_when_name_is_missing(monkeypatch):
+    monkeypatch.setattr("soundcork.datastore.settings.data_dir", "/virtual/data")
+    monkeypatch.setattr("soundcork.datastore.makedirs", MagicMock())
+
     from soundcork.marge import update_preset
 
     class PresetDatastore:

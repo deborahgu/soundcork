@@ -188,9 +188,8 @@ def get_bose_devices() -> list[upnpclient.upnp.Device]:
     devices = upnpclient.discover()
     bose_devices = [d for d in devices if "Bose SoundTouch" in d.model_description]
     logger.info("Discovering upnp devices on the network")
-    logger.info(
-        f'Discovered Bose devices:\n- {"\n- ".join([b.friendly_name for b in bose_devices])}'
-    )
+    device_names = "\n- ".join([b.friendly_name for b in bose_devices])
+    logger.info(f"Discovered Bose devices:\n- {device_names}")
     return bose_devices
 
 
