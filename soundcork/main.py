@@ -224,7 +224,7 @@ async def log_unknown_requests(request: Request, call_next):
 # Bose protocol endpoints are only accessible from registered speaker IPs.
 # Paths starting with /webui, /mgmt, /docs, /openapi.json, or / (root) are exempt.
 
-_EXEMPT_PREFIXES = ("/webui", "/mgmt", "/docs", "/openapi.json", "/auth")
+_EXEMPT_PREFIXES = ("/webui", "/mgmt", "/docs", "/openapi.json", "/auth", "/api")
 
 
 @app.middleware("http")
