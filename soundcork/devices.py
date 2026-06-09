@@ -226,17 +226,23 @@ def show_upnp_devices() -> None:
 def is_reachable(device: upnpclient.upnp.Device) -> bool:
     """Returns true if device is reachable via telnet, ssh, etc."""
     device_address = urlparse(device.location).hostname
-    return is_reachable(device_address)
+    return bool(device_address and addr_is_reachable(device_address))
 
 
-def addr_is_reachable(device_address: str) -> bool:
+def addr_port_is_reachable(device_address: str, port: int, timeout: int = 2) -> bool:
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(2)  # Timeout in case of port not open
+    s.settimeout(timeout)
     try:
-        s.connect((device_address, 22))  # Port ,Here 22 is port
+        s.connect((device_address, port))
         return True
     except:
         return False
+    finally:
+        s.close()
+
+
+def addr_is_reachable(device_address: str) -> bool:
+    return addr_port_is_reachable(device_address, 22)
 
 
 def add_device(device: upnpclient.upnp.Device) -> bool:
