@@ -229,7 +229,7 @@ def is_reachable(device: upnpclient.upnp.Device) -> bool:
     return bool(device_address and addr_is_reachable(device_address))
 
 
-def addr_port_is_reachable(device_address: str, port: int, timeout: int = 2) -> bool:
+def addr_port_is_reachable(device_address: str, port: int, timeout: float = 2) -> bool:
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(timeout)
     try:

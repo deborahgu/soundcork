@@ -50,7 +50,7 @@ def _management_devices_by_id(datastore: DataStore) -> dict[str, ManagementDevic
         for device in list_management_devices(
             datastore,
             management_settings,
-            include_discovered=True,
+            include_discovered=False,
             refresh=True,
         ).devices
     }
@@ -88,8 +88,10 @@ def _apply_management_state(
 
 
 def _refresh_device_reachability(device: CombinedDevice) -> CombinedDevice:
-    device.ssh_reachable = addr_port_is_reachable(device.ip, SSH_PORT)
-    device.telnet_reachable = addr_port_is_reachable(device.ip, CLISERVER_PORT)
+    device.ssh_reachable = addr_port_is_reachable(device.ip, SSH_PORT, timeout=0.5)
+    device.telnet_reachable = addr_port_is_reachable(
+        device.ip, CLISERVER_PORT, timeout=0.5
+    )
     device.reachable = device.ssh_reachable
     device.repair_available = device.marge_server != "Soundcork" and (
         device.ssh_reachable or device.telnet_reachable

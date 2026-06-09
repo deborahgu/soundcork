@@ -74,9 +74,15 @@ def make_client(monkeypatch, speakers: FakeSpeakers | None = None):
 
 
 def test_admin_shows_live_marge_and_telnet_repair_action(monkeypatch):
+    list_calls = []
+
+    def fake_list_management_devices(*_args, **kwargs):
+        list_calls.append(kwargs)
+        return management_devices_response()
+
     monkeypatch.setattr(
         "soundcork.admin.list_management_devices",
-        lambda *_args, **_kwargs: management_devices_response(),
+        fake_list_management_devices,
     )
     monkeypatch.setattr(
         "soundcork.admin.addr_port_is_reachable",
@@ -94,6 +100,7 @@ def test_admin_shows_live_marge_and_telnet_repair_action(monkeypatch):
     assert f"/admin/switchToSoundcork/{DEVICE_ID}" in response.text
     assert "B0D5CC0391DB" not in response.text
     assert "Swtich" not in response.text
+    assert list_calls[0]["include_discovered"] is False
 
 
 def test_switch_to_soundcork_uses_telnet_when_ssh_is_unavailable(monkeypatch):
