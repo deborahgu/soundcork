@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Soundcork Dashboard</title>
     <link rel="stylesheet" href="/static/css/main.css">
+    <script src="https://code.jquery.com/jquery-4.0.0.min.js" integrity="sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao=" crossorigin="anonymous"></script>
+    <script type="module" src="../static/js/miniapp_handler.js"></script>
 </head>
 
 <body>
@@ -91,7 +93,7 @@
                 {% if devices %}
                 <ul class="devices-grid">
                     {% for device in devices %}
-                    <li class="device-card {{device.online_status}}">
+                    <li id="form_{{device.device_id}}" class="device-card {{device.online_status}}">
                         <form
                             action="/miniapp/select-device{% if selected_content_item_id %}?selected_content_item_id={{ selected_content_item_id }}{% endif %}"
                             method="post" style="display:contents;">
@@ -100,11 +102,14 @@
                             <button type="submit" {% if device.status=='offline' %} disabled aria-disabled="true" {%
                                 endif %}>
                                 <img src="/static/images/devices/{{ device.image_file }}" alt="" class="device-image">
-                                <div class="device-info">
+                                <div id="{{device.device_id}}-info" class="device-info">
                                     <div class="device-name">{{ device.name }}</div>
                                     {% if device.now_playing and device.play_state == "PLAY_STATE" %}
-                                    <div class="device-now-playing">{{ device.now_playing }}</div>
-                                    <div class="device-now-playing">Volume: {{ device.now_playing_volume }}</div>
+                                    <div class="device-now-playing np-info">{{ device.now_playing }}</div>
+                                    <div class="device-now-playing volume">Volume: {{ device.now_playing_volume }}</div>
+                                    {% else %}
+                                    <div class="device-now-playing np-info"></div>
+                                    <div class="device-now-playing volume"></div>
                                     {% endif %}
                                 </div>
                             </button>
@@ -120,12 +125,12 @@
             </section>
         </main>
         <section class="left-sidebar">
-            <div class="device-info">
+            <div class="device-info" id="sidebar-{{ns.selected_device_obj.device_id}}">
                 {% if ns.selected_device_obj %}
                 Selected speaker: {{ ns.selected_device_obj.name }}
                 {% if ns.selected_device_obj.now_playing and ns.selected_device_obj.play_state == "PLAY_STATE" %}
                 <p>Now Playing on {{ ns.selected_device_obj.name }}:<br>
-                    {{ ns.selected_device_obj.now_playing }}</p>
+                    <span class="now_playing">{{ ns.selected_device_obj.now_playing }}</span></p>
                 {% if ns.selected_device_obj.now_playing_image %}
                 <img alt="" src="{{  ns.selected_device_obj.now_playing_image }}" width=100px;>
                 {% endif %}

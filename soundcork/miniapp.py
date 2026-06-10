@@ -138,7 +138,7 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                 key="soundcork_account_id",
                 value=account_id,
                 max_age=86400 * 30,  # 30 days
-                httponly=True,
+                httponly=False,  # allow JS for websocket connection
                 samesite="strict",
             )
             response.set_cookie(
