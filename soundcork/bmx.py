@@ -351,10 +351,10 @@ def tunein_sections_ashx(
     for idx, item in enumerate(body):
         type = item.get("type", "")
         if type:
-            # i only saw top-level items that were of type "link"; "audio" items seemed
-            # only to be included as chlidren of subsections.
             if type == "link":
                 items.append(tunein_navigate_link(item))
+            elif type == "audio":
+                items.append(tunein_navigate_playitem(item))
             else:
                 logger.info(f"top-level item has type {type}: {item}")
         else:
@@ -416,16 +416,30 @@ def tunein_sections_ashx(
     return sections
 
 
+def tunein_item_guide_id(item: dict) -> str:
+    guide_id = item.get("guide_id", "")
+    if guide_id:
+        return guide_id
+
+    tune_url = item.get("URL", "")
+    if not tune_url:
+        return ""
+
+    tune_query = urllib.parse.parse_qs(urllib.parse.urlsplit(tune_url).query)
+    return tune_query.get("id", [""])[0]
+
+
 def tunein_navigate_playitem(item: dict) -> BmxNavItem:
+    guide_id = tunein_item_guide_id(item)
     return BmxNavItem(
         links={
             "bmx_playback": {
-                "href": f'/v1/playback/station/{item.get("guide_id", "")}',
+                "href": f"/v1/playback/station/{guide_id}",
                 "type": "stationurl",
             },
             "bmx_preset": {
                 "container_art": item.get("image", ""),
-                "href": f'{item.get("guide_id", "")}',
+                "href": guide_id,
                 "name": item.get("text", ""),
                 "type": "stationurl",
             },
