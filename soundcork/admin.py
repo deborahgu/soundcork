@@ -22,11 +22,16 @@ from soundcork.constants import ACCOUNT_RE
 from soundcork.datastore import DataStore
 from soundcork.devices import (
     add_device_by_ip,
-    addr_is_reachable,
+    addr_port_is_reachable,
     default_sources,
     override_speaker_config,
     override_speaker_config_non_rooted,
     reboot_speaker,
+)
+from soundcork.management import (
+    ManagementDevice,
+    list_management_devices,
+    settings as management_settings,
 )
 from soundcork.model import ConfiguredSource
 from soundcork.ui.speakers import CombinedDevice, Speakers
@@ -34,6 +39,89 @@ from soundcork.ui.speakers import CombinedDevice, Speakers
 router = APIRouter(tags=["admin"])
 
 logger = logging.getLogger(__name__)
+
+SSH_PORT = 22
+CLISERVER_PORT = 17000
+
+
+def _management_devices_by_id(datastore: DataStore) -> dict[str, ManagementDevice]:
+    return {
+        device.device_id: device
+        for device in list_management_devices(
+            datastore,
+            management_settings,
+            include_discovered=False,
+            refresh=True,
+        ).devices
+    }
+
+
+def _apply_management_state(
+    device: CombinedDevice,
+    management_device: ManagementDevice | None,
+) -> CombinedDevice:
+    if not management_device:
+        return device
+
+    device.rest_reachable = management_device.rest_reachable
+    device.marge_url = management_device.marge_url
+    device.marge_server = management_device.marge_server
+    device.state_source = management_device.source
+    device.error = management_device.error
+    device.in_soundcork = management_device.in_soundcork
+    device.source_statuses = management_device.source_statuses
+    device.internet_radio_ready = management_device.internet_radio_ready
+    device.playback_capability = management_device.playback_capability
+    device.playback_capability_detail = management_device.playback_capability_detail
+
+    if management_device.account_id:
+        device.account = management_device.account_id
+    elif management_device.reported_account_id:
+        device.account = management_device.reported_account_id
+
+    if management_device.ip_address:
+        device.ip = management_device.ip_address
+    if management_device.name:
+        device.name = management_device.name
+    if management_device.product_code:
+        logger.debug(
+            "Device %s reports product %s", device.id, management_device.product_code
+        )
+
+    return device
+
+
+def _refresh_device_reachability(device: CombinedDevice) -> CombinedDevice:
+    device.ssh_reachable = addr_port_is_reachable(device.ip, SSH_PORT, timeout=0.5)
+    device.telnet_reachable = addr_port_is_reachable(
+        device.ip, CLISERVER_PORT, timeout=0.5
+    )
+    device.reachable = device.ssh_reachable
+    device.repair_available = device.marge_server != "Soundcork" and (
+        device.ssh_reachable or device.telnet_reachable
+    )
+    return device
+
+
+def _host_for_repair(
+    combined_device: CombinedDevice | None,
+    management_device: ManagementDevice | None,
+) -> str | None:
+    if management_device:
+        if management_device.ip_address:
+            return management_device.ip_address
+        if management_device.stored_ip_address:
+            return management_device.stored_ip_address
+        if management_device.reported_ip_address:
+            return management_device.reported_ip_address
+
+    if combined_device:
+        if combined_device.ip:
+            return combined_device.ip
+        if combined_device.st_device:
+            return combined_device.st_device.Host
+
+    return None
 
 
 def get_admin_router(datastore: DataStore, speakers: Speakers):
@@ -52,6 +140,7 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
     @router.get("/admin/", response_class=HTMLResponse)
     async def admin(request: Request):
         combined_devices = speakers.all_devices()
+        management_devices = _management_devices_by_id(datastore)
 
         unassociated_devices = []
         account_ids = datastore.list_accounts()
@@ -68,6 +157,9 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
         sorted_keys = sorted(combined_devices)
         for key in sorted_keys:
             dev = combined_devices[key]
+            _apply_management_state(dev, management_devices.get(dev.id))
+            _refresh_device_reachability(dev)
+
             # assign to account
             account_id = dev.account
             if account_id:
@@ -90,9 +182,6 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
                 except:
                     dev.language_code = "0"
 
-            # also check to see if it's available via ssh
-            dev.reachable = addr_is_reachable(dev.ip)
-
         return templates.TemplateResponse(
             request=request,
             name="admin/admin_main.html",
@@ -112,22 +201,36 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
     @router.post("/admin/switchToSoundcork/{device_id}")
     async def switch_device(device_id: str):
         logger.info(f"switch {device_id} to soundcork")
+        management_devices = _management_devices_by_id(datastore)
+        management_device = management_devices.get(device_id)
         combined_device = speakers.all_devices().get(device_id)
-        if combined_device:
-            st_device = combined_device.st_device
-            if st_device:
-                hostname = st_device.Host
-                if combined_device.reachable:
-                    success = override_speaker_config(hostname)
-                    reboot = reboot_speaker(hostname)
-                    logger.info(f"reboot {hostname} result {reboot}")
+        hostname = _host_for_repair(combined_device, management_device)
+
+        if hostname:
+            ssh_reachable = addr_port_is_reachable(hostname, SSH_PORT)
+            telnet_reachable = addr_port_is_reachable(hostname, CLISERVER_PORT)
+
+            if ssh_reachable:
+                success = override_speaker_config(hostname)
+                reboot = reboot_speaker(hostname)
+                logger.info(f"reboot {hostname} result {reboot}")
+                if success:
                     speakers.clear_device(device_id)
-                else:
-                    success = await override_speaker_config_non_rooted(hostname)
-                    logger.info(
-                        f"override speaker config on {hostname} success = {success}"
-                    )
+            elif telnet_reachable:
+                success = await override_speaker_config_non_rooted(hostname)
+                logger.info(
+                    f"override speaker config on {hostname} success = {success}"
+                )
+                if success:
                     speakers.clear_device(device_id)
+            else:
+                logger.warning(
+                    "cannot switch %s to Soundcork: no SSH or CLIServer access",
+                    device_id,
+                )
+        else:
+            logger.warning("cannot switch %s to Soundcork: no host known", device_id)
+
         # wait a little for the speaker to restart
         time.sleep(10)
         return RedirectResponse(

@@ -9,7 +9,7 @@ from bosesoundtouchapi.soundtouchclient import (  # type: ignore
     SoundTouchNodes,
 )
 from bosesoundtouchapi.soundtouchdiscovery import SoundTouchDiscovery  # type: ignore
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from soundcork.config import Settings
 from soundcork.datastore import DataStore
@@ -34,6 +34,12 @@ class CombinedDevice(BaseModel):
     - in_soundcork: In the soundcork datastore
     - marge_server: API this speaker uses for Marge: (ie. Bose, or this Soundcork instance)
     - reachable:  Has been configured (ie. with a USB key) to have shell-access available.
+      Equivalent to ssh_reachable and kept for compatibility.
+    - rest_reachable: The speaker's HTTP /info endpoint responded.
+    - ssh_reachable: The speaker has SSH open on port 22.
+    - telnet_reachable: The speaker has the SoundTouch CLIServer open on port 17000.
+    - repair_available: Soundcork can try to point Bose URLs at this instance.
+    - playback_capability: Whether internet radio playback is currently usable.
     - st_device: SoundTouchDevice instance as discovered by BoseSoundTouchApi
     """
 
@@ -47,6 +53,17 @@ class CombinedDevice(BaseModel):
     reachable: bool
     st_device: SoundTouchDevice | None
     language_code: str | None = None
+    rest_reachable: bool = False
+    ssh_reachable: bool = False
+    telnet_reachable: bool = False
+    repair_available: bool = False
+    marge_url: str | None = None
+    source_statuses: dict[str, str] = Field(default_factory=dict)
+    internet_radio_ready: bool | None = None
+    playback_capability: str = "Unknown"
+    playback_capability_detail: str | None = None
+    state_source: str = "discovery"
+    error: str | None = None
 
     class Config:
         arbitrary_types_allowed = True
