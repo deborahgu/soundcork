@@ -482,6 +482,50 @@ def test_update_preset_uses_username_when_name_is_missing():
     assert response.find("username").text == "Beats Radio"
 
 
+def test_add_recent_uses_first_id_when_recents_are_empty():
+    from soundcork.marge import add_recent
+
+    class RecentDatastore:
+        def __init__(self):
+            self.saved_recents = None
+
+        def get_configured_sources(self, account, device=""):
+            return [
+                ConfiguredSource(
+                    display_name="Internet Radio",
+                    id="100006",
+                    secret="",
+                    secret_type="",
+                    source_key_type="INTERNET_RADIO",
+                    source_key_account="",
+                    created_on=DEFAULT_DATESTR,
+                    updated_on=DEFAULT_DATESTR,
+                )
+            ]
+
+        def get_recents(self, account, device):
+            return []
+
+        def save_recents(self, account, device, recents_list):
+            self.saved_recents = recents_list
+
+    datastore = RecentDatastore()
+    xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+        <recent>
+            <sourceid>100006</sourceid>
+            <name>Beats Radio</name>
+            <location>/v1/playback/station/s309907</location>
+            <contentItemType>stationurl</contentItemType>
+        </recent>"""
+
+    response = add_recent(datastore, "2123456", "0000BA10B1AB", xml)
+
+    assert datastore.saved_recents is not None
+    assert datastore.saved_recents[0].id == "1"
+    assert response.attrib["id"] == "1"
+    assert response.find("name").text == "Beats Radio"
+
+
 def test_get_recents_parses_xml_from_mocked_parse(
     datastore: DataStore,
     sample_device: DeviceInfo,
