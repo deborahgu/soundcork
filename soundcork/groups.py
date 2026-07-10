@@ -24,14 +24,37 @@ BOSE_UPDATEGROUP = "/updateGroup"  # POST + XML
 BOSE_REMOVEGROUP = "/removeGroup"  # GET
 
 
+def _bose_xml_str(xml: ET.Element) -> str:
+    return f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>{ET.tostring(xml, encoding="unicode")}'
+
+
 # ----------------------------------------------------------------------
 # Factory: creates router with access to datastore (Dependency Injection)
 # ----------------------------------------------------------------------
 def get_groups_router(datastore):
     marge = APIRouter(tags=["marge"])
 
-    from soundcork.main import bose_xml_str
+    @marge.get(
+        "/marge/streaming/account/{account}/groups",
+        response_class=BoseXMLResponse,
+        tags=["marge"],
+    )
+    async def account_groups(
+        account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    ):
+        """marge group endpoint to list all groups for an account"""
 
+        groups_elem = ET.Element("groups")
+        for group in datastore.list_groups(account):
+            groups_elem.append(datastore.group_to_xml(group))
+
+        return _bose_xml_str(groups_elem)
+
+    @marge.get(
+        "/marge/streaming/account/{account}/device/{device}/group/",
+        response_class=BoseXMLResponse,
+        tags=["marge"],
+    )
     @marge.get(
         "/marge/streaming/account/{account}/device/{device}/group",
         response_class=BoseXMLResponse,
@@ -45,8 +68,13 @@ def get_groups_router(datastore):
 
         result = get_device_group_xml(datastore, account, device)
 
-        return bose_xml_str(result)
+        return _bose_xml_str(result)
 
+    @marge.post(
+        "/marge/streaming/account/{account}/group/",
+        response_class=BoseXMLResponse,
+        tags=["marge"],
+    )
     @marge.post(
         "/marge/streaming/account/{account}/group",
         response_class=BoseXMLResponse,
@@ -55,15 +83,28 @@ def get_groups_router(datastore):
     async def add_group_endpoint(
         account: Annotated[str, Path(pattern=ACCOUNT_RE)],
         request: Request,
+        response: Response,
     ) -> str:
 
         reqxml_bytes = await request.body()
         reqxml_str = reqxml_bytes.decode("utf-8")
 
         result = add_group(datastore, account, reqxml_str)
+        response.status_code = HTTPStatus.CREATED
+        group_id = result.get("id")
+        if group_id:
+            base_url = str(request.base_url).rstrip("/")
+            response.headers["Location"] = (
+                f"{base_url}/marge/streaming/account/{account}/group/{group_id}"
+            )
 
-        return bose_xml_str(result)
+        return _bose_xml_str(result)
 
+    @marge.put(
+        "/marge/streaming/account/{account}/group/{group}",
+        response_class=BoseXMLResponse,
+        tags=["marge"],
+    )
     @marge.post(
         "/marge/streaming/account/{account}/group/{group}",
         response_class=BoseXMLResponse,
@@ -81,7 +122,7 @@ def get_groups_router(datastore):
             xml_str = body.decode("utf-8")
             result = modify_group(datastore, account, group, xml_str)
 
-            return bose_xml_str(result)
+            return _bose_xml_str(result)
 
         except ET.ParseError:
             response.status_code = HTTPStatus.BAD_REQUEST
@@ -89,6 +130,30 @@ def get_groups_router(datastore):
         except UnicodeDecodeError:
             response.status_code = HTTPStatus.BAD_REQUEST
             return "<error>Invalid UTF-8 in request body</error>"
+
+    @marge.delete(
+        "/marge/streaming/account/{account}/group/",
+        response_class=BoseXMLResponse,
+        tags=["marge"],
+    )
+    async def delete_account_groups_endpoint(
+        account: Annotated[str, Path(pattern=ACCOUNT_RE)],
+    ):
+        """marge group endpoint to delete all account groups"""
+        try:
+            error = datastore.delete_all_groups(account)
+            if error:
+                return BoseXMLResponse(
+                    content=f"<error>{error}</error>",
+                    status_code=HTTPStatus.BAD_REQUEST,
+                )
+            return BoseXMLResponse(
+                content="<status>Groups deleted successfully</status>"
+            )
+        except Exception as e:
+            return BoseXMLResponse(
+                content=f"<error>Unexpected error: {e}</error>", status_code=500
+            )
 
     @marge.delete(
         "/marge/streaming/account/{account}/group/{group}",

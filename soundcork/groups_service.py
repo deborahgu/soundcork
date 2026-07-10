@@ -130,13 +130,14 @@ def _group_xml_by_id(datastore, account: str, groupid: str) -> str:
 
 
 def _group_id_by_name(datastore, account: str, name: str) -> Optional[str]:
-    for gid in datastore.list_groups(account):
+    for group in datastore.list_groups(account):
         try:
-            xml = _group_xml_by_id(datastore, account, gid)
+            group_id = group.id
+            xml = _group_xml_by_id(datastore, account, group_id)
             root = ET.fromstring(xml.strip())
             nm = (root.findtext("name") or "").strip()
             if nm == name:
-                return gid
+                return group_id
         except Exception:
             continue
     return None

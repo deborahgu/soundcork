@@ -546,7 +546,7 @@ def get_device_group_xml(
     if group:
         return datastore.group_to_xml(group)
     else:
-        return ET.Element("groups")
+        return ET.Element("group")
 
 
 def add_group(datastore: "DataStore", account: str, group_info_xml: str) -> ET.Element:

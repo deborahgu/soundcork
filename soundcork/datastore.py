@@ -758,25 +758,34 @@ class DataStore:
             if not path.exists(filepath):
                 return group_id
 
+    def _normalize_group_id(self, group_id: str) -> str:
+        """Return the bare 7-digit group id from an id or Group_<id>.xml name."""
+        if group_id.startswith("Group_") and group_id.endswith(".xml"):
+            return group_id[len("Group_") : -len(".xml")]
+        return group_id
+
     def list_groups(self, account: str) -> list[Group]:
         """list all existing groups"""
         devices_dir = self.account_devices_dir(account)
+        if not path.exists(devices_dir):
+            return []
         groups = []
         for fn in listdir(devices_dir):
             if fn.startswith("Group_") and fn.endswith(".xml"):
-                group = self.get_group(account, fn)
+                group = self.get_group(account, self._normalize_group_id(fn))
                 if group:
                     groups.append(group)
         return groups
 
     def group_exists(self, account: str, group_id: str) -> bool:
         """check if a group with given id exist"""
+        group_id = self._normalize_group_id(group_id)
         return path.exists(
             path.join(self.account_devices_dir(account), f"Group_{group_id}.xml")
         )
 
     def device_is_groupable(self, device_info: DeviceInfo) -> bool:
-        return device_info.product_code == "SoundTouch 10"
+        return device_info.product_code.lower().startswith("soundtouch 10")
 
     def add_group(self, account: str, group: Group) -> ET.Element:
         """adds a group
@@ -790,6 +799,11 @@ class DataStore:
         group_id = self._generate_group_id(account)
         group.id = group_id
         device_ids = [group.left_id, group.right_id]
+        if not group.master_id or not group.left_id or not group.right_id:
+            raise HTTPException(
+                HTTPStatus.BAD_REQUEST,
+                "Group requires masterDeviceId plus LEFT and RIGHT deviceId roles",
+            )
         # -- are these already grouped?
         for dev_id in device_ids:
             existing_group = self.group_for_device(account, dev_id)
@@ -811,6 +825,10 @@ class DataStore:
                     HTTPStatus.BAD_REQUEST,
                     f"Device {dev_id} is not of type 'SoundTouch 10'",
                 )
+            if dev_id == group.left_id and not group.left_ip:
+                group.left_ip = device_info.ip_address
+            if dev_id == group.right_id and not group.right_ip:
+                group.right_ip = device_info.ip_address
 
         return self.save_group(account, group_id, group)
 
@@ -832,6 +850,7 @@ class DataStore:
 
     def get_group(self, account: str, group_id: str) -> Group | None:
         """Gets a group from the account files in the datastore"""
+        group_id = self._normalize_group_id(group_id)
         filename = f"Group_{group_id}.xml"
         filepath = path.join(self.account_devices_dir(account), filename)
         if path.exists(filepath):
@@ -849,6 +868,7 @@ class DataStore:
         - Empty string on success
         - raises exception if group doesn't exist or if there's an error deleting the file
         """
+        group_id = self._normalize_group_id(group_id)
         filename = f"Group_{group_id}.xml"
         filepath = path.join(self.account_devices_dir(account), filename)
 
@@ -866,6 +886,16 @@ class DataStore:
                 f"Failed to delete group {group_id}: {e}",
             )
 
+        return ""
+
+    def delete_all_groups(self, account: str) -> str:
+        """Delete every stored group for an account."""
+        devices_dir = self.account_devices_dir(account)
+        if not path.exists(devices_dir):
+            return ""
+        for fn in listdir(devices_dir):
+            if fn.startswith("Group_") and fn.endswith(".xml"):
+                remove(path.join(devices_dir, fn))
         return ""
 
     def group_for_device(self, account: str, device_id: str) -> Group | None:
@@ -892,7 +922,8 @@ class DataStore:
 
     def group_to_xml(self, group: Group) -> ET.Element:
         """Converts a Group object to an XML element for storage."""
-        group_elem = ET.Element("group")
+        attrs = {"id": group.id} if group.id else {}
+        group_elem = ET.Element("group", attrs)
         ET.SubElement(group_elem, "name").text = group.name
         ET.SubElement(group_elem, "masterDeviceId").text = group.master_id
         roles = ET.SubElement(group_elem, "roles")
@@ -910,12 +941,17 @@ class DataStore:
 
     def group_from_xml(self, group_id: str, group_elem: ET.Element) -> Group:
         """Converts an XML element into a Group object."""
+        group_id = group_id or group_elem.get("id") or ""
         name = strip_element_text(group_elem.find("name"))
         master_id = strip_element_text(group_elem.find("masterDeviceId"))
         roles_elem = group_elem.find("roles")
+        left_id = ""
+        left_ip = ""
+        right_id = ""
+        right_ip = ""
         if not roles_elem == None:
             for role_elem in roles_elem.findall("groupRole"):
-                role = strip_element_text(role_elem.find("role"))
+                role = strip_element_text(role_elem.find("role")).upper()
                 if role == "LEFT":
                     left_id = strip_element_text(role_elem.find("deviceId"))
                     left_ip = strip_element_text(role_elem.find("ipAddress"))
