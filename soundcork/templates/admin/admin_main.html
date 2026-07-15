@@ -45,6 +45,26 @@
                             <input type="submit" value="Switch to Soundcork">
                         </form>
                         {% endif %}
+                        {% if account.in_soundcork and device.in_soundcork %}
+                        {% set target_accounts = namespace(count=0) %}
+                        {% for target_id, target_account in accounts.items() %}
+                            {% if target_account.in_soundcork and target_id != account.id %}
+                            {% set target_accounts.count = target_accounts.count + 1 %}
+                            {% endif %}
+                        {% endfor %}
+                        {% if target_accounts.count > 0 %}
+                        <form class="inline-form" action="/admin/{{device.id}}/setAccount" method="POST">
+                            <select name="account_id">
+                            {% for target_id, target_account in accounts.items() %}
+                                {% if target_account.in_soundcork and target_id != account.id %}
+                                <option value="{{target_id}}">{{target_id}}</option>
+                                {% endif %}
+                            {% endfor %}
+                            </select>
+                            <input type="submit" value="Move to Account">
+                        </form>
+                        {% endif %}
+                        {% endif %}
                     </td>
             {% endfor %}
             </tbody>

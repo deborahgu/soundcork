@@ -36,6 +36,70 @@ router = APIRouter(tags=["admin"])
 logger = logging.getLogger(__name__)
 
 
+def _device_accounts(datastore: DataStore, device_id: str) -> list[str]:
+    accounts = []
+    for account_id in datastore.list_accounts():
+        if account_id and datastore.device_exists(account_id, device_id):
+            accounts.append(account_id)
+    return accounts
+
+
+def _remove_device_from_other_accounts(
+    datastore: DataStore,
+    device_id: str,
+    target_account: str,
+) -> None:
+    for account_id in _device_accounts(datastore, device_id):
+        if account_id == target_account:
+            continue
+        group = datastore.group_for_device(account_id, device_id)
+        if group:
+            datastore.delete_group(account_id, group.id)
+        datastore.remove_device(account_id, device_id)
+
+
+def _set_device_account(
+    datastore: DataStore,
+    speakers: Speakers,
+    device_id: str,
+    account_id: str,
+) -> bool:
+    if not datastore.account_exists(account_id):
+        logger.warning(
+            "cannot move %s: account %s does not exist", device_id, account_id
+        )
+        return False
+
+    combined_device = speakers.all_devices().get(device_id)
+    if not combined_device or not combined_device.st_device:
+        logger.warning("cannot move %s: device is not online", device_id)
+        return False
+
+    hostname = combined_device.st_device.Host
+    reachable = addr_is_reachable(hostname)
+    if not speakers.set_account(device_id, account_id):
+        logger.warning("cannot move %s: speaker rejected setMargeAccount", device_id)
+        return False
+
+    if not add_device_by_ip(hostname, reachable):
+        logger.warning(
+            "cannot move %s: failed to import device from %s", device_id, hostname
+        )
+        return False
+
+    if not datastore.device_exists(account_id, device_id):
+        logger.warning(
+            "cannot move %s: imported device is not stored under account %s",
+            device_id,
+            account_id,
+        )
+        return False
+
+    _remove_device_from_other_accounts(datastore, device_id, account_id)
+    speakers.clear_device(device_id)
+    return True
+
+
 def get_admin_router(datastore: DataStore, speakers: Speakers):
     from fastapi.responses import HTMLResponse
     from fastapi.templating import Jinja2Templates
@@ -207,7 +271,13 @@ def get_admin_router(datastore: DataStore, speakers: Speakers):
     async def set_account(
         request: Request, device_id: str, account_id: Annotated[str, Form()]
     ):
-        success = speakers.set_account(device_id, account_id)
+        success = _set_device_account(datastore, speakers, device_id, account_id)
+        logger.info(
+            "set account for %s to %s success=%s",
+            device_id,
+            account_id,
+            success,
+        )
         return RedirectResponse(url="/admin/", status_code=HTTPStatus.FOUND)
 
     @router.get("/admin/edit_device/{device_id}")
