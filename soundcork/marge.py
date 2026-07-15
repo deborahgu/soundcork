@@ -322,7 +322,7 @@ def add_recent(
         # need a new id
         # TODO handle race conditions -- right now two recent requests
         # would probably have the second clobber the first
-        next_id = max(int(recent.id) for recent in recents_list) + 1
+        next_id = max((int(recent.id) for recent in recents_list), default=0) + 1
         recent_obj = Recent(
             name=name,  # type: ignore
             utc_time=str(utc_time),
