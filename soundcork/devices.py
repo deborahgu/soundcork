@@ -172,12 +172,12 @@ def read_file_from_speaker_ssh(host: str, remote_path: str, local_path: str) -> 
         logger.info(f"Error: {e}")
 
 
-def read_file_from_speaker_http(host: str, path: str) -> str:
+def read_file_from_speaker_http(host: str, path: str, timeout: int = 2) -> str:
     """Read a file from the remote speaker, using their HTTP API."""
     url = f"http://{host}:{SPEAKER_HTTP_PORT}{path}"
     logger.info(f"checking {url}")
     try:
-        return str(urllib.request.urlopen(url).read(), "utf-8")
+        return str(urllib.request.urlopen(url, timeout=timeout).read(), "utf-8")
     except Exception:
         logger.info(f"no result for {url}")
         return ""
