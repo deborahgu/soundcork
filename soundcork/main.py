@@ -70,6 +70,7 @@ from soundcork.model import (
 from soundcork.ui.speakers import Speakers
 from soundcork.unhandled_exception_handler import NotFoundHandler
 from soundcork.utils import strip_element_text
+from soundcork.zeroconf_primer import ZeroConfPrimer
 
 logging.basicConfig(
     level=logging.INFO,
@@ -83,7 +84,8 @@ speakers = Speakers(datastore, settings)
 
 from soundcork.spotify_service import SpotifyService
 
-spotify_service = SpotifyService()
+spotify_service = SpotifyService(settings)
+zeroconf_primer = ZeroConfPrimer(spotify_service, datastore, settings)
 
 
 description = """
@@ -105,12 +107,22 @@ tags_metadata = [
         "description": "Communicates with streaming radio services (eg. TuneIn).",
     },
 ]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    zeroconf_primer.start_periodic()
+    yield
+    zeroconf_primer.stop_periodic()
+
+
 app = FastAPI(
     title="SoundCork",
     description=description,
     summary="Emulates SoundTouch servers.",
     version="0.0.1",
     openapi_tags=tags_metadata,
+    lifespan=lifespan,
 )
 
 from soundcork.management import router as management_router
@@ -133,6 +145,33 @@ app.include_router(management_router)
 
 
 startup_timestamp = int(datetime.now().timestamp() * 1000)
+
+
+@app.middleware("http")
+async def register_spotify_primer_speakers(request: Request, call_next):
+    response = await call_next(request)
+
+    if not zeroconf_primer.enabled:
+        return response
+
+    path = request.url.path
+    if "/marge/" not in path or "/account/" not in path or "/device/" not in path:
+        return response
+
+    parts = path.split("/")
+    try:
+        account_idx = parts.index("account") + 1
+        device_idx = parts.index("device") + 1
+        account_id = parts[account_idx]
+        device_id = parts[device_idx]
+    except (ValueError, IndexError):
+        return response
+
+    if not account_id or not device_id:
+        return response
+
+    zeroconf_primer.register_speaker(account_id, device_id)
+    return response
 
 
 @app.get("/")
@@ -160,6 +199,8 @@ async def power_on(request: Request, response: Response) -> Response:
     xml = await request.body()
     account = update_device_poweron(datastore, xml)
     if account:
+        source_ip = request.client.host if request.client else None
+        zeroconf_primer.on_power_on(source_ip)
         response.status_code = HTTPStatus.OK
         return response
     else:
@@ -903,7 +944,7 @@ app.include_router(get_groups_service_router(datastore))
 app.include_router(get_admin_router(datastore, speakers))
 
 #  include miniapp router
-app.include_router(get_miniapp_router(datastore, speakers))
+app.include_router(get_miniapp_router(datastore, speakers, zeroconf_primer))
 
 # 404 handling
 handler = NotFoundHandler(settings.unhandled_log_dir)

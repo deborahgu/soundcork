@@ -19,6 +19,7 @@ from soundcork.ui.speakers import Speakers
 
 if TYPE_CHECKING:
     from soundcork.model import Preset
+    from soundcork.zeroconf_primer import ZeroConfPrimer
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +58,55 @@ def get_device_image(product_code: str) -> str:
     return DEVICE_IMAGE_MAP.get(product_code.lower(), DEFAULT_DEVICE_IMAGE)
 
 
-def get_miniapp_router(datastore: DataStore, speakers: Speakers):
+def get_miniapp_router(
+    datastore: DataStore,
+    speakers: Speakers,
+    zeroconf_primer: "ZeroConfPrimer | None" = None,
+):
     templates = Jinja2Templates(directory="templates")
 
     router = APIRouter(tags=["miniapp"])
+
+    def prime_spotify_before_play(
+        account_id: str | None,
+        device_id: str | None,
+        content_item_id: str | None,
+    ) -> None:
+        if not (
+            zeroconf_primer
+            and zeroconf_primer.enabled
+            and account_id
+            and device_id
+            and content_item_id
+        ):
+            return
+
+        try:
+            content_item = datastore.get_content_item(
+                account=account_id,
+                device_id=device_id,
+                ci_id=content_item_id,
+            )
+        except Exception:
+            logger.exception(
+                "Could not inspect content item %s before playback",
+                content_item_id,
+            )
+            return
+
+        if not content_item or (content_item.source or "").upper() != "SPOTIFY":
+            return
+
+        try:
+            zeroconf_primer.prime_before_play(
+                device_id,
+                account_id=account_id,
+            )
+        except Exception:
+            logger.exception(
+                "Spotify ZeroConf pre-play priming failed for device %s",
+                device_id,
+            )
 
     @router.get("/miniapp", response_class=HTMLResponse)
     async def main_page(request: Request):
@@ -382,6 +428,12 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             if not selected_content_item_id or not selected_device_id:
                 logger.warning("Cannot play: content_item or device not selected")
                 return RedirectResponse(url="/miniapp/dashboard", status_code=303)
+
+            account_id = request.cookies.get("soundcork_account_id")
+
+            prime_spotify_before_play(
+                account_id, selected_device_id, selected_content_item_id
+            )
 
             # Play the content_item
             if speakers.play_content_item(selected_device_id, selected_content_item_id):

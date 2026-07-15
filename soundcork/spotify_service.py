@@ -28,10 +28,9 @@ SPOTIFY_AUTHORIZE_URL = "https://accounts.spotify.com/authorize"
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 SPOTIFY_API_BASE = "https://api.spotify.com/v1"
 
-# Scopes needed for user profile and entity resolution.
-# Add "streaming" and "user-modify-playback-state" if you plan to
-# control playback via the Spotify Web API.
-SPOTIFY_SCOPES = "user-read-private user-read-email"
+# Scopes needed for user profile, entity resolution, and Web Playback SDK tokens.
+SPOTIFY_SCOPES_MINIMAL = "streaming user-read-email user-read-private"
+SPOTIFY_SCOPES = SPOTIFY_SCOPES_MINIMAL
 
 # full set of permissions that bose returned; included in case they're
 # needed in the future (like for browse)
@@ -45,11 +44,15 @@ SPOTIFY_SCOPES_FULL = (
 class SpotifyService:
     """TODO refactor so instead of writing to disk, it relies on either the datastore or storing in memory."""
 
-    def __init__(self):
-        self._settings = Settings()
+    def __init__(self, settings: Settings | None = None):
+        self._settings = settings or Settings()
         self._accounts_file = os.path.join(
             self._settings.data_dir, "spotify", "accounts.json"
         )
+
+    @property
+    def spotify_scopes(self) -> str:
+        return self._settings.spotify_scopes or SPOTIFY_SCOPES_MINIMAL
 
     def _ensure_spotify_dir(self):
         """Create the spotify data directory if it doesn't exist.
@@ -87,7 +90,7 @@ class SpotifyService:
             "client_id": self._settings.spotify_client_id,
             "response_type": "code",
             "redirect_uri": redirect_uri or self._settings.spotify_redirect_uri,
-            "scope": SPOTIFY_SCOPES,
+            "scope": self.spotify_scopes,
         }
         return f"{SPOTIFY_AUTHORIZE_URL}?{urllib.parse.urlencode(params)}"
 
@@ -118,6 +121,7 @@ class SpotifyService:
             "accessToken": access_token,
             "refreshToken": refresh_token,
             "tokenExpiresAt": int(time.time()) + expires_in,
+            "scope": token_data.get("scope", self.spotify_scopes),
         }
 
         # Upsert: replace if same user ID already exists
@@ -195,13 +199,16 @@ class SpotifyService:
             account["tokenExpiresAt"] = now + token_data.get("expires_in", 3600)
             if "refresh_token" in token_data:
                 account["refreshToken"] = token_data["refresh_token"]
+            account["scope"] = token_data.get(
+                "scope", account.get("scope", self.spotify_scopes)
+            )
             self._save_accounts(accounts)
 
         return {
             "access_token": account["accessToken"],
             "token_type": "Bearer",
             "expires_in": account["tokenExpiresAt"] - now,
-            "scope": SPOTIFY_SCOPES,
+            "scope": account.get("scope", self.spotify_scopes),
         }
 
     def get_fresh_token_sync(self) -> dict:
@@ -209,7 +216,9 @@ class SpotifyService:
 
     def get_spotify_user_id(self) -> str:
         accounts = self._load_accounts()
-        return accounts[0].get("id", "")
+        if not accounts:
+            return ""
+        return accounts[0].get("spotifyUserId") or accounts[0].get("id", "")
 
     async def _get_user_profile(self, access_token: str) -> dict:
         """Fetch the current user's Spotify profile."""
