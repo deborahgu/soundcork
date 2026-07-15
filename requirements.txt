@@ -6,7 +6,7 @@ httpx==0.28.1
 gunicorn==26.0.0
 isort==8.0.1  # dev only
 mypy==2.1.0  # dev only
-paramiko==4.0.0
+paramiko==5.0.0
 pydantic-settings==2.14.1
 pytest==9.0.3  # dev only
 pytest-cov==7.1.0  # dev only
