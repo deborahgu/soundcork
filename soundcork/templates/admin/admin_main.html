@@ -2,6 +2,18 @@
 {% block title %}Soundcork Admin{% endblock %}
 {% block header %}Soundcork:  Can't Brick Us{% endblock %}
 {% block main %}
+        <details open>
+            <summary>Status guide</summary>
+            <ul>
+                <li><strong>Live Marge</strong> is read from the speaker's current <code>/info</code> response. <strong>Soundcork</strong> means the speaker already points at this server, <strong>Bose</strong> means it still points at Bose cloud URLs, and <strong>Other</strong> means it points somewhere else.</li>
+                <li><strong>Playback</strong> is inferred from the live <code>/sources</code> response. <strong>Soundcork-ready</strong> means this server is selected and radio sources are ready, <strong>Legacy-ready</strong> means the speaker still points at Bose but radio sources are still ready until a reboot, and <strong>Needs repair</strong> means internet radio sources are not currently ready.</li>
+                <li><strong>REST /info</strong> means the speaker answered its HTTP API on port 8090. This is enough to inspect live state, but not enough to rewrite Bose URLs.</li>
+                <li><strong>SSH</strong> means root shell access is available on port 22. Soundcork can copy the override XML and reboot the speaker.</li>
+                <li><strong>Telnet CLIServer</strong> means the non-rooted SoundTouch command port 17000 is reachable. Soundcork can ask the speaker to update its Bose URLs and reboot.</li>
+                <li><strong>Switch to Soundcork</strong> sets the Bose service URLs to this Soundcork instance. Use it when Live Marge is not Soundcork and either SSH or Telnet CLIServer is available.</li>
+            </ul>
+        </details>
+
         {% for id, account in accounts.items() %}
         <h2>Account {{account.id}}
             {% if not account.in_soundcork %}
@@ -13,10 +25,13 @@
                 <th>Device</th>
                 <th>IP Address</th>
                 <th>Name</th>
-                <th>Marge</th>
-                <th>Online</th>
+                <th>Live Marge</th>
+                <th>Playback</th>
+                <th>REST /info</th>
+                <th>Discovery</th>
                 <th>In Soundcork</th>
-                <th>Reachable</th>
+                <th>SSH</th>
+                <th>Telnet CLIServer</th>
                 <th>Action</th>
             </thead>
             <tbody></tbody>
@@ -25,13 +40,16 @@
                     <td><a href = "/admin/edit_device/{{device.id}}">{{device.id}}</a></td>
                     <td>{{device.ip}}</td>
                     <td>{{device.name}}</td>
-                    <td>{{device.marge_server}}</td>
+                    <td title="{{device.marge_url or ''}}">{{device.marge_server}}</td>
+                    <td title="{{device.playback_capability_detail or ''}}">{{device.playback_capability}}</td>
+                    <td>{{device.rest_reachable}}</td>
                     <td>{{device.online}}</td>
                     <td>{{device.in_soundcork}}</td>
-                    <td>{{device.reachable}}</td>
+                    <td>{{device.ssh_reachable}}</td>
+                    <td>{{device.telnet_reachable}}</td>
                     <td>
                         {% if not device.in_soundcork %}
-                          {% if not account.in_soundcork and device.reachable %}
+                          {% if not account.in_soundcork and device.rest_reachable %}
                             <form action="/admin/addDevice/{{device.id}}" method="POST">
                               <input type="submit" value="Configure Account">
                             </form>
@@ -40,10 +58,16 @@
                               <input type="submit" value="Add to Soundcork">
                             </form>
                           {% endif %}
-                        {% elif device.reachable and device.marge_server != "Soundcork"%}
+                        {% elif device.repair_available %}
                         <form action="/admin/switchToSoundcork/{{device.id}}" method="POST">
                             <input type="submit" value="Switch to Soundcork">
                         </form>
+                        {% elif device.marge_server == "Soundcork" %}
+                        Already using Soundcork
+                        {% elif device.error %}
+                        {{device.error}}
+                        {% else %}
+                        Needs SSH or Telnet CLIServer
                         {% endif %}
                     </td>
             {% endfor %}
@@ -68,9 +92,12 @@
                 <th>Device</th>
                 <th>IP Address</th>
                 <th>Name</th>
-                <th>Marge</th>
-                <th>Online</th>
-                <th>Reachable</th>
+                <th>Live Marge</th>
+                <th>Playback</th>
+                <th>REST /info</th>
+                <th>Discovery</th>
+                <th>SSH</th>
+                <th>Telnet CLIServer</th>
                 <th>Action</th>
             </thead>
             <tbody></tbody>
@@ -79,9 +106,12 @@
                     <td>{{device.id}}</td>
                     <td>{{device.ip}}</td>
                     <td>{{device.name}}</td>
-                    <td>{{device.marge_server}}</td>
+                    <td title="{{device.marge_url or ''}}">{{device.marge_server}}</td>
+                    <td title="{{device.playback_capability_detail or ''}}">{{device.playback_capability}}</td>
+                    <td>{{device.rest_reachable}}</td>
                     <td>{{device.online}}</td>
-                    <td>{{device.reachable}}</td>
+                    <td>{{device.ssh_reachable}}</td>
+                    <td>{{device.telnet_reachable}}</td>
                     <td>
                         {% if device.language_code == "0" %}
                         <form class="inline-form" action = "/admin/{{device.id}}/setLanguage" method="POST">
@@ -92,10 +122,12 @@
                             </select>
                             <input type="submit" value="Set Language">
                         </form>
-                        {% elif device.marge_server != "Soundcork" %}
-                        <form action="/admin/switchToSoundcork/B0D5CC0391DB" method="POST">
-                            <input type="submit" value="Swtich To Soundcork">
+                        {% elif device.repair_available %}
+                        <form action="/admin/switchToSoundcork/{{device.id}}" method="POST">
+                            <input type="submit" value="Switch to Soundcork">
                         </form>
+                        {% elif device.marge_server != "Soundcork" %}
+                        Needs SSH or Telnet CLIServer
                         {% else %}
                         <form class="inline-form" action="/admin/{{device.id}}/setAccount" method="POST">
                             <select name="account_id">

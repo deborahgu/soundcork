@@ -67,6 +67,7 @@ SPEAKER_HTTP_PORT = 8090
 SPEAKER_DEVICE_INFO_PATH = "/info"
 SPEAKER_RECENTS_PATH = "/recents"
 SPEAKER_PRESETS_PATH = "/presets"
+SPEAKER_SOURCES_PATH = "/sources"
 # this one needs to be pulled from a device
 SPEAKER_SOURCES_FILE_LOCATION = "/mnt/nv/BoseApp-Persistence/1/Sources.xml"
 SPEAKER_OVERRIDE_SDK_LOCATION = "/mnt/nv/OverrideSdkPrivateCfg.xml"

@@ -31,6 +31,7 @@ from soundcork.constants import (
     SPEAKER_PRESETS_PATH,
     SPEAKER_RECENTS_PATH,
     SPEAKER_SOURCES_FILE_LOCATION,
+    SPEAKER_SOURCES_PATH,
 )
 from soundcork.datastore import DataStore
 from soundcork.model import ConfiguredSource
@@ -65,6 +66,10 @@ def read_device_info(hostname: str) -> str:
 
 def read_presets(hostname: str) -> str:
     return read_file_from_speaker_http(hostname, SPEAKER_PRESETS_PATH)
+
+
+def read_runtime_sources(hostname: str) -> str:
+    return read_file_from_speaker_http(hostname, SPEAKER_SOURCES_PATH)
 
 
 def read_sources(hostname: str) -> str:
@@ -172,12 +177,12 @@ def read_file_from_speaker_ssh(host: str, remote_path: str, local_path: str) -> 
         logger.info(f"Error: {e}")
 
 
-def read_file_from_speaker_http(host: str, path: str) -> str:
+def read_file_from_speaker_http(host: str, path: str, timeout: int = 2) -> str:
     """Read a file from the remote speaker, using their HTTP API."""
     url = f"http://{host}:{SPEAKER_HTTP_PORT}{path}"
     logger.info(f"checking {url}")
     try:
-        return str(urllib.request.urlopen(url).read(), "utf-8")
+        return str(urllib.request.urlopen(url, timeout=timeout).read(), "utf-8")
     except Exception:
         logger.info(f"no result for {url}")
         return ""
@@ -226,17 +231,23 @@ def show_upnp_devices() -> None:
 def is_reachable(device: upnpclient.upnp.Device) -> bool:
     """Returns true if device is reachable via telnet, ssh, etc."""
     device_address = urlparse(device.location).hostname
-    return is_reachable(device_address)
+    return bool(device_address and addr_is_reachable(device_address))
 
 
-def addr_is_reachable(device_address: str) -> bool:
+def addr_port_is_reachable(device_address: str, port: int, timeout: float = 2) -> bool:
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(2)  # Timeout in case of port not open
+    s.settimeout(timeout)
     try:
-        s.connect((device_address, 22))  # Port ,Here 22 is port
+        s.connect((device_address, port))
         return True
     except:
         return False
+    finally:
+        s.close()
+
+
+def addr_is_reachable(device_address: str) -> bool:
+    return addr_port_is_reachable(device_address, 22)
 
 
 def add_device(device: upnpclient.upnp.Device) -> bool:
