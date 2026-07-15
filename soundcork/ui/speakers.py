@@ -188,7 +188,7 @@ class Speakers:
         )
         bose_content_item = self._content_item_to_soundtouchclient(content_item)
         client = SoundTouchClient(cd.st_device)
-        client.PlayContentItem(bose_content_item)
+        client.PlayContentItem(bose_content_item, delay=0)
 
         return True
 
