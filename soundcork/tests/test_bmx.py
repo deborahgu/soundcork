@@ -57,6 +57,42 @@ def test_navigate_uses_ashx_parser_for_opml_browse_urls(monkeypatch):
     )
 
 
+def test_navigate_uses_top_level_ashx_audio_items(monkeypatch):
+    tunein_uri = "http://opml.radiotime.com/Browse.ashx?id=r101232&filter=s%3Apopular&render=json"
+    image_url = "http://cdn-radiotime-logos.tunein.com/s15666q.png"
+    requested_urls = []
+
+    def fake_urlopen(url):
+        requested_urls.append(url)
+        return FakeTuneInResponse(
+            {
+                "head": {"title": "Most Popular - Czech Republic"},
+                "body": [
+                    {
+                        "type": "audio",
+                        "text": "Evropa 2",
+                        "subtext": "Praha, Czech Republic",
+                        "image": image_url,
+                        "URL": "http://opml.radiotime.com/Tune.ashx?id=s15666&filter=s:popular",
+                    }
+                ],
+            }
+        )
+
+    monkeypatch.setattr("soundcork.bmx.urllib.request.urlopen", fake_urlopen)
+
+    response = tunein_navigate_v1(encode_uri(tunein_uri))
+    item = response.bmx_sections[0].items[0]
+
+    assert requested_urls == [tunein_uri]
+    assert response.bmx_sections[0].name == "Most Popular - Czech Republic"
+    assert item.name == "Evropa 2"
+    assert item.image_url == image_url
+    assert item.links.bmx_playback.href == "/v1/playback/station/s15666"
+    assert item.links.bmx_preset.href == "s15666"
+    assert item.links.bmx_preset.container_art == image_url
+
+
 def test_search_url_encodes_spaces_and_more_link_uses_encoded_query(monkeypatch):
     requested_urls = []
 
