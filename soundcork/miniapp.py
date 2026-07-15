@@ -4,6 +4,7 @@ Endpoints for a miniapp UI.
 
 import asyncio
 import logging
+import time
 import urllib.parse
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 NOW_PLAYING_TIMEOUT = 3.0
+STARTED_OPTIMISTIC_SECONDS = 3.0
 
 
 @dataclass
@@ -57,10 +59,106 @@ def get_device_image(product_code: str) -> str:
     return DEVICE_IMAGE_MAP.get(product_code.lower(), DEFAULT_DEVICE_IMAGE)
 
 
+def use_started_state(started: bool, started_at: float | None) -> bool:
+    """Return True while a just-started playback action may still have stale metadata."""
+    if not started or started_at is None:
+        return False
+
+    elapsed = time.time() - started_at
+    return 0 <= elapsed <= STARTED_OPTIMISTIC_SECONDS
+
+
 def get_miniapp_router(datastore: DataStore, speakers: Speakers):
     templates = Jinja2Templates(directory="templates")
 
     router = APIRouter(tags=["miniapp"])
+
+    def play_selected_content_item(
+        device_id: str,
+        content_item_id: str,
+        *,
+        log_context: str,
+    ) -> bool:
+        if speakers.play_content_item(device_id, content_item_id):
+            logger.info(
+                f"Started playback from {log_context}: content_item {content_item_id} on device {device_id}"
+            )
+            return True
+
+        logger.error(f"Failed to start playback from {log_context}")
+        return False
+
+    def is_actionable_device(combined_device) -> bool:
+        return (
+            combined_device.online
+            and combined_device.in_soundcork
+            and (combined_device.marge_server == "Soundcork")
+        )
+
+    def resolve_selected_device(
+        account_id: str,
+        selected_device_id: str | None,
+        *,
+        combined_devices: dict | None = None,
+    ):
+        if not selected_device_id:
+            return None
+
+        candidate_devices = (
+            combined_devices if combined_devices is not None else speakers.all_devices()
+        )
+        combined_device = candidate_devices.get(selected_device_id)
+        if not combined_device or combined_device.account != account_id:
+            logger.warning(
+                "Ignoring miniapp selected device %s outside account %s",
+                selected_device_id,
+                account_id,
+            )
+            return None
+
+        if not is_actionable_device(combined_device):
+            logger.warning(
+                "Ignoring miniapp selected device %s because it is not actionable",
+                selected_device_id,
+            )
+            return None
+
+        return combined_device
+
+    def get_account_presets(account_id: str):
+        try:
+            return datastore.get_presets(account_id)
+        except Exception as e:
+            logger.warning(f"Error getting presets for account {account_id}: {e}")
+            return []
+
+    def resolve_selected_preset(presets, selected_content_item_id: str | None):
+        if not selected_content_item_id:
+            return None
+
+        selected_preset = next(
+            (
+                preset
+                for preset in presets
+                if str(preset.id) == selected_content_item_id
+            ),
+            None,
+        )
+        if not selected_preset:
+            logger.warning(
+                "Ignoring unknown miniapp content item %s",
+                selected_content_item_id,
+            )
+        return selected_preset
+
+    def dashboard_redirect(params: dict[str, str] | None = None) -> RedirectResponse:
+        if not params:
+            return RedirectResponse(url="/miniapp/dashboard", status_code=303)
+
+        return RedirectResponse(
+            url=f"/miniapp/dashboard?{urllib.parse.urlencode(params)}",
+            status_code=303,
+        )
 
     @router.get("/miniapp", response_class=HTMLResponse)
     async def main_page(request: Request):
@@ -163,6 +261,8 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
         request: Request,
         selected_content_item_id: str | None = Query(None),
         selected_device_id: str | None = Query(None),
+        started: bool = Query(False),
+        started_at: float | None = Query(None),
         stopped: bool = Query(False),
     ):
         """Display dashboard with devices and presets.
@@ -175,6 +275,13 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
 
             selected_device_id: The speaker, if one is selected
                 in the user's context.
+
+            started: If playback on the current device was just started
+                by the user's request. Passing as an argument to avoid
+                timing issues in the query.
+
+            started_at: Server timestamp for the playback start redirect. Keeps
+                the optimistic started state short-lived if the page is reloaded.
 
             stopped: If the stream on the current device was just stopped
                 by the user's request. Passing as an argument to avoid
@@ -206,8 +313,20 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                 if cd.account == account_id
             }
 
+            selected_device = resolve_selected_device(
+                account_id,
+                selected_device_id,
+                combined_devices=my_combined_devices,
+            )
+            selected_device_id = selected_device.id if selected_device else None
+
             devices: list[dict[str, str]] = []
-            presets: list["Preset"] = []
+            presets = get_account_presets(account_id)
+            selected_preset = resolve_selected_preset(presets, selected_content_item_id)
+            selected_content_item_id = (
+                str(selected_preset.id) if selected_preset else None
+            )
+            show_started_state = use_started_state(started, started_at)
 
             for device_id in my_combined_devices.keys():
                 try:
@@ -215,14 +334,23 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                         np = NowPlaying("", "", "", 0, 0, False)
                     else:
                         np = await _get_now_playing(device_id)
+                        if (
+                            show_started_state
+                            and device_id == selected_device_id
+                            and selected_preset
+                        ):
+                            np = NowPlaying(
+                                selected_preset.name,
+                                selected_preset.container_art or "",
+                                "PLAY_STATE",
+                                np.volume_actual,
+                                np.volume_target,
+                                np.is_muted,
+                            )
                     online = "offline"
                     cd = my_combined_devices[device_id]
                     device_info = datastore.get_device_info(account_id, device_id)
-                    if (
-                        cd.online
-                        and cd.in_soundcork
-                        and (cd.marge_server == "Soundcork")
-                    ):
+                    if is_actionable_device(cd):
                         online = "online"
                     devices.append(
                         {
@@ -238,14 +366,6 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                             "now_playing_is_muted": str(np.is_muted),
                         }
                     )
-
-                    if not presets:
-                        try:
-                            presets = datastore.get_presets(account_id)
-                        except Exception as e:
-                            logger.warning(
-                                f"Error getting presets for device {device_id}: {e}"
-                            )
 
                 except Exception as e:
                     logger.error(f"Error getting device info for {device_id}: {e}")
@@ -301,8 +421,13 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             logger.warning(f"Timeout getting now playing status for {device_id}")
             return NowPlaying("[Unknown]", "", "", 0, 0, False)
 
-        if np:
+        try:
             volume = speakers.get_volume(device_id)
+        except Exception as e:
+            logger.warning(f"Error getting volume for {device_id}: {e}")
+            volume = None
+
+        if np:
             return NowPlaying(
                 f"{np.StationName or np.ContentItem.Name}",
                 np.ContainerArtUrl or "",
@@ -312,7 +437,14 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                 volume.IsMuted if volume else False,
             )
         else:
-            return NowPlaying("", "", "", 0, 0, False)
+            return NowPlaying(
+                "",
+                "",
+                "",
+                volume.Actual if volume else 0,
+                volume.Target if volume else 0,
+                volume.IsMuted if volume else False,
+            )
 
     @router.post("/miniapp/select-content-item")
     async def select_content_item(
@@ -332,15 +464,32 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             ):
                 return RedirectResponse(url="/miniapp/dashboard", status_code=303)
 
+            account_id = request.cookies.get("soundcork_account_id", "")
+            if not account_id or not datastore.account_exists(account_id):
+                return RedirectResponse(url="/miniapp/login", status_code=303)
+
+            presets = get_account_presets(account_id)
+            selected_preset = resolve_selected_preset(presets, content_item_id)
+            if not selected_preset:
+                return dashboard_redirect()
+
+            content_item_id = str(selected_preset.id)
             params: dict[str, str] = {"selected_content_item_id": content_item_id}
-            if selected_device_id:
-                params["selected_device_id"] = selected_device_id
-            qs = urllib.parse.urlencode(params)
-            return RedirectResponse(url=f"/miniapp/dashboard?{qs}", status_code=303)
+            selected_device = resolve_selected_device(account_id, selected_device_id)
+            if selected_device:
+                params["selected_device_id"] = selected_device.id
+                if play_selected_content_item(
+                    selected_device.id,
+                    content_item_id,
+                    log_context="preset click",
+                ):
+                    params["started"] = "true"
+                    params["started_at"] = f"{time.time():.3f}"
+            return dashboard_redirect(params)
 
         except Exception as e:
             logger.error(f"Error selecting content_item: {e}")
-            return RedirectResponse(url="/miniapp/dashboard", status_code=303)
+            return dashboard_redirect()
 
     @router.post("/miniapp/select-device")
     async def select_device(
@@ -360,16 +509,25 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             ):
                 return RedirectResponse(url="/miniapp/dashboard", status_code=303)
 
-            params: dict[str, str] = {"selected_device_id": str(device_id)}
-            if selected_content_item_id:
-                params["selected_content_item_id"] = selected_content_item_id
-            qs = urllib.parse.urlencode(params)
-            logger.info(f"Device selected: {device_name} ({device_id})")
-            return RedirectResponse(url=f"/miniapp/dashboard?{qs}", status_code=303)
+            account_id = request.cookies.get("soundcork_account_id", "")
+            if not account_id or not datastore.account_exists(account_id):
+                return RedirectResponse(url="/miniapp/login", status_code=303)
+
+            selected_device = resolve_selected_device(account_id, str(device_id))
+            if not selected_device:
+                return dashboard_redirect()
+
+            params: dict[str, str] = {"selected_device_id": selected_device.id}
+            presets = get_account_presets(account_id)
+            selected_preset = resolve_selected_preset(presets, selected_content_item_id)
+            if selected_preset:
+                params["selected_content_item_id"] = str(selected_preset.id)
+            logger.info(f"Device selected: {device_name} ({selected_device.id})")
+            return dashboard_redirect(params)
 
         except Exception as e:
             logger.error(f"Error selecting device: {e}")
-            return RedirectResponse(url="/miniapp/dashboard", status_code=303)
+            return dashboard_redirect()
 
     @router.post("/miniapp/play")
     async def play(
@@ -381,28 +539,42 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
         try:
             if not selected_content_item_id or not selected_device_id:
                 logger.warning("Cannot play: content_item or device not selected")
-                return RedirectResponse(url="/miniapp/dashboard", status_code=303)
+                return dashboard_redirect()
 
-            # Play the content_item
-            if speakers.play_content_item(selected_device_id, selected_content_item_id):
-                logger.info(
-                    f"Started playback: content_item {selected_content_item_id} on device {selected_device_id}"
+            account_id = request.cookies.get("soundcork_account_id", "")
+            if not account_id or not datastore.account_exists(account_id):
+                return RedirectResponse(url="/miniapp/login", status_code=303)
+
+            selected_device = resolve_selected_device(account_id, selected_device_id)
+            presets = get_account_presets(account_id)
+            selected_preset = resolve_selected_preset(presets, selected_content_item_id)
+            params: dict[str, str] = {}
+            if selected_device:
+                selected_device_id = selected_device.id
+                params["selected_device_id"] = selected_device_id
+            if selected_preset:
+                selected_content_item_id = str(selected_preset.id)
+                params["selected_content_item_id"] = selected_content_item_id
+            if not selected_device or not selected_preset:
+                logger.warning(
+                    "Cannot play: selected device or content item is invalid"
                 )
-            else:
-                logger.error("Failed to start playback")
+                return dashboard_redirect(params)
 
-            params = {
-                "selected_device_id": selected_device_id,
-                "selected_content_item_id": selected_content_item_id,
-            }
-            return RedirectResponse(
-                url=f"/miniapp/dashboard?{urllib.parse.urlencode(params)}",
-                status_code=303,
+            started = play_selected_content_item(
+                selected_device_id,
+                selected_content_item_id,
+                log_context="play button",
             )
+
+            if started:
+                params["started"] = "true"
+                params["started_at"] = f"{time.time():.3f}"
+            return dashboard_redirect(params)
 
         except Exception as e:
             logger.error(f"Error in play endpoint: {e}")
-            return RedirectResponse(url="/miniapp/dashboard", status_code=303)
+            return dashboard_redirect()
 
     @router.post("/miniapp/stop")
     async def stop(
@@ -414,7 +586,24 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
         try:
             if not selected_device_id:
                 logger.warning("Cannot stop: device not selected")
-                return RedirectResponse(url="/miniapp/dashboard", status_code=303)
+                return dashboard_redirect()
+
+            account_id = request.cookies.get("soundcork_account_id", "")
+            if not account_id or not datastore.account_exists(account_id):
+                return RedirectResponse(url="/miniapp/login", status_code=303)
+
+            selected_device = resolve_selected_device(account_id, selected_device_id)
+            presets = get_account_presets(account_id)
+            selected_preset = resolve_selected_preset(presets, selected_content_item_id)
+            params: dict[str, str] = {}
+            if selected_device:
+                selected_device_id = selected_device.id
+                params["selected_device_id"] = selected_device_id
+            if selected_preset:
+                params["selected_content_item_id"] = str(selected_preset.id)
+            if not selected_device:
+                logger.warning("Cannot stop: selected device is invalid")
+                return dashboard_redirect(params)
 
             # Stop playback
             success = speakers.stop_playback(selected_device_id)
@@ -423,12 +612,7 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
             else:
                 logger.error("Failed to stop playback")
 
-            params: dict[str, str] = {
-                "selected_device_id": selected_device_id,
-                "stopped": "true",
-            }
-            if selected_content_item_id:
-                params["selected_content_item_id"] = selected_content_item_id
+            params["stopped"] = "true"
             return RedirectResponse(
                 url=f"/miniapp/dashboard?{urllib.parse.urlencode(params)}",
                 status_code=303,
@@ -436,7 +620,7 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
 
         except Exception as e:
             logger.error(f"Error in stop endpoint: {e}")
-            return RedirectResponse(url="/miniapp/dashboard", status_code=303)
+            return dashboard_redirect()
 
     @router.post("/miniapp/logout")
     async def logout(request: Request):
