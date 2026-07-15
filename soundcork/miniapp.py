@@ -9,8 +9,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
 
-from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+import httpx
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from soundcork.constants import DEFAULT_DEVICE_IMAGE, DEVICE_IMAGE_MAP
@@ -23,6 +24,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 NOW_PLAYING_TIMEOUT = 3.0
+ARTWORK_PROXY_TIMEOUT = 5.0
+ARTWORK_PROXY_MAX_BYTES = 2_000_000
+ARTWORK_PROXY_HOST_SUFFIXES = ("tunein.com", "radiotime.com")
 
 
 @dataclass
@@ -57,10 +61,77 @@ def get_device_image(product_code: str) -> str:
     return DEVICE_IMAGE_MAP.get(product_code.lower(), DEFAULT_DEVICE_IMAGE)
 
 
+def should_proxy_artwork_url(url: str | None) -> bool:
+    """Return True for external artwork hosts known to need browser-safe proxying."""
+    if not url:
+        return False
+
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        return False
+
+    hostname = (parsed.hostname or "").lower()
+    return any(
+        hostname == suffix or hostname.endswith(f".{suffix}")
+        for suffix in ARTWORK_PROXY_HOST_SUFFIXES
+    )
+
+
+def miniapp_artwork_url(url: str | None) -> str:
+    """Return a browser-friendly artwork URL for the miniapp."""
+    if not url:
+        return ""
+
+    if not should_proxy_artwork_url(url):
+        return url
+
+    return f"/miniapp/artwork?url={quote(url, safe='')}"
+
+
 def get_miniapp_router(datastore: DataStore, speakers: Speakers):
     templates = Jinja2Templates(directory="templates")
+    templates.env.globals["miniapp_artwork_url"] = miniapp_artwork_url
 
     router = APIRouter(tags=["miniapp"])
+
+    @router.get("/miniapp/artwork")
+    async def artwork_proxy(url: str = Query(...)):
+        """Proxy selected station artwork so browsers do not block CDN images."""
+        if not should_proxy_artwork_url(url):
+            raise HTTPException(status_code=400, detail="Unsupported artwork URL")
+
+        try:
+            async with httpx.AsyncClient(
+                timeout=ARTWORK_PROXY_TIMEOUT,
+                follow_redirects=True,
+            ) as client:
+                upstream = await client.get(
+                    url,
+                    headers={"User-Agent": "SoundCork miniapp artwork proxy"},
+                )
+                upstream.raise_for_status()
+        except httpx.HTTPError as e:
+            logger.warning(f"Could not fetch miniapp artwork {url}: {e}")
+            raise HTTPException(status_code=502, detail="Artwork fetch failed") from e
+
+        content_type = (
+            upstream.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        )
+        if not content_type.startswith("image/"):
+            logger.warning(
+                f"Miniapp artwork URL {url} returned non-image content type {content_type}"
+            )
+            raise HTTPException(status_code=502, detail="Artwork URL is not an image")
+
+        if len(upstream.content) > ARTWORK_PROXY_MAX_BYTES:
+            logger.warning(f"Miniapp artwork URL {url} returned too much data")
+            raise HTTPException(status_code=502, detail="Artwork is too large")
+
+        return Response(
+            content=upstream.content,
+            media_type=content_type,
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
 
     @router.get("/miniapp", response_class=HTMLResponse)
     async def main_page(request: Request):

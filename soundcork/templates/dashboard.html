@@ -72,7 +72,7 @@
                             <input type="hidden" name="content_item_name" value="{{ preset.name }}">
                             <button type="submit" class="preset-card">
                                 {% if preset.container_art %}
-                                <img src="{{ preset.container_art }}" alt="">
+                                <img src="{{ miniapp_artwork_url(preset.container_art) }}" alt="">
                                 {% endif %}
                                 <span class="preset-number">{{ preset.id }}</span>
                                 <span class="preset-name">{{ preset.name }}</span>
@@ -132,7 +132,7 @@
                 <p>Now Playing on {{ ns.selected_device_obj.name }}:<br>
                     <span class="now_playing">{{ ns.selected_device_obj.now_playing }}</span></p>
                 {% if ns.selected_device_obj.now_playing_image %}
-                <img alt="" src="{{  ns.selected_device_obj.now_playing_image }}" width=100px;>
+                <img alt="" src="{{ miniapp_artwork_url(ns.selected_device_obj.now_playing_image) }}" width=100px;>
                 {% endif %}
                 {# TODO: right now this is read-only #}
                 <p><input type="range" min="1" max="100" value={{ ns.selected_device_obj.now_playing_volume }}
@@ -145,8 +145,8 @@
             <div class="content-item-info">
                 {% if ns.selected_preset_obj %}
                 Selected audio source: {{ ns.selected_preset_obj.name }}
-                {% if ns.selected_preset_obj.now_playing_image %}
-                <img alt="" src="{{  ns.selected_preset_obj.container_art }}" width=100px;>
+                {% if ns.selected_preset_obj.container_art %}
+                <img alt="" src="{{ miniapp_artwork_url(ns.selected_preset_obj.container_art) }}" width=100px;>
                 {% endif %}
                 {% else %}
                 No preset selected.
