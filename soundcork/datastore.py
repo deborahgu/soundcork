@@ -110,6 +110,8 @@ class DataStore:
         except FileNotFoundError:
             # Initialize the file if it doesn't exist
             self.initialize_accounts_file()
+            with open(path.join(self.data_dir, ACCOUNTS_FILE), "r") as f:
+                accounts = json.load(f)
         if account not in accounts:
             self.save_account_info(account, f"{DEFAULT_ACCOUNT_LABEL} {account}")
             return f"{DEFAULT_ACCOUNT_LABEL} {account}"
@@ -120,7 +122,8 @@ class DataStore:
         """Saves the label for the given account"""
         with open(path.join(self.data_dir, ACCOUNTS_FILE), "r") as f:
             accounts = json.load(f)
-        if account_label := accounts.get(label):
+        if account_info := accounts.get(account):
+            account_label = account_info.get("label")
             if account_label == label:
                 return
             logger.warning(
@@ -456,6 +459,9 @@ class DataStore:
     # TODO: add error handling if you can't write the file
     def save_configured_sources_xml(self, account: str, sources_xml: str):
         """Write Sources.xml for an Account"""
+        if not sources_xml.strip():
+            logger.info(f"not writing empty {SOURCES_FILE} for account {account}")
+            return
         with open(
             path.join(self.account_dir(account), SOURCES_FILE), "w"
         ) as sources_file:
@@ -555,6 +561,9 @@ class DataStore:
         name = strip_element_text(info_elem.find("name"))
         type = strip_element_text(info_elem.find("type"))
         module_type = strip_element_text(info_elem.find("moduleType"))
+        product_code = type
+        if module_type and not type.lower().endswith(f" {module_type.lower()}"):
+            product_code = f"{type} {module_type}"
 
         try:
             components = info_elem.find("components").findall("component")  # type: ignore
@@ -592,7 +601,7 @@ class DataStore:
         try:
             return DeviceInfo(
                 device_id=device_id,
-                product_code=f"{type} {module_type}",
+                product_code=product_code,
                 device_serial_number=str(device_serial_number),
                 product_serial_number=str(product_serial_number),
                 firmware_version=str(firmware_version),

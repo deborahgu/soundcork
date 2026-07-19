@@ -69,15 +69,19 @@ def read_presets(hostname: str) -> str:
 
 def read_sources(hostname: str) -> str:
     sources_tmp_file = tempfile.NamedTemporaryFile(delete=False)
-    read_file_from_speaker_ssh(
-        host=hostname,
-        remote_path=SPEAKER_SOURCES_FILE_LOCATION,
-        local_path=sources_tmp_file.name,
-    )
-    sources = sources_tmp_file.read()
     sources_tmp_file.close()
-    unlink(sources_tmp_file.name)
-    return sources.decode()
+    try:
+        copied = read_file_from_speaker_ssh(
+            host=hostname,
+            remote_path=SPEAKER_SOURCES_FILE_LOCATION,
+            local_path=sources_tmp_file.name,
+        )
+        if not copied:
+            return ""
+        with open(sources_tmp_file.name, "rb") as sources_file:
+            return sources_file.read().decode()
+    finally:
+        unlink(sources_tmp_file.name)
 
 
 def override_speaker_config(host: str) -> bool:
@@ -159,7 +163,7 @@ def reboot_speaker(host: str) -> bool:
         return False
 
 
-def read_file_from_speaker_ssh(host: str, remote_path: str, local_path: str) -> None:
+def read_file_from_speaker_ssh(host: str, remote_path: str, local_path: str) -> bool:
     """Read a file from the remote speaker, using ssh."""
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -168,8 +172,10 @@ def read_file_from_speaker_ssh(host: str, remote_path: str, local_path: str) -> 
 
         with SCPClient(ssh.get_transport()) as scp:
             scp.get(remote_path, local_path)
+        return True
     except Exception as e:
         logger.info(f"Error: {e}")
+        return False
 
 
 def read_file_from_speaker_http(host: str, path: str) -> str:
@@ -257,6 +263,13 @@ def add_device_by_ip(hostname: str, reachable: bool = True) -> bool:
             if reachable:
                 sources = read_sources(hostname)
             else:
+                fallback_sources = default_sources()
+                recents = _filter_items_for_sources(
+                    recents, "recent", "contentItem", fallback_sources
+                )
+                presets = _filter_items_for_sources(
+                    presets, "preset", "ContentItem", fallback_sources
+                )
                 sources = default_sources_string()
             logger.info(f"sources={sources}")
             # FIXME get the account email address for this
@@ -274,6 +287,42 @@ def add_device_by_ip(hostname: str, reachable: bool = True) -> bool:
     return False
 
 
+def _filter_items_for_sources(
+    items_xml: str,
+    item_tag: str,
+    content_item_tag: str,
+    sources: list[ConfiguredSource],
+) -> str:
+    """Remove imported items that cannot be represented by available sources."""
+    root = ET.fromstring(items_xml)
+    source_keys = {
+        (source.source_key_type, source.source_key_account) for source in sources
+    }
+    removed = 0
+    for item in list(root.findall(item_tag)):
+        content_item = item.find(content_item_tag)
+        if content_item is None:
+            continue
+        source_key = (
+            content_item.attrib.get("source", ""),
+            content_item.attrib.get("sourceAccount", ""),
+        )
+        if source_key not in source_keys:
+            root.remove(item)
+            removed += 1
+
+    if not removed:
+        return items_xml
+
+    logger.info(
+        "removed %d %s entries without an available configured source",
+        removed,
+        item_tag,
+    )
+    ET.indent(root, space="    ", level=0)
+    return ET.tostring(root, xml_declaration=True, encoding="UTF-8").decode()
+
+
 def add_account(
     account_id: str,
     recents: str,
@@ -285,7 +334,10 @@ def add_account(
         return False
     datastore.save_presets_xml(account_id, presets)
     datastore.save_recents_xml(account_id, recents)
-    datastore.save_configured_sources_xml(account_id, sources)
+    if sources.strip():
+        datastore.save_configured_sources_xml(account_id, sources)
+    else:
+        logger.info(f"skipping empty Sources.xml for account {account_id}")
 
     return True
 

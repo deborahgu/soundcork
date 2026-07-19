@@ -5,7 +5,7 @@ from typing import Any, cast
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from soundcork.miniapp import get_miniapp_router
+from soundcork.miniapp import get_device_image, get_miniapp_router
 from soundcork.model import Preset
 
 ACCOUNT_ID = "8208423"
@@ -99,3 +99,7 @@ def test_dashboard_decodes_display_cookies(monkeypatch):
 
     assert response.status_code == 200
     assert "Účet ložnice" in response.text
+
+
+def test_get_device_image_normalizes_product_code_whitespace():
+    assert get_device_image("SoundTouch 10 sm2 ") == "d9.png"
