@@ -35,6 +35,7 @@ class NowPlaying:
     volume_actual: int
     volume_target: int
     is_muted: bool
+    soundcork_managed: bool = False
 
     def is_volume_changing(self) -> bool:
         """Target and Actual values will only be different while volume is changing."""
@@ -211,18 +212,18 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
 
             for device_id in my_combined_devices.keys():
                 try:
+                    cd = my_combined_devices[device_id]
                     if stopped and device_id == selected_device_id:
                         np = NowPlaying("", "", "", 0, 0, False)
-                    else:
+                    elif cd.online or device_id == selected_device_id:
                         np = await _get_now_playing(device_id)
+                    else:
+                        np = NowPlaying("", "", "", 0, 0, False)
                     online = "offline"
-                    cd = my_combined_devices[device_id]
                     device_info = datastore.get_device_info(account_id, device_id)
                     if (
-                        cd.online
-                        and cd.in_soundcork
-                        and (cd.marge_server == "Soundcork")
-                    ):
+                        cd.online and cd.in_soundcork and cd.marge_server == "Soundcork"
+                    ) or (np.soundcork_managed and cd.in_soundcork):
                         online = "online"
                     devices.append(
                         {
@@ -290,19 +291,35 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
         """Get now_playing info for a device"""
         loop = asyncio.get_event_loop()
         try:
-            np = await asyncio.wait_for(
+            playback_state = await asyncio.wait_for(
                 loop.run_in_executor(
                     None,
-                    lambda: speakers.get_now_playing_status(device_id=device_id),
+                    lambda: speakers.get_playback_state(device_id=device_id),
                 ),
                 timeout=NOW_PLAYING_TIMEOUT,
             )
         except asyncio.TimeoutError:
             logger.warning(f"Timeout getting now playing status for {device_id}")
             return NowPlaying("[Unknown]", "", "", 0, 0, False)
+        except Exception as exc:
+            logger.warning(
+                "Error getting now playing status for %s: %s", device_id, exc
+            )
+            return NowPlaying("[Unknown]", "", "", 0, 0, False)
 
-        if np:
-            volume = speakers.get_volume(device_id)
+        if playback_state:
+            np = playback_state.now_playing
+            volume = playback_state.volume
+            if not np:
+                return NowPlaying(
+                    "",
+                    "",
+                    "",
+                    volume.Actual if volume else 0,
+                    volume.Target if volume else 0,
+                    volume.IsMuted if volume else False,
+                    playback_state.soundcork_managed,
+                )
             return NowPlaying(
                 f"{np.StationName or np.ContentItem.Name}",
                 np.ContainerArtUrl or "",
@@ -310,6 +327,7 @@ def get_miniapp_router(datastore: DataStore, speakers: Speakers):
                 volume.Actual if volume else 0,
                 volume.Target if volume else 0,
                 volume.IsMuted if volume else False,
+                playback_state.soundcork_managed,
             )
         else:
             return NowPlaying("", "", "", 0, 0, False)
