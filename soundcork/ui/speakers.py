@@ -1,3 +1,4 @@
+import errno
 import logging
 import xml.etree.ElementTree as ET
 
@@ -60,7 +61,15 @@ class Speakers:
 
     def __init__(self, datastore: DataStore, settings: Settings) -> None:
         self._st_discovery = SoundTouchDiscovery(areDevicesVerified=True)
-        self._st_discovery.DiscoverDevices(timeout=1)
+        try:
+            self._st_discovery.DiscoverDevices(timeout=1)
+        except OSError as exc:
+            if exc.errno != errno.ENODEV:
+                raise
+            logger.warning(
+                "Initial SoundTouch discovery was interrupted by a disappearing "
+                "network interface; continuing with configured devices"
+            )
         self._datastore = datastore
         self._settings = settings
 
