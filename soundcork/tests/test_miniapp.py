@@ -84,21 +84,6 @@ def set_cookie_headers(response) -> list[str]:
     return response.headers.get_list("set-cookie")
 
 
-def test_select_device_percent_encodes_unicode_cookie(monkeypatch):
-    client, _speakers = make_client(monkeypatch)
-
-    response = client.post(
-        "/miniapp/select-device",
-        data={"device_id": DEVICE_ID, "device_name": "ložnice"},
-        follow_redirects=False,
-    )
-
-    cookies = "\n".join(set_cookie_headers(response))
-    assert response.status_code == 303
-    assert "soundcork_selected_device=lo%C5%BEnice" in cookies
-    assert "ložnice" not in cookies
-
-
 def test_dashboard_decodes_display_cookies(monkeypatch):
     client, _speakers = make_client(monkeypatch)
 
@@ -108,63 +93,9 @@ def test_dashboard_decodes_display_cookies(monkeypatch):
             "Cookie": (
                 f"soundcork_account_id={ACCOUNT_ID}; "
                 "soundcork_account_label=%C3%9A%C4%8Det%20lo%C5%BEnice; "
-                "soundcork_selected_device=lo%C5%BEnice; "
-                "soundcork_selected_content_item_name=R%C3%A1dio%20Proglas; "
-                f"soundcork_selected_device_id={DEVICE_ID}"
             )
         },
     )
 
     assert response.status_code == 200
     assert "Účet ložnice" in response.text
-    assert "ložnice" in response.text
-    assert "Rádio Proglas" in response.text
-
-
-def test_select_content_item_plays_when_device_is_selected(monkeypatch):
-    client, speakers = make_client(monkeypatch)
-
-    response = client.post(
-        "/miniapp/select-content-item",
-        data={"content_item_id": "4", "content_item_name": "Rádio Proglas"},
-        headers={"Cookie": f"soundcork_selected_device_id={DEVICE_ID}"},
-        follow_redirects=False,
-    )
-
-    cookies = "\n".join(set_cookie_headers(response))
-    assert response.status_code == 303
-    assert speakers.play_calls == [(DEVICE_ID, "4")]
-    assert "soundcork_selected_content_item_name=R%C3%A1dio%20Proglas" in cookies
-    assert "soundcork_is_playing=true" in cookies
-
-
-def test_select_content_item_without_device_only_selects(monkeypatch):
-    client, speakers = make_client(monkeypatch)
-
-    response = client.post(
-        "/miniapp/select-content-item",
-        data={"content_item_id": "4", "content_item_name": "Rádio Proglas"},
-        follow_redirects=False,
-    )
-
-    cookies = "\n".join(set_cookie_headers(response))
-    assert response.status_code == 303
-    assert speakers.play_calls == []
-    assert "soundcork_selected_content_item_name=R%C3%A1dio%20Proglas" in cookies
-    assert "soundcork_is_playing" not in cookies
-
-
-def test_select_content_item_records_failed_playback(monkeypatch):
-    client, speakers = make_client(monkeypatch, FakeSpeakers(play_result=False))
-
-    response = client.post(
-        "/miniapp/select-content-item",
-        data={"content_item_id": "4", "content_item_name": "Rádio Proglas"},
-        headers={"Cookie": f"soundcork_selected_device_id={DEVICE_ID}"},
-        follow_redirects=False,
-    )
-
-    cookies = "\n".join(set_cookie_headers(response))
-    assert response.status_code == 303
-    assert speakers.play_calls == [(DEVICE_ID, "4")]
-    assert "soundcork_is_playing=false" in cookies

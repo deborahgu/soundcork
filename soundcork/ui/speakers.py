@@ -1,9 +1,12 @@
 import logging
+import xml.etree.ElementTree as ET
 
+from bosesoundtouchapi.models import NowPlayingStatus, Volume  # type: ignore
 from bosesoundtouchapi.soundtouchclient import (  # type: ignore
     ContentItem as BCContentItem,
     SoundTouchClient,
     SoundTouchDevice,
+    SoundTouchNodes,
 )
 from bosesoundtouchapi.soundtouchdiscovery import SoundTouchDiscovery  # type: ignore
 from pydantic import BaseModel
@@ -38,11 +41,12 @@ class CombinedDevice(BaseModel):
     ip: str
     name: str
     online: bool
-    account: str
+    account: str | None
     in_soundcork: bool
     marge_server: str
     reachable: bool
     st_device: SoundTouchDevice | None
+    language_code: str | None = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -166,6 +170,10 @@ class Speakers:
             logger.error(f"Device {device_id} not found or not online")
             return False
 
+        if not cd.account:
+            logger.error(f"Device {device_id} not associated with an account")
+            return False
+
         content_item = self._datastore.get_content_item(
             account=cd.account,
             device_id=cd.id,
@@ -206,3 +214,114 @@ class Speakers:
         except Exception as e:
             logger.error(f"Error stopping playback on device {device_id}: {e}")
             return False
+
+    def get_volume(self, device_id: str, refresh: bool = False) -> Volume | None:
+        """Get the volume of a specific speaker device
+
+        Args:
+            device_id: The device ID to play on
+
+            refresh (bool): True to query the device for realtime information
+               and refresh the cache; otherwise, False. Default False.
+
+        Returns:
+            Volume object if successful, None otherwise
+        """
+        cd = self.all_devices().get(device_id)
+        if not cd or not cd.st_device:
+            logger.error(f"Device {device_id} not found or not online")
+            return False
+
+        client = SoundTouchClient(cd.st_device)
+        volume = client.GetVolume(refresh=refresh)
+        logger.info(f"Volume: {volume.Actual, volume.Target, volume.IsMuted}")
+
+        return volume
+
+    async def set_name(self, device_id: str, name: str) -> bool:
+        """Sets the name of a device.
+
+        Args:
+            device_id: The device ID of the device
+            name: the new name
+
+        Returns:
+            True if successful, False otherwise
+        """
+        logger.info(f"setting name {device_id} to {name}")
+        combined_device = self.all_devices().get(device_id)
+        if combined_device:
+            logger.info(f"found device {combined_device.id}")
+            speaker = combined_device.st_device
+            st_client = SoundTouchClient(speaker)
+            logger.info("setting name")
+            root = ET.Element("name")
+            root.text = name
+            payload = ET.tostring(root, "utf-8").decode()
+            logger.info(f"sending set name payload {payload}")
+
+            st_client.Put(SoundTouchNodes.name, payload)
+            # st_client.SetName(name)
+            logger.info("set name was successful")
+            return True
+        return False
+
+    async def set_language(self, device_id: str, language: str) -> bool:
+        """Sets the language for a device.
+
+        Args:
+            device_id: The device ID of the device
+            language: the new language
+
+        Returns:
+            True if successful, False otherwise
+        """
+        combined_device = self.all_devices().get(device_id)
+        if combined_device:
+            speaker = combined_device.st_device
+            st_client = SoundTouchClient(speaker)
+            st_client.SetLanguage(language)
+            return True
+        return False
+
+    def set_account(self, device_id: str, account_id: str) -> bool:
+        """Sets the account for a device.
+
+        Args:
+            device_id: The device ID of the device
+            account_id: The ID of the account
+
+        Returns:
+            True if successful, False otherwise
+        """
+        combined_device = self.all_devices().get(device_id)
+
+        if combined_device:
+            root = ET.Element("PairDeviceWithAccount")
+            ET.SubElement(root, "accountId").text = account_id
+            ET.SubElement(root, "userAuthToken").text = "dontcare"
+            payload = ET.tostring(root, "utf-8").decode()
+            logger.info(f"sending set account payload {payload}")
+            speaker = combined_device.st_device
+            st_client = SoundTouchClient(speaker)
+
+            st_client.Put(SoundTouchNodes.setMargeAccount, payload)
+            return True
+        return False
+
+    def get_now_playing_status(self, device_id: str) -> NowPlayingStatus | None:
+        """Get the Now Playing information from the device.
+
+        Args:
+            device_id: The device being queried.
+
+        Returns:
+            A BoseSoundTouchApi NowPlayingStatus object.
+        """
+        cd = self.all_devices().get(device_id)
+        if not cd or not cd.st_device:
+            logger.error(f"Device {device_id} not found or not online")
+            return None
+
+        client = SoundTouchClient(cd.st_device)
+        return client.GetNowPlayingStatus()
