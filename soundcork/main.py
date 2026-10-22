@@ -496,7 +496,7 @@ async def post_account_recent(
     "/marge/streaming/account/{account}/device/",
     response_class=BoseXMLResponse,
     tags=["marge"],
-    status_code=HTTPStatus.OK,
+    status_code=HTTPStatus.CREATED,
     dependencies=[
         Depends(
             Etag(
@@ -524,7 +524,7 @@ async def post_account_device(
     "/marge/streaming/account/{account}/device/{device_id}",
     response_class=BoseXMLResponse,
     tags=["marge"],
-    status_code=HTTPStatus.CREATED,
+    status_code=HTTPStatus.OK,
     dependencies=[
         Depends(
             Etag(
