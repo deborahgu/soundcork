@@ -17,7 +17,9 @@ from typing import Annotated, Optional
 import httpx
 from fastapi import APIRouter, Path, Query, Request, Response
 
-from soundcork.constants import ACCOUNT_RE, DEVICE_RE, GROUP_RE
+from soundcork.constants import (
+    ACCOUNT_RE, DEVICE_RE, GROUP_RE, SC_RESP_MIMETYPE
+)
 from soundcork.datastore import DataStore
 from soundcork.marge import add_group, modify_group
 
@@ -32,7 +34,7 @@ BOSE_REMOVEGROUP = "/removeGroup"  # GET
 def _xml_status(ok: bool, http_ok: int = 200, http_err: int = 500) -> Response:
     return Response(
         content=f"<status>{'GROUP_OK' if ok else 'GROUP_ERROR'}</status>",
-        media_type="application/xml",
+        media_type=SC_RESP_MIMETYPE,
         status_code=http_ok if ok else http_err,
     )
 
@@ -57,7 +59,7 @@ async def _box_call(
     url = f"http://{ip}:{BOSE_PORT}{path}"
     headers = {"Accept": "*/*"}
     if xml_payload is not None:
-        headers["Content-Type"] = "application/xml"
+        headers["Content-Type"] = SC_RESP_MIMETYPE
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         m = method.upper()
@@ -186,7 +188,7 @@ def get_groups_service_router(datastore: DataStore):
         except Exception as e:
             return Response(
                 f"<error>{e}</error>",
-                media_type="application/xml",
+                media_type=SC_RESP_MIMETYPE,
                 status_code=HTTPStatus.BAD_REQUEST,
             )
 
@@ -245,7 +247,7 @@ def get_groups_service_router(datastore: DataStore):
             parts.append("  </group>")
         parts.append("</groups>")
         xml = "\n".join(parts) + "\n"
-        return Response(xml, media_type="application/xml", status_code=200)
+        return Response(xml, media_type=SC_RESP_MIMETYPE, status_code=200)
 
     @service.get("/service/account/{account}/creategroup", tags=["service"])
     async def service_creategroup(
@@ -264,7 +266,7 @@ def get_groups_service_router(datastore: DataStore):
         if not master_id or not slave_id:
             return Response(
                 "<error>Use ?master=...&slave=...</error>",
-                media_type="application/xml",
+                media_type=SC_RESP_MIMETYPE,
                 status_code=HTTPStatus.BAD_REQUEST,
             )
 
@@ -275,7 +277,7 @@ def get_groups_service_router(datastore: DataStore):
         except Exception as e:
             return Response(
                 f"<error>{e}</error>",
-                media_type="application/xml",
+                media_type=SC_RESP_MIMETYPE,
                 status_code=HTTPStatus.BAD_REQUEST,
             )
         # -- build XML payload
@@ -295,7 +297,7 @@ def get_groups_service_router(datastore: DataStore):
         )  # reuse
         # xml_with_id = _extract_resp_text(resp).strip()
         if "<error" in xml_with_id and "<group" not in xml_with_id:
-            return Response(xml_with_id, media_type="application/xml", status_code=409)
+            return Response(xml_with_id, media_type=SC_RESP_MIMETYPE, status_code=409)
 
         # -- submit to both boxes
         results = await asyncio.gather(
@@ -334,7 +336,7 @@ def get_groups_service_router(datastore: DataStore):
         if not newname:
             return Response(
                 "<error>Missing newname</error>",
-                media_type="application/xml",
+                media_type=SC_RESP_MIMETYPE,
                 status_code=HTTPStatus.BAD_REQUEST,
             )
         # -- exactly one must be set
@@ -343,7 +345,7 @@ def get_groups_service_router(datastore: DataStore):
         ):
             return Response(
                 "<error>Use exactly one of groupid=... or name=...</error>",
-                media_type="application/xml",
+                media_type=SC_RESP_MIMETYPE,
                 status_code=HTTPStatus.BAD_REQUEST,
             )
 
@@ -353,7 +355,7 @@ def get_groups_service_router(datastore: DataStore):
             if not groupid:
                 return Response(
                     "<error>Group name not found</error>",
-                    media_type="application/xml",
+                    media_type=SC_RESP_MIMETYPE,
                     status_code=404,
                 )
         try:
@@ -363,19 +365,19 @@ def get_groups_service_router(datastore: DataStore):
             if not master_dev:
                 return Response(
                     "<error>Stored group has no masterDeviceId</error>",
-                    media_type="application/xml",
+                    media_type=SC_RESP_MIMETYPE,
                     status_code=500,
                 )
             if len(ips) != 2:
                 return Response(
                     "<error>Stored group must contain exactly two ipAddress entries</error>",
-                    media_type="application/xml",
+                    media_type=SC_RESP_MIMETYPE,
                     status_code=500,
                 )
         except Exception as e:
             return Response(
                 f"<error>{e}</error>",
-                media_type="application/xml",
+                media_type=SC_RESP_MIMETYPE,
                 status_code=HTTPStatus.BAD_REQUEST,
             )
 
@@ -395,7 +397,7 @@ def get_groups_service_router(datastore: DataStore):
         )  # reuse
         # updated_xml = _extract_resp_text(resp).strip()
         if "<error" in updated_xml and "<group" not in updated_xml:
-            return Response(updated_xml, media_type="application/xml", status_code=409)
+            return Response(updated_xml, media_type=SC_RESP_MIMETYPE, status_code=409)
 
         # -- update both boxes
         results = await asyncio.gather(
@@ -435,7 +437,7 @@ def get_groups_service_router(datastore: DataStore):
         ):
             return Response(
                 "<error>Use exactly one of groupid=... or name=...</error>",
-                media_type="application/xml",
+                media_type=SC_RESP_MIMETYPE,
                 status_code=HTTPStatus.BAD_REQUEST,
             )
         # -- resolve groupid from name if needed
@@ -444,7 +446,7 @@ def get_groups_service_router(datastore: DataStore):
             if not groupid:
                 return Response(
                     "<error>Group name not found</error>",
-                    media_type="application/xml",
+                    media_type=SC_RESP_MIMETYPE,
                     status_code=404,
                 )
 
@@ -455,13 +457,13 @@ def get_groups_service_router(datastore: DataStore):
             if not master_ip:
                 return Response(
                     "<error>Cannot determine master ip</error>",
-                    media_type="application/xml",
+                    media_type=SC_RESP_MIMETYPE,
                     status_code=500,
                 )
         except Exception as e:
             return Response(
                 f"<error>{e}</error>",
-                media_type="application/xml",
+                media_type=SC_RESP_MIMETYPE,
                 status_code=HTTPStatus.BAD_REQUEST,
             )
 
@@ -471,14 +473,14 @@ def get_groups_service_router(datastore: DataStore):
         except Exception as e:
             return Response(
                 f"<error>removeGroup request failed: {e}</error>",
-                media_type="application/xml",
+                media_type=SC_RESP_MIMETYPE,
                 status_code=500,
             )
 
         if status != 200 or not _is_group_empty_xml(text):
             return Response(
                 f"<error>removeGroup failed on {master_ip}: HTTP {status} {text}</error>",
-                media_type="application/xml",
+                media_type=SC_RESP_MIMETYPE,
                 status_code=500,
             )
         # only if successful delete also in datastore
@@ -487,7 +489,7 @@ def get_groups_service_router(datastore: DataStore):
         except Exception as e:
             return Response(
                 f"<error>Removed on box, but datastore delete failed: {e}</error>",
-                media_type="application/xml",
+                media_type=SC_RESP_MIMETYPE,
                 status_code=500,
             )
         return _xml_status(True)

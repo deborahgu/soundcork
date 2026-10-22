@@ -28,7 +28,9 @@ from soundcork.bmx import (
     tunein_search_v1,
 )
 from soundcork.config import Settings
-from soundcork.constants import ACCOUNT_RE, DEVICE_RE
+from soundcork.constants import (
+    ACCOUNT_RE, DEVICE_RE, SC_MIMETYPE, SC_RESP_MIMETYPE
+)
 from soundcork.datastore import DataStore
 from soundcork.devices import (
     add_device,
@@ -108,8 +110,8 @@ tags_metadata = [
 app = FastAPI(
     title="SoundCork",
     description=description,
-    summary="Emulates SoundTouch servers.",
-    version="0.0.1",
+    summary="SoundTouch servers emulation",
+    version="1.0.1",
     openapi_tags=tags_metadata,
 )
 
@@ -153,14 +155,14 @@ def read_root():
 
 
 @app.get("/healthcheck")
-def read_root():
+def healthcheck():
     """ Service healthcheck endpoint
         
         Returns 200 and JSON on good poll, opportunity for stats
         reporting.
     """
     return JSONResponse(
-            status_code=200,
+            status_code=HTTPStatus.OK,
             content={"healthcheck": "OK"}
     )
 
@@ -257,9 +259,8 @@ def streamingsourceproviders():
             "</sourceprovider>"
         )
     return_xml = return_xml + "</sourceProviders>"
-    response = Response(content=return_xml, media_type="application/xml")
-    # TODO: move content type to constants
-    response.headers["content-type"] = "application/vnd.bose.streaming-v1.2+xml"
+    response = Response(content=return_xml, media_type=SC_RESP_MIMETYPE)
+    response.headers["content-type"] = SC_MIMETYPE
     # sourceproviders seems to return now as its etag
     etag = int(datetime.now().timestamp() * 1000)
     response.headers["etag"] = str(etag)
@@ -267,19 +268,19 @@ def streamingsourceproviders():
 
 
 def etag_for_presets(request: Request) -> str:
-    return str(datastore.etag_for_presets(str(request.path_params.get("account"))))
+    return datastore.etag_for_presets_request(request)
 
 
 def etag_for_recents(request: Request) -> str:
-    return str(datastore.etag_for_recents(str(request.path_params.get("account"))))
+    return datastore.etag_for_recents_request(request)
 
 
 def etag_for_account(request: Request) -> str:
-    return str(datastore.etag_for_account(str(request.path_params.get("account"))))
+    return datastore.etag_for_account_request(request)
 
 
 def etag_for_sources(request: Request) -> str:
-    return str(datastore.etag_for_sources(str(request.path_params.get("account"))))
+    return datastore.get_etag_for_sources_request(request)
 
 
 def etag_for_swupdate(request: Request) -> str:
@@ -495,7 +496,7 @@ async def post_account_recent(
     "/marge/streaming/account/{account}/device/",
     response_class=BoseXMLResponse,
     tags=["marge"],
-    status_code=HTTPStatus.CREATED,
+    status_code=HTTPStatus.OK,
     dependencies=[
         Depends(
             Etag(
@@ -523,7 +524,7 @@ async def post_account_device(
     "/marge/streaming/account/{account}/device/{device_id}",
     response_class=BoseXMLResponse,
     tags=["marge"],
-    status_code=HTTPStatus.OK,
+    status_code=HTTPStatus.CREATED,
     dependencies=[
         Depends(
             Etag(
@@ -597,7 +598,7 @@ async def post_account_login(
         <message>Account Login failure.</message>
         <status-code>4024</status-code>
         </status>"""
-        response = Response(content=exception_xml, media_type="application/xml")
+        response = Response(content=exception_xml, media_type=SC_RESP_MIMETYPE)
         response.status_code = HTTPStatus.BAD_REQUEST
         return response
 
@@ -608,9 +609,8 @@ async def post_account_login(
     ET.SubElement(account_elem, "preferredLanguage").text = "en"
 
     return_xml = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>{ET.tostring(account_elem, encoding="unicode")}'
-    response = Response(content=return_xml, media_type="application/xml")
-    # TODO: move content type to constants
-    response.headers["content-type"] = "application/vnd.bose.streaming-v1.2+xml"
+    response = Response(content=return_xml, media_type=SC_RESP_MIMETYPE)
+    response.headers["content-type"] = SC_MIMETYPE
 
     etag = startup_timestamp
 
@@ -832,7 +832,7 @@ def bmx_siriusxm() -> Service:
 def sw_update() -> Response:
     with open("swupdate.xml", "r") as file:
         sw_update_response = file.read()
-        response = Response(content=sw_update_response, media_type="application/xml")
+        response = Response(content=sw_update_response, media_type=SC_RESP_MIMETYPE)
         return response
 
 

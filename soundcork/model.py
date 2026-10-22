@@ -3,9 +3,10 @@ from typing import List, Optional
 from fastapi import Response
 from pydantic import AliasChoices, BaseModel, Field
 
+from soundcork.constants import SC_MIMETYPE
 
 class BoseXMLResponse(Response):
-    media_type = "application/vnd.bose.streaming-v1.2+xml"
+    media_type = SC_MIMETYPE
 
 
 class Link(BaseModel):
