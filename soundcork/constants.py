@@ -132,3 +132,6 @@ DEVICE_IMAGE_MAP = {
     "lifestyle 600/650": "d14.png",
 }
 DEFAULT_DEVICE_IMAGE = "soundtouch-30.png"
+
+SC_MIMETYPE = "application/vnd.bose.streaming-v1.2+xml"
+SC_RESP_MIMETYPE = "application/xml"

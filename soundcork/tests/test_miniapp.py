@@ -99,3 +99,19 @@ def test_dashboard_decodes_display_cookies(monkeypatch):
 
     assert response.status_code == 200
     assert "Účet ložnice" in response.text
+
+
+def test_healthcheck(monkeypatch):
+    client, _speakers = make_client(monkeypatch)
+
+    response = client.get(
+        "/healthcheck",
+        headers={
+            "Cookie": (
+                f"soundcork_account_id={ACCOUNT_ID}; "
+                "soundcork_account_label=%C3%9A%C4%8Det%20lo%C5%BEnice; "
+            )
+        },
+    )
+    assert response.status_code == 200
+    assert '{"healthcheck":"OK"}' in response.text
