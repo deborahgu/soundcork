@@ -646,16 +646,16 @@ class DataStore:
     # ETags Request Helpers #
     #########################
 
-    def get_etag_for_presets_request(self req: object) -> str:
+    def get_etag_for_presets_request(self, req: object) -> str:
         return str(self.etag_for_presets(str(req.path_params.get("account"))))
 
-    def get_etag_for_sources_request(self req: object) -> str:
+    def get_etag_for_sources_request(self, req: object) -> str:
         return str(self.etag_for_sources(str(req.path_params.get("account"))))
 
-    def get_etag_for_recents_request(self req: object) -> str:
+    def get_etag_for_recents_request(self, req: object) -> str:
         return str(self.etag_for_recets(str(req.path_params.get("account"))))
 
-    def get_etag_for_accounts_request(self req: object) -> str:
+    def get_etag_for_accounts_request(self, req: object) -> str:
         return str(self.etag_for_accounts(str(req.path_params.get("account"))))
 
     ##################
