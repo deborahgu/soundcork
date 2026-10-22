@@ -222,4 +222,21 @@ curl http://your-server:8000/
 # Expected: {"Bose":"Can't Brick Us"}
 ```
 
+### Service Healthcheck ###
+An additional API endpoint is provided `/healthcheck`.  Upon a successful poll of the server, your health check should receive the following from the server:
+
+```
+> GET /healthcheck HTTP/1.1
+> Host: your-server:8000
+> Accept: */*
+> 
+* Request completely sent off
+< HTTP/1.1 200 OK
+< server: uvicorn
+< content-length: 20
+< content-type: application/json
+< 
+{"healthcheck":"OK"}
+```
+
 After redirecting your speaker (see [Speaker Setup](speaker-setup.md)), you should see incoming requests in the server logs.
