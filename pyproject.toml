@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "soundcork"
-version = "1.0"
+version = "1.0.1"
 
 description = "A replacement server for Bose SoundTouch devices."
 readme = "README.md"
