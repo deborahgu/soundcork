@@ -1,15 +1,15 @@
-black==26.5.1  # dev only
+black==26.5.1 # dev only
 bosesoundtouchapi==1.0.87
 fastapi[standard]==0.136.1
 fastapi-etag==0.4.0
-httpx==0.28.1
+httpx2==2.16.0
 gunicorn==26.0.0
-isort==8.0.1  # dev only
-mypy==2.1.0  # dev only
-paramiko==4.0.0
-pydantic-settings==2.14.1
-pytest==9.0.3  # dev only
-pytest-cov==7.1.0  # dev only
+isort==8.0.1 # dev only
+mypy==2.1.0 # dev only
+paramiko==5.1.0
+pydantic-settings==2.14.2
+pytest==9.0.3 # dev only
+pytest-cov==7.1.0 # dev only
 scp==0.15.0
 telnetlib3==4.0.2
 types-paramiko==4.0.0.20260518
