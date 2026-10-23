@@ -3,7 +3,7 @@ bosesoundtouchapi==1.0.87
 fastapi[standard]==0.137.2
 fastapi-etag==0.4.0
 httpx2==2.16.0
-gunicorn==26.0.0
+gunicorn==26.2.0
 isort==8.0.1  # dev only
 mypy==2.1.0  # dev only
 paramiko==5.1.0
