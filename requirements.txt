@@ -1,6 +1,6 @@
 black==26.5.1 # dev only
 bosesoundtouchapi==1.0.87
-fastapi[standard]==0.137.2
+fastapi[standard]==0.152.0
 fastapi-etag==0.4.0
 httpx2==2.16.0
 gunicorn==26.0.0
